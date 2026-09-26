@@ -228,3 +228,13 @@ def test_replacing_a_private_file_never_exposes_the_document(
     assert modes == [0o600]
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
     assert out.read_bytes() != b"old\n"
+
+
+@pytest.mark.parametrize("export", [export_to_json, export_to_yaml],
+                         ids=["json", "yaml"])
+def test_a_directory_destination_raises_oserror_and_leaves_no_file(
+        tmp_path, monkeypatch, sample_data, export):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(OSError):
+        export(sample_data, ".")
+    assert list(tmp_path.iterdir()) == []

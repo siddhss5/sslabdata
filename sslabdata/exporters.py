@@ -37,7 +37,7 @@ def _write(output_path: str, text: str) -> None:
         mode = stat.S_IMODE(output_file.stat().st_mode)
     except FileNotFoundError:
         mode = None
-    temp = output_file.with_name(f".{uuid.uuid4().hex}.tmp")
+    temp = output_file.parent / f".{uuid.uuid4().hex}.tmp"
     try:
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
                      0o666 if mode is None else mode)
