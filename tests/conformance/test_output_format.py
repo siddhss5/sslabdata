@@ -52,7 +52,8 @@ def schema_errors(validator, data):
 
 
 def check_references(data):
-    """Every ID the output refers to exists in the output."""
+    """Every ID the output refers to exists in the output, and the back-links
+    on people and projects say what the works say."""
     people = {p["id"] for p in data["people"]}
     works = {w["bib_id"] for w in data["works"]}
     keys = {c["key"] for c in data["collaborators"]}
@@ -67,11 +68,22 @@ def check_references(data):
                 (work["bib_id"], author)
         for editor in work["editors"]:
             assert editor["person_id"] in people | {None}, (work["bib_id"], editor)
+    # Back-links are exactly what the works say, so a member or project that
+    # authored or has works never ends up with an empty or partial list
+    # (editing is not an authorship, so editors contribute nothing).
     for person in data["people"]:
         assert set(person["work_ids"]) <= works, person["id"]
+        authored = [w["bib_id"] for w in data["works"]
+                    if any(a["person_id"] == person["id"] for a in w["authors"])]
+        assert sorted(person["work_ids"]) == sorted(authored), person["id"]
     for project in data["projects"]:
         assert set(project["work_ids"]) <= works, project["id"]
         assert set(project["people_ids"]) <= people, project["id"]
+        having = [w for w in data["works"] if project["id"] in w["project_ids"]]
+        assert sorted(project["work_ids"]) == sorted(w["bib_id"] for w in having), \
+            project["id"]
+        assert sorted(project["people_ids"]) == sorted(
+            {a["person_id"] for w in having for a in w["authors"]} - {None}), project["id"]
     positions = {(w["bib_id"], a["position"]) for w in data["works"]
                  for a in w["authors"]}
     for collaborator in data["collaborators"]:

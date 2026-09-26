@@ -10,12 +10,17 @@
 #                reached. assembly: it loads and assembly finds a fatal code.
 #                Absent: nothing is fatal, and a document is written.
 #   diagnostics  the records `--validate --format json` reports, every one of
-#                them: code, severity, and where (file, key, field; omitted
-#                when null). CONFIG-LAB-NAME-MISSING is left out: these
-#                fixtures declare no lab name, and test_config_cli.py owns it.
-#                `values` are tokens the message must carry: the value that is
-#                wrong, never the wording around it.
-#   kept         bib keys that must be in the exported document.
+#                them, each exactly once: code, severity, and where (file, key,
+#                field; omitted when null). `--unresolved` and the standard
+#                error of `--output` report the same records, as warnings
+#                unless the case is fatal. CONFIG-LAB-NAME-MISSING is left out:
+#                these fixtures declare no lab name, and test_config_cli.py owns
+#                it. `values` are tokens the message must carry: the value that
+#                is wrong, never the wording around it.
+#   unresolved_only
+#                records `--unresolved` adds to those: the names it lists.
+#   kept         every bib key in the exported document, exactly and each as often as
+#                it is exported; a fatal case writes no document.
 #   emits        what the exported document holds for a work, person or project
 #                (by bib key or id): a value, or contains/excludes for text.
 #   not_emitted  tokens the exported document must not contain.
@@ -33,19 +38,21 @@ structure.unclosed_brace:
     - {code: BIB-SYNTAX-ERROR, severity: warning, file: ./broken.bib, key: brace-broken, field: title}
     - {code: BIB-VENUE-MISSING, severity: warning, file: ./broken.bib, key: brace-broken, field: journal}
     - {code: BIB-YEAR-MISSING, severity: warning, file: ./broken.bib, key: brace-broken, field: year}
-  kept: [brace-before, brace-after]
+  kept: [brace-before, brace-broken, brace-after]
 
 structure.duplicate_key_file:
   dir: duplicate_key_same_file
   exit: 1
   diagnostics:
     - {code: BIB-DUPLICATE-KEY, severity: error, file: ./dup.bib, key: dup-key, field: citation_key}
+  kept: [dup-key]
 
 structure.duplicate_key_across:
   dir: duplicate_key_across_files
   exit: 1
   diagnostics:
     - {code: BIB-DUPLICATE-KEY, severity: error, file: ./second.bib, key: shared-key, field: citation_key, values: [./first.bib]}
+  kept: [shared-key, shared-key]
 
 structure.missing_year:
   dir: missing_year
@@ -169,12 +176,14 @@ people.duplicate_id:
   exit: 1
   diagnostics:
     - {code: PEOPLE-ID-DUPLICATE, severity: error, file: people.yaml, key: aadams, field: id}
+  kept: [ok-entry]
 
 projects.duplicate_id:
   dir: duplicate_project_id
   exit: 1
   diagnostics:
     - {code: PROJECTS-ID-DUPLICATE, severity: error, file: projects.yaml, key: homebot, field: id}
+  kept: [ok-entry]
 
 # A role is any non-empty string, so what is wrong is the absence of one:
 # missing (bbrown), empty (ccote) or not a string (ddavis).
@@ -185,18 +194,21 @@ people.invalid_role:
     - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: role}
     - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: ccote, field: role}
     - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: ddavis, field: role}
+  kept: [ok-entry]
 
 people.invalid_status:
   dir: invalid_person_status
   exit: 0
   diagnostics:
     - {code: PEOPLE-STATUS-INVALID, severity: warning, file: people.yaml, key: bbrown, field: status, values: [retired]}
+  kept: [ok-entry]
 
 projects.invalid_status:
   dir: invalid_project_status
   exit: 0
   diagnostics:
     - {code: PROJECTS-STATUS-INVALID, severity: warning, file: projects.yaml, key: sharedarm, field: status, values: [sometimes]}
+  kept: [ok-entry]
 
 # One key in each file: a warning at the file, the record and the key, and no
 # key reaches the document.
@@ -208,6 +220,7 @@ records.unknown_key:
     - {code: RECORD-KEY-UNKNOWN, severity: warning, file: projects.yaml, key: homebot, field: funding}
     - {code: RECORD-KEY-UNKNOWN, severity: warning, file: collaborators.yaml, key: Priya Patel, field: affiliation}
   not_emitted: [webiste, funding, affiliation]
+  kept: [ok-entry]
 
 # Each wrong-typed optional field is one located warning and a null in the
 # document; a status that is not a string reads as the default, and aliases
@@ -236,6 +249,7 @@ records.optional_type_invalid:
       expect: {email: null, end_year: null}
     - project: homebot
       expect: {status: active, description: null, website: null, image: null}
+  kept: [ok-entry]
 
 # An `id`, `name` or `title` is never coerced: a number, a list or a boolean
 # makes the record unusable, one located error per file.
@@ -302,6 +316,8 @@ identity.ambiguous_alias:
   emits:
     - work: brown-initial
       expect: {authors.0.person_id: null, authors.0.resolution.status: ambiguous}
+  unresolved_only:
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./brown.bib, key: brown-initial, field: author, values: [B. Brown]}
 
 # --- Config -------------------------------------------------------------------
 

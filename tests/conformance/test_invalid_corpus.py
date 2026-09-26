@@ -22,6 +22,7 @@ import json
 import os
 import re
 import shutil
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -53,6 +54,22 @@ LINE = re.compile(r"^(Warning: |Error: |Error loading configuration: )?"
                   r"([A-Z]+(?:-[A-Z]+)+) ")
 
 
+def printed(line):
+    """`<severity> <code> <location>` of one line of standard error, whose
+    location runs to the first `: `; `uncoded` for a line that carries no code."""
+    found = LINE.match(line)
+    if not found:
+        return "uncoded"
+    severity = "warning" if found.group(1) == "Warning: " else "error"
+    return f"{severity} {found.group(2)} {line[found.end():].split(': ', 1)[0]}"
+
+
+def stream(want):
+    """The `printed()` form of an expected diagnostic."""
+    return (f"{want['severity']} {want['code']} "
+            f"{want.get('file') or ''}:{want.get('key') or ''}:{want.get('field') or ''}")
+
+
 def place(record):
     """The (code, severity, file, key, field) of a record or an expected entry."""
     return tuple(record.get(name) for name in
@@ -66,7 +83,8 @@ class Observed:
     """What one fixture did. `entry` is the deterministic part, and the whole of
     the case's share of the results artifact."""
     entry: dict
-    records: list
+    records: dict     # the JSON records of `--validate` and `--unresolved`
+    stderr: list      # the lines `--output` printed
     data: Optional[dict]
     problems: list = field(default_factory=list)
 
@@ -79,7 +97,7 @@ def observe(spec, work_dir):
         if run.crash is not None:
             problems.append(f"{mode} crashed: {run.crash}")
 
-    records = []
+    records = {}
     for mode in ("--validate", "--unresolved"):
         run = run_sslabdata(["--config", "lab.yaml", mode, "--format", "json"], folder)
         note(mode, run)
@@ -92,20 +110,19 @@ def observe(spec, work_dir):
             "exit": run.code,
             "diagnostics": [dict(zip(("code", "severity", "file", "key", "field"),
                                      place(r))) for r in found]}
-        if mode == "--validate":
-            records = found
+        records[mode.lstrip("-")] = found
 
     out = work_dir / f"{spec['dir']}.json"
     run = run_sslabdata(["--config", "lab.yaml", "--format", "json", "--output", out],
                         folder)
     note("--output", run)
     data = json.loads(out.read_text(encoding="utf-8")) if out.exists() else None
+    stderr = run.stderr.splitlines()
     entry["output"] = {
         "exit": run.code,
         "written": data is not None,
         "works": [w["bib_id"] for w in data["works"]] if data else [],
-        "stderr": sorted({f"{'warning' if m.group(1) == 'Warning: ' else 'error'} {m.group(2)}"
-                          for line in run.stderr.splitlines() if (m := LINE.match(line))})}
+        "stderr": sorted(printed(line) for line in stderr)}
 
     with working_dir(folder), contextlib.redirect_stderr(io.StringIO()):
         try:
@@ -113,7 +130,9 @@ def observe(spec, work_dir):
                                          diagnostics=False)).__name__
         except (ConfigurationError, AssemblyError) as e:
             entry["api"] = type(e).__name__
-    return Observed(entry, records, data, problems)
+        except Exception as e:  # noqa: BLE001 - a defect is this case's outcome, not the harness's
+            entry["api"] = f"crashed: {type(e).__name__}"
+    return Observed(entry, records, stderr, data, problems)
 
 
 def render(observed):
@@ -133,38 +152,62 @@ def observed(tmp_path_factory):
 
 # --- One test per fixture ----------------------------------------------------------
 
+def exactly(mode, got, want):
+    """`got` and `want` hold the same items, each the same number of times: an
+    extra, a repeated or a missing diagnostic or work fails."""
+    got, want = Counter(got), Counter(want)
+    assert got == want, (f"{mode}: unexpected {sorted((got - want).elements(), key=str)}, "
+                         f"missing {sorted((want - got).elements(), key=str)}")
+
+
+def carries(mode, wants, found):
+    """Every expected `values` token is in a message reported at that place.
+    `found` is [(place, message)]."""
+    for want in wants:
+        messages = [m for where, m in found if where == place(want)]
+        assert any(all(v in m for v in want.get("values", ())) for m in messages), (
+            f"{mode}: no {want['code']} message carries {want.get('values')}: {messages}")
+
+
 @pytest.mark.parametrize("case_id", DIAGNOSTICS)
 def test_outcome(observed, case_id):
+    """Everything a user can observe of one fixture, exactly, in every mode:
+    the exit status, the diagnostics (code, severity, location, values) and the
+    works the document keeps. An extra or repeated diagnostic or work fails."""
     spec, seen = DIAGNOSTICS[case_id], observed[case_id]
     entry, fatal = seen.entry, spec.get("fatal")
     assert not seen.problems, seen.problems
-
-    # `--validate`: the exit status and every diagnostic, exactly.
-    assert entry["validate"]["exit"] == spec["exit"], entry["validate"]
-    reported = [r for r in seen.records if r["code"] not in INCIDENTAL]
     expected = spec["diagnostics"]
-    assert sorted(map(place, reported), key=str) == sorted(map(place, expected), key=str)
-    for want in expected:
-        messages = [r["message"] for r in reported if place(r) == place(want)]
-        assert any(all(v in m for v in want.get("values", ())) for m in messages), (
-            f"no {want['code']} message carries {want['values']}: {messages}")
+    # Outside `--validate` only a fatal diagnostic is still an error.
+    elsewhere = [{**w, "severity": w["severity"] if fatal else "warning"} for w in expected]
 
-    # `--unresolved`: only a fatal diagnostic is still an error.
+    # `--validate`.
+    assert entry["validate"]["exit"] == spec["exit"], entry["validate"]
+    reported = [r for r in seen.records["validate"] if r["code"] not in INCIDENTAL]
+    exactly("--validate", map(place, reported), map(place, expected))
+    carries("--validate", expected, [(place(r), r["message"]) for r in reported])
+
+    # `--unresolved`: the same diagnostics, and the names it alone lists.
     unresolved = entry["unresolved"]
     assert unresolved["exit"] == (1 if fatal else 0), unresolved
-    seen_places = {place(d) for d in unresolved["diagnostics"]}
-    for want in expected:
-        severity = want["severity"] if fatal else "warning"
-        assert place({**want, "severity": severity}) in seen_places, (
-            f"{want['code']} is not reported as a {severity}: {unresolved}")
+    listed = [r for r in seen.records["unresolved"] if r["code"] not in INCIDENTAL]
+    wanted = elsewhere + spec.get("unresolved_only", [])
+    exactly("--unresolved", map(place, listed), map(place, wanted))
+    carries("--unresolved", wanted, [(place(r), r["message"]) for r in listed])
 
     # `--output`: a fatal diagnostic writes nothing; anything else writes a
-    # document that keeps its works and names each diagnostic on standard error.
+    # document with exactly the works `kept` lists, and each diagnostic once
+    # on standard error.
     output = entry["output"]
     assert (output["exit"], output["written"]) == ((1, False) if fatal else (0, True)), output
-    assert not set(spec.get("kept", ())) - set(output["works"]), output
-    stream = {f"{'error' if fatal else 'warning'} {d['code']}" for d in expected}
-    assert stream <= set(output["stderr"]), output
+    exactly("--output works", output["works"], spec.get("kept", ()))
+    printed_lines = [line for line in output["stderr"]
+                     if line.split(" ")[1] not in INCIDENTAL]
+    exactly("--output stderr", printed_lines, map(stream, elsewhere))
+    for want in elsewhere:
+        lines = [l for l in seen.stderr if printed(l) == stream(want)]
+        assert any(all(v in l for v in want.get("values", ())) for l in lines), (
+            f"--output: no {want['code']} line carries {want.get('values')}: {lines}")
     for subject in spec.get("emits", ()):
         (kind,) = subject.keys() & SUBJECT
         section, key = SUBJECT[kind]
@@ -206,7 +249,8 @@ def test_the_results_artifact_holds_no_host_data(observed, tmp_path):
 
 def test_spec_is_well_formed():
     """A typo in the expected outcomes must fail here rather than be ignored."""
-    keys = {"dir", "exit", "fatal", "diagnostics", "kept", "emits", "not_emitted"}
+    keys = {"dir", "exit", "fatal", "diagnostics", "unresolved_only", "kept", "emits",
+            "not_emitted"}
     places = {"code", "severity", "file", "key", "field", "values"}
     dirs = [spec["dir"] for spec in DIAGNOSTICS.values()]
     assert len(dirs) == len(set(dirs)), "a fixture has more than one entry"
@@ -216,7 +260,7 @@ def test_spec_is_well_formed():
         assert set(spec) <= keys and {"dir", "exit", "diagnostics"} <= set(spec), case_id
         assert spec["exit"] in (0, 1) and spec.get("fatal") in (None, "load", "assembly"), case_id
         assert spec["exit"] == 1 or not spec.get("fatal"), case_id
-        for d in spec["diagnostics"]:
+        for d in [*spec["diagnostics"], *spec.get("unresolved_only", ())]:
             assert {"code", "severity"} <= set(d) and set(d) <= places, (case_id, d)
             assert d["severity"] in ("error", "warning"), (case_id, d)
             assert all(isinstance(d.get(n), (str, type(None))) for n in places - {"values"}), (case_id, d)

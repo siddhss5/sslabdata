@@ -32,10 +32,11 @@ so a case turns red once the issue is fixed and the marker is stale.
 
 Each fixture in `tests/corpus/invalid/` has one entry in
 `tests/corpus/expected/diagnostics.yaml` (its header defines the fields): the
-exit status, every diagnostic with its code, severity and location, and what
-the document keeps. `test_invalid_corpus.py::test_outcome` runs the fixture
-once per mode (`--validate`, `--unresolved`, `--output`) and once through the
-Python API and compares all of it with that entry.
+exit status, every diagnostic with its code, severity and location, and every
+work the document keeps. `test_invalid_corpus.py::test_outcome` runs the
+fixture once per mode (`--validate`, `--unresolved`, `--output`) and once
+through the Python API and compares all of it with that entry exactly in each
+mode: an extra, repeated or missing diagnostic or work fails.
 
 Those runs are also written out as the conformance-results artifact, a JSON
 file with one entry per case, in a stable order and free of timestamps, paths
@@ -43,8 +44,11 @@ and host data. To reproduce it, from the repository root:
 
 ```
 SSLABDATA_CONFORMANCE_RESULTS=conformance-results.json \
-  uv run pytest tests/conformance/test_invalid_corpus.py
+  uv run --frozen --extra test pytest tests/conformance/test_invalid_corpus.py
 ```
+
+`pytest` is in the optional `test` extra, so a bare `uv run pytest` fails in a
+clean environment.
 
 The file is replaced atomically, only once every case has run, and it is the
 same on every host, so `sha256sum` of two runs is the way to compare them. CI
