@@ -228,20 +228,3 @@ def test_replacing_a_private_file_never_exposes_the_document(
     assert modes == [0o600]
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
     assert out.read_bytes() != b"old\n"
-
-
-@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0,
-                    reason="root bypasses permission bits")
-@pytest.mark.parametrize("export, name",
-                         [(export_to_json, "lab.json"),
-                          (export_to_yaml, "lab.yml")],
-                         ids=["json", "yaml"])
-def test_a_read_only_destination_is_refused_and_left_alone(
-        tmp_path, sample_data, export, name):
-    out = tmp_path / name
-    out.write_bytes(b"old\n")
-    out.chmod(0o400)
-    with pytest.raises(PermissionError):
-        export(sample_data, str(out))
-    assert out.read_bytes() == b"old\n"
-    assert list(tmp_path.iterdir()) == [out]

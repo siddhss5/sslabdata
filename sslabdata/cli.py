@@ -28,8 +28,8 @@ CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
 CONFIG_READ_ERRORS = (OSError, UnicodeDecodeError, yaml.YAMLError)
 
 
-def build_parser():
-    """The argument parser, with every flag and its help."""
+def main(argv=None):
+    """Main CLI entry point. ``argv`` defaults to ``sys.argv[1:]``."""
     parser = argparse.ArgumentParser(
         description='Assemble academic lab data from BibTeX and YAML',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -79,62 +79,7 @@ Examples:
         help='Treat every coded diagnostic as an error, except those about '
              'authors who matched no lab member and redefined @string macros'
     )
-    return parser
 
-
-def classify(lines, validating, strict):
-    """Pair each diagnostic with its severity in this run, in the order given."""
-    return [(line, severity(line, validating=validating, strict=strict))
-            for line in lines]
-
-
-def print_json_report(graded):
-    """The diagnostics as the one JSON array standard output holds."""
-    print(json.dumps([record(line, level) for line, level in graded],
-                     indent=2, ensure_ascii=False))
-
-
-def print_validation_report(result, errors, warnings):
-    """The text report of ``--validate``, on standard output."""
-    data = result.data
-    print(f"Works: {len(data.works)}")
-    print(f"People: {len(data.people)}")
-    print(f"Projects: {len(data.projects)}")
-
-    if result.unresolved_authors:
-        print(f"\nUnresolved authors ({len(result.unresolved_authors)}):")
-        for name in sorted(result.unresolved_authors):
-            print(f"  - {name}")
-
-    if warnings:
-        print(f"\nWarnings ({len(warnings)}):")
-        for warning in warnings:
-            print(f"  - {warning}")
-
-    if errors:
-        print(f"\nBibliography errors ({len(errors)}):")
-        for error in errors:
-            print(f"  - {error}")
-        print(f"\nValidation found {len(errors)} error(s).")
-    else:
-        print("\nValidation passed.")
-
-
-def print_unresolved_report(config, result):
-    """The text report of ``--unresolved``, on standard output."""
-    if not config.people_file:
-        print("Author resolution is not configured (no people_file).")
-    elif not result.unresolved_authors:
-        print("All authors resolved.")
-    else:
-        print(f"Unresolved authors ({len(result.unresolved_authors)}):")
-        for name in sorted(result.unresolved_authors):
-            print(f"  {name}")
-
-
-def main(argv=None):
-    """Main CLI entry point. ``argv`` defaults to ``sys.argv[1:]``."""
-    parser = build_parser()
     args = parser.parse_args(argv)
 
     if not args.output and not args.validate and not args.unresolved:
@@ -167,27 +112,47 @@ def main(argv=None):
         stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
              "Error loading configuration: ", as_json)
     data = result.data
+    found = result.diagnostics
 
-    graded = classify(result.diagnostics, args.validate, args.strict)
-    errors = [line for line, level in graded if level == ERROR]
-    warnings = [line for line, level in graded if level != ERROR]
+    def level(line):
+        return severity(line, validating=args.validate, strict=args.strict)
+    errors = [line for line in found if level(line) == ERROR]
+    warnings = [line for line in found if level(line) != ERROR]
 
     if as_json:
+        records = [record(line, level(line)) for line in found]
         if args.unresolved and not args.validate:
-            graded += classify(
-                unresolved_name_diagnostics(data.works,
-                                            result.unresolved_authors,
-                                            config.bib_dir),
-                args.validate, args.strict)
-        print_json_report(graded)
+            records += [record(line, level(line)) for line in
+                        unresolved_name_diagnostics(data.works,
+                                                    result.unresolved_authors,
+                                                    config.bib_dir)]
+        print(json.dumps(records, indent=2, ensure_ascii=False))
         if errors:
             sys.exit(1)
         return
 
     if args.validate:
-        print_validation_report(result, errors, warnings)
+        print(f"Works: {len(data.works)}")
+        print(f"People: {len(data.people)}")
+        print(f"Projects: {len(data.projects)}")
+
+        if result.unresolved_authors:
+            print(f"\nUnresolved authors ({len(result.unresolved_authors)}):")
+            for name in sorted(result.unresolved_authors):
+                print(f"  - {name}")
+
+        if warnings:
+            print(f"\nWarnings ({len(warnings)}):")
+            for warning in warnings:
+                print(f"  - {warning}")
+
         if errors:
+            print(f"\nBibliography errors ({len(errors)}):")
+            for error in errors:
+                print(f"  - {error}")
+            print(f"\nValidation found {len(errors)} error(s).")
             sys.exit(1)
+        print("\nValidation passed.")
         return
 
     # Outside --validate, an error still stops the run: a user must not be
@@ -201,7 +166,15 @@ def main(argv=None):
         sys.exit(1)
 
     if args.unresolved:
-        print_unresolved_report(config, result)
+        if not config.people_file:
+            print("Author resolution is not configured (no people_file).")
+            return
+        if not result.unresolved_authors:
+            print("All authors resolved.")
+        else:
+            print(f"Unresolved authors ({len(result.unresolved_authors)}):")
+            for name in sorted(result.unresolved_authors):
+                print(f"  {name}")
         return
 
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
