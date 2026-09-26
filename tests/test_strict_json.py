@@ -126,6 +126,10 @@ def strict_run(folder, *mode):
     ("ambiguous_alias", "RESOLVE-AMBIGUOUS-NAME"),        # warning, lab members
 ])
 def test_strict_fails_every_mode_on_each_error_class(tmp_path, folder, code):
+    """`--strict` promotes every class to a failure in all three modes.
+
+    The corpus runs without `--strict`, so a class `severity()` forgot to
+    promote passes it and fails only here, with a document still written."""
     out = tmp_path / "lab.json"
     for mode in (["--validate"], ["--unresolved"], ["--format", "json", "--output", out]):
         run = strict_run(folder, *mode)
@@ -135,6 +139,9 @@ def test_strict_fails_every_mode_on_each_error_class(tmp_path, folder, code):
 
 
 def test_the_demo_passes_every_mode_under_strict(tmp_path):
+    """The example lab is clean under `--strict` in every mode, not only in
+    the `--validate` run CI makes: a warning that leaked into `--unresolved`
+    or `--output` would fail a user's strict pipeline."""
     for mode in (["--validate"], ["--unresolved"], ["--output", tmp_path / "d.yaml"]):
         run = run_sslabdata(["--config", "examples/demo/lab.yaml", "--strict", *mode],
                           REPO_ROOT)
@@ -204,6 +211,9 @@ def test_a_suggestion_alone_leaves_strict_at_exit_0(tmp_path):
 
 
 def test_an_initials_only_grouping_alone_leaves_strict_at_exit_0(tmp_path):
+    """An ambiguous initials-only grouping is a warning even under `--strict`
+    (decision 10); promoting it would fail runs over a lab's ordinary
+    outside co-authors. The corpus never runs with `--strict`."""
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Quinn, Q. and Quinn, Quentin}}\n", people=MEMBERS)
@@ -215,6 +225,9 @@ def test_an_initials_only_grouping_alone_leaves_strict_at_exit_0(tmp_path):
 # The boundary of ID-GROUPING-AMBIGUOUS-DECLARED (#26 decisions 6 and 10).
 
 def test_a_name_fitting_two_collaborator_entries_is_a_grouping_warning(tmp_path):
+    """A name two collaborator entries both declare is one grouping warning,
+    exit 0 under `--strict`: it links to neither, so nothing is misattributed.
+    The corpus never runs with `--strict`, and holds no such declarations."""
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Patel, P.}}\n", people=MEMBERS,
@@ -312,6 +325,9 @@ def test_a_name_fitting_an_entry_and_two_members_fails_strict(tmp_path):
 
 
 def test_a_failing_strict_export_writes_nothing_and_keeps_an_existing_file(tmp_path):
+    """A `--strict` failure never truncates the last good document. The
+    corpus runs start from an empty directory, so only a pre-existing
+    destination shows a failed run damaging one."""
     absent = tmp_path / "absent.json"
     run = strict_run("year_not_number", "--format", "json", "--output", absent)
     assert run.code == 1 and not absent.exists()
@@ -325,6 +341,9 @@ def test_a_failing_strict_export_writes_nothing_and_keeps_an_existing_file(tmp_p
 
 
 def test_strict_validate_lists_promoted_codes_as_errors():
+    """The text report moves a promoted warning under its error heading, the
+    one place a reader of `--validate --strict` output looks. JSON records
+    carry the severity but not the section."""
     run = strict_run("year_not_number", "--validate")
     errors = run.stdout.split("\nBibliography errors (", 1)[1]
     assert "  - BIB-YEAR-INVALID ./badyear.bib:bad-year:year: " in errors
@@ -342,6 +361,10 @@ def json_run(cwd, *mode, config="lab.yaml"):
 
 
 def test_unresolved_names_are_records_only_under_unresolved_json():
+    """`RESOLVE-UNRESOLVED-NAME` is a record under `--unresolved` and equals
+    the text listing line for line, but never appears under `--validate`,
+    where a lab's outside co-authors are expected. The corpus reads only the
+    text listing, never the JSON records."""
     run, records = json_run(REPO_ROOT, "--unresolved",
                             config="examples/demo/lab.yaml")
     names = [r for r in records if r["code"] == "RESOLVE-UNRESOLVED-NAME"]
@@ -359,6 +382,9 @@ def test_unresolved_names_are_records_only_under_unresolved_json():
 
 
 def test_a_configuration_that_does_not_load_is_still_one_array(tmp_path):
+    """A JSON consumer always receives one array, even when there is no
+    configuration to load. The corpus runs each fixture's own `lab.yaml`, so
+    a file that is missing or unparseable is out of its reach."""
     run, records = json_run(tmp_path, "--validate", config="missing.yaml")
     assert run.code == 1
     [record] = records
@@ -375,6 +401,9 @@ def test_a_configuration_that_does_not_load_is_still_one_array(tmp_path):
 # --- The five codes that were uncoded -------------------------------------------
 
 def test_a_missing_or_unreadable_configuration_is_coded_as_text(tmp_path):
+    """A missing or unparseable `--config` is a coded line in text mode,
+    never a traceback. Out of the corpus's reach for the same reason as
+    the JSON case above."""
     run = run_sslabdata(["--config", "missing.yaml", "--validate"], tmp_path)
     assert run.code == 1
     [line] = run.stderr.splitlines()
@@ -387,6 +416,10 @@ def test_a_missing_or_unreadable_configuration_is_coded_as_text(tmp_path):
 
 
 def test_a_parser_library_message_is_coded_and_located_at_its_entry(tmp_path):
+    """A message the BibTeX library prints itself is re-emitted coded and
+    located at its entry, so no uncoded line reaches standard error. The
+    library's own wording is not asserted; no corpus fixture makes the
+    library complain."""
     write_lab(tmp_path, "@article{e, title = {A}, title = {B}, journal = {J},"
                         " year = 2024}\n")
     run = run_sslabdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],

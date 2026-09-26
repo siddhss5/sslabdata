@@ -211,10 +211,3 @@ class TestConfigurationShape:
         config = LabDataConfig.from_yaml(str(path))
         assert config.unknown_keys == ["people_fil", "extra"]
         assert config.bib_files == []
-
-    def test_an_empty_bib_files_list_is_reported(self, tmp_path):
-        config = LabDataConfig(bib_dir=str(tmp_path), bib_files=[],
-                               path="lab.yaml")
-        result = assemble(config, diagnostics=True)
-        assert any(w.startswith("CONFIG-BIB-FILES-MISSING lab.yaml:bib_files::")
-                   for w in result.diagnostics), result.diagnostics

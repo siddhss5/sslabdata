@@ -11,6 +11,9 @@ from ..test_strict_json import (
 
 
 def test_the_code_classes_are_the_ones_spec_states():
+    """SPEC.md is the registry: a code added, reclassified or exempted from
+    `--strict` in one place only would change every user's exit status, and
+    no fixture exercises the codes that a fault alone reaches."""
     assert spec_registry() == set(CLASSES)
     assert spec_classes() == CLASSES
     assert spec_never_an_error() == NEVER_AN_ERROR
@@ -18,6 +21,9 @@ def test_the_code_classes_are_the_ones_spec_states():
 
 
 def test_every_code_the_source_names_is_classified():
+    """A code the source emits but `CLASSES` lacks raises `KeyError` inside
+    `severity()` on the run that first reports it, which only a fixture that
+    reaches that code would otherwise reveal."""
     named = set()
     for path in (REPO_ROOT / "sslabdata").rglob("*.py"):
         named |= set(re.findall(rf'"({CODE})"', path.read_text(encoding="utf-8")))
@@ -25,6 +31,9 @@ def test_every_code_the_source_names_is_classified():
 
 
 def test_a_field_whose_latex_cannot_be_read_is_located(tmp_path, monkeypatch):
+    """`LATEX-CONVERSION-FAILED` is located at its field and fails `--strict`.
+    The converter fails only on a fault, so no corpus input can reach it;
+    the failure is injected."""
     import sslabdata.parsers.bibtex as bibtex
 
     def unreadable(value):
@@ -41,6 +50,8 @@ def test_a_field_whose_latex_cannot_be_read_is_located(tmp_path, monkeypatch):
 
 
 def test_an_entry_that_cannot_be_written_back_is_located(tmp_path, monkeypatch):
+    """`BIB-WRITE-BACK-FAILED` is located at its entry and stays a warning.
+    Serializing a parsed entry fails only on a fault, so it is injected."""
     def refuse(self, *args, **kwargs):
         raise ValueError("cannot write")
     monkeypatch.setattr("sslabdata.parsers.bibtex.Entry.to_string", refuse)

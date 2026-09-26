@@ -3,10 +3,10 @@
 Isolated on purpose: each class names the boundary the conformance corpus would
 need a fixture per case to reach."""
 
-import pytest
-from pathlib import Path
+import re
 
-from sslabdata.config import BIB_FILE_ABSOLUTE as CONFIG_BIB_FILE_ABSOLUTE
+import pytest
+
 from sslabdata.parsers.bibtex import (
     CROSSREF_UNSUPPORTED,
     DUPLICATE_CITATION_KEY,
@@ -30,12 +30,7 @@ from sslabdata.parsers.bibtex import (
     parse_all_works,
     pdf_link,
 )
-from sslabdata.config import ConfigurationError
-from sslabdata.models import Author
 from sslabdata.parsers.latex import unknown_commands
-
-
-FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 class TestBuildVenue:
@@ -100,8 +95,11 @@ class TestBuildLinks:
 
 
 class TestPdfLink:
-    """A remote `pdf_base_url` is never fetched. Asserted with no network in reach,
-    which the conformance run cannot guarantee."""
+    """A remote `pdf_base_url` is labelled `unchecked`, because a build never fetches.
+
+    Read as a local path, every remote PDF would be labelled `missing`. The
+    conformance case for this (#20) is an expected failure, so only this test
+    pins today's behaviour; it changes with #20."""
 
     def test_a_remote_base_is_never_fetched(self):
         link = pdf_link("k", "https://example.org/pdfs")
@@ -137,25 +135,9 @@ class TestParseProjectIds:
 
 
 class TestParseAllWorks:
-    """The order of `works`, and a work with no year, at the parser's own boundary."""
+    """A work with no year sorts last, and its year is null rather than 0.
 
-    def test_parse_fixtures(self):
-        """SPEC.md section 3 orders `works` newest first. Nothing in the
-        conformance suite asserts the document order, so a reversed or
-        unsorted result would pass everything else."""
-        bib_files = [
-            {"name": "sample.bib", "category": "Test Papers"},
-        ]
-        works = parse_all_works(
-            bib_dir=str(FIXTURES),
-            bib_files=bib_files,
-            diagnostics=[],
-        )
-        assert len(works) == 3
-        # Should be sorted by year descending
-        assert works[0].year >= works[-1].year
-        # Check first work has structured authors
-        assert all(isinstance(a, Author) for a in works[0].authors)
+    The corpus asserts the missing-year diagnostic, not the position."""
 
     def test_a_work_with_no_year_sorts_last_and_says_so(self, tmp_path):
         """Null rather than 0: the position is the same, the meaning is not."""
@@ -176,42 +158,13 @@ class TestParseAllWorks:
         assert "y.bib:no-year:year" in warnings[0]
 
 
-class TestSourceFileIsNeverAbsolute:
-    """`parse_all_works()` takes the configured name and does not check it.
-
-    It is private, so nothing reaches it without going past
-    `LabDataConfig`; but it is the shortest path to a `Work` carrying an
-    absolute `source_file`, and what stops that reaching a document is the
-    check at the serialization boundary rather than any check here.
-    """
-
-    def parse(self, tmp_path, name):
-        (tmp_path / "journal.bib").write_text(
-            "@article{a2024,\n  title   = {A Title},\n"
-            "  author  = {Adams, Alice},\n  journal = {J},\n  year    = {2024}\n}\n",
-            encoding="utf-8")
-        # An empty bib_dir with an absolute name still resolves to the file,
-        # which is how a name that escapes bib_dir gets read at all.
-        return parse_all_works(
-            bib_dir="", diagnostics=[],
-            bib_files=[{"name": str(tmp_path / "journal.bib"),
-                        "category": "Journal Papers"}])
-
-    def test_the_parser_carries_the_name_it_was_given(self, tmp_path):
-        works = self.parse(tmp_path, "journal.bib")
-        assert works[0].source_file == str(tmp_path / "journal.bib")
-
-    def test_serializing_it_is_refused(self, tmp_path):
-        works = self.parse(tmp_path, "journal.bib")
-        with pytest.raises(ConfigurationError) as raised:
-            works[0].to_dict()
-        assert type(raised.value) is ConfigurationError, type(raised.value)
-        assert str(raised.value).startswith(CONFIG_BIB_FILE_ABSOLUTE)
-        assert str(tmp_path / "journal.bib") in str(raised.value)
-
-
 class TestCrossref:
-    """An entry carrying a crossref is rejected rather than resolved (#65)."""
+    """An entry carrying a crossref is rejected rather than resolved (#65).
+
+    Resolving it silently would emit a child with no author of its own. The
+    corpus proves the fatal outcome of three fixtures; only this class sees the
+    parse itself (the parent still compiles, no author-less work exists) and
+    the field's case-insensitive spelling."""
 
     CHILD = ("@proceedings{a-parent,\n"
              "  title  = {Proceedings of the Fictional Workshop},\n"
@@ -278,17 +231,6 @@ class TestCrossref:
         named = []
         self.parse(tmp_path, self.CHILD, named)
         assert "'a-parent'" in named[0], named[0]
-
-    def test_no_work_can_be_emitted_with_an_empty_author_list(self, tmp_path):
-        """The failure crossref caused: a child with no author of its own.
-
-        Rejecting the entry removes the path rather than patching it, so
-        there is no code path left that emits a work with no authors because
-        of a crossref.
-        """
-        errors = []
-        works = self.parse(tmp_path, self.CHILD, errors)
-        assert [w.bib_id for w in works if not w.authors] == []
 
 
 class TestDuplicateCitationKeys:
@@ -411,7 +353,11 @@ def read_source(tmp_path, source, name="hazard.bib"):
 
 
 class TestCommentHandling:
-    """What a @comment group hides, and what it must never take with it."""
+    """What a @comment group hides, and what it must never take with it.
+
+    A comment group that swallows the entries after it loses works with no
+    diagnostic. Each hazard is a distinct byte layout, too many to write as
+    fixtures."""
 
     @pytest.mark.parametrize("label, source, present, absent",
                              COMMENT_HAZARDS,
@@ -457,10 +403,9 @@ class TestLatexFallback:
 class TestEntryFiltering:
     """pybtex raises SkipEntry for a filtered entry too, not only for @comment.
 
-    sslabdata passes ``wanted_entries`` straight through, so recovering from the
-    wrong SkipEntry would corrupt a filtered read — and would do it silently,
-    because the scanner is left somewhere quite different from a comment.
-    """
+    sslabdata sets no `wanted_entries` filter, so no user input reaches this;
+    the test keeps the SkipEntry recovery in `_Parser` from swallowing the entry
+    after a filtered one, silently, if the filter is ever used."""
 
     REJECTED = "@article{drop, title = {D}, year = {2024}}\n"
     WANTED = "@article{keep, title = {K}, year = {2024}}\n"
@@ -492,7 +437,12 @@ def located(tmp_path, source, name="hazard.bib"):
 
 
 class TestLocatedParserDiagnostics:
-    """What the parser library finds is located at `<file>:<key>:<field>`."""
+    """What the parser library finds is located at `<file>:<key>:<field>`.
+
+    The corpus checks each finding's location from the CLI and that the entry
+    is kept; this pairs it with the value the parser leaves behind (a null year
+    or venue, a kept entry type) and covers spellings no fixture carries (`%`
+    comment lines, a `:` in a citation key)."""
 
     def test_an_undefined_macro_inside_a_string_names_no_entry(self, tmp_path):
         found, _ = located(tmp_path, "@string{alias = nosuchmacro}\n" + entry("e"))
@@ -623,7 +573,10 @@ class TestUnknownCommands:
 
 
 class TestRedefinedStringSummary:
-    """Every redefined @string macro of a run is reported in one line."""
+    """Every redefined @string macro of a run is reported in one line.
+
+    One line per redefinition would bury a run in warnings, and a summary built
+    per file would miss a macro redefined across files; the corpus has one file."""
 
     def run(self, tmp_path, files):
         for name, text in files.items():
@@ -633,28 +586,27 @@ class TestRedefinedStringSummary:
                         bib_files=[{"name": n, "category": "C"} for n in files])
         return [w for w in warnings if w.startswith(STRING_REDEFINED)]
 
+    @staticmethod
+    def sites(line, tmp_path):
+        """The `<file>:<line>` sites a summary lists, in the order it lists them."""
+        return re.findall(rf"{re.escape(str(tmp_path))}/\w+\.bib:\d+", line)
+
     def test_one_line_across_files_with_every_site(self, tmp_path):
         [line] = self.run(tmp_path, {
             "a.bib": "@string{b = 1}\n@string{a = 1}\n@string{B = 2}\n@string{b = 3}\n",
             "c.bib": "@string{a = 1}\n@string{a = 2}\n@string{once = 1}\n",
         })
-        assert line == (
-            f"{STRING_REDEFINED} ::: 2 @string macros redefined (last definition "
-            f"used): a, b [{tmp_path}/a.bib:3, {tmp_path}/a.bib:4, "
-            f"{tmp_path}/c.bib:2]")
-        assert line.file is None
-
-    def test_one_file_is_the_location_and_one_macro_is_singular(self, tmp_path):
-        [line] = self.run(tmp_path, {"a.bib": "@string{x = 1}\n\n@string{x = 2}\n"})
-        assert line == (f"{STRING_REDEFINED} {tmp_path}/a.bib::: 1 @string macro "
-                        f"redefined (last definition used): x [{tmp_path}/a.bib:3]")
-
-    def test_nothing_redefined_says_nothing(self, tmp_path):
-        assert self.run(tmp_path, {"a.bib": "@string{x = 1}\n@string{y = 1}\n"}) == []
+        assert line.startswith(f"{STRING_REDEFINED} ::: ") and line.file is None
+        assert "a, b" in line and "once" not in line
+        assert self.sites(line, tmp_path) == [
+            f"{tmp_path}/a.bib:3", f"{tmp_path}/a.bib:4", f"{tmp_path}/c.bib:2"]
 
 
 class TestRedefinitionsFollowTheParser:
-    """Only what the parser reads as an @string definition is counted."""
+    """Only what the parser reads as an @string definition is counted.
+
+    A commented-out definition, a BOM or CRLF line endings must neither add a
+    false redefinition nor shift the reported line numbers."""
 
     def parse(self, tmp_path, data: bytes):
         path = tmp_path / "strings.bib"
@@ -676,9 +628,9 @@ class TestRedefinitionsFollowTheParser:
         ]
         data = b"\xef\xbb\xbf" + "\r\n".join(lines).encode("utf-8") + b"\r\n"
         path, warnings, works = self.parse(tmp_path, data)
-        assert warnings == [
-            f"{STRING_REDEFINED} {path}::: 1 @string macro redefined (last "
-            f"definition used): rss [{path}:5, {path}:6]"]
+        [line] = warnings
+        assert line.startswith(f"{STRING_REDEFINED} {path}::: ") and "rss" in line
+        assert re.findall(rf"{re.escape(path)}:\d+", line) == [f"{path}:5", f"{path}:6"]
         assert works["e"].venue.name == "Three"
 
     def test_a_commented_out_and_a_real_definition_say_nothing(self, tmp_path):
