@@ -83,7 +83,7 @@ Flags, as `sslabdata.cli.main()` defines them:
 |---|---|
 | `--config PATH` | Required. The `lab.yaml` to compile. |
 | `--format {yaml,json}` | Default `yaml`. It has **two meanings**. With `--output` alone it is the **document's** format, and diagnostics stay on standard error as text. With `--validate` or `--unresolved`, `json` prints the **diagnostics** as one JSON array on standard output instead of the text report (*Diagnostics as JSON* below), and `yaml` is the text report. |
-| `--output PATH` | Write the document to `PATH`. |
+| `--output PATH` | Write the document to `PATH`. The document is written in full to a temporary file beside `PATH` and then moved over it, so a failed write leaves any file already there as it was and creates none. |
 | `--validate` | Report counts and problems, then exit without writing. |
 | `--unresolved` | List author names that matched no person, then exit. A name left ambiguous is one of them. |
 | `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error: a redefined `@string` macro, and anything about an author who matched no lab member. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
