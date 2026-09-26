@@ -1,5 +1,4 @@
 # CASE structure.duplicate_key_file
-# CASE diag.duplicate_citation_key
 # Fictional invalid input for tests/COVERAGE.md.
 bib_dir: "."
 bib_files:

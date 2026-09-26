@@ -10,6 +10,7 @@ import contextlib
 import io
 import json
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -92,6 +93,22 @@ def export(cwd: Path, out_dir: Path, config="lab.yaml", fmt="json"):
         with open(out_path, encoding="utf-8") as f:
             data = json.load(f) if fmt == "json" else yaml.safe_load(f)
     return run, data
+
+
+def write_atomically(path, text: str) -> None:
+    """Replace ``path`` with ``text`` whole, or leave it as it was."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def write_variant(tmp_path: Path, **changes) -> Path:

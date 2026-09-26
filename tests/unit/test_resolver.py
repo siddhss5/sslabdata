@@ -1,4 +1,7 @@
-"""Tests for the resolver: author matching, collaborator grouping, back-linking."""
+"""Tests for the resolver: author matching, collaborator grouping, back-linking.
+
+Isolated on purpose: each class names the boundary the conformance corpus would
+need a fixture per case to reach."""
 
 import pytest
 
@@ -19,6 +22,10 @@ from sslabdata.resolver import (
 
 
 class TestNormalizeName:
+    """The matching key. Accent, period, whitespace and footnote-markup variants of one name each
+    need their own corpus entry to reach through the CLI; a wrong key silently links
+    or drops every author it touches."""
+
     def test_basic(self):
         assert normalize_name("A. Adams") == "a adams"
 
@@ -36,6 +43,9 @@ class TestNormalizeName:
 
 
 class TestIsAbbreviated:
+    """The gate on fuzzy matching. A wrong answer lets `H. Zhang` suggest an unrelated
+    person; the spellings that decide it are too many to write as fixtures."""
+
     def test_single_initial_surname(self):
         assert is_abbreviated("a kim") is True
         assert is_abbreviated("h zhang") is True
@@ -51,6 +61,10 @@ class TestIsAbbreviated:
 
 
 class TestSameInitial:
+    """Two members sharing an initial and a family name: an alias one of them never
+    declared must not link an abbreviated name to the wrong person, a silent
+    misattribution."""
+
     def test_same_initial_collision_without_alias(self):
         """An alias shared implicitly with another person's initials is ambiguous.
 
@@ -72,6 +86,10 @@ class TestSameInitial:
 
 
 class TestFuzzyMatches:
+    """The threshold and tie boundaries of a suggestion: abbreviated names are skipped,
+    ties are all returned in sorted order, and a form two people declare suggests
+    neither. Reached through the CLI only by one suggestion per fixture."""
+
     def test_abbreviated_name_skipped(self):
         """Single-initial names should NOT fuzzy match — too ambiguous."""
         assert fuzzy_matches("H. Zhang", Candidates([("yzhang", ["Y. Zhang"])])) == []
@@ -387,6 +405,9 @@ class TestRunTogetherInitials:
 
 
 class TestResolveAuthors:
+    """An editor resolves but is never reported as an unresolved author; the
+    conformance suite reads the author report only."""
+
     def _make_work(self, authors, editors=()):
         return Work(
             bib_id="test",
@@ -413,6 +434,9 @@ class TestResolveAuthors:
 
 
 class TestComputeBacklinks:
+    """Back-links ignore editors and are idempotent. The CLI runs them once, so a
+    second run is unreachable through conformance."""
+
     def _work(self, **changes):
         fields = dict(
             bib_id="adams2024",
@@ -451,16 +475,24 @@ class TestComputeBacklinks:
 
 
 class TestLoadPeople:
+    """The loader called directly, as a caller with a hand-built configuration does,
+    on a file that is not there. The CLI reports it first, as a coded error."""
+
     def test_missing_file(self):
         assert load_people("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadProjects:
+    """The loader called directly on a file that is not there; see TestLoadPeople."""
+
     def test_missing_file(self):
         assert load_projects("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadCollaborators:
+    """The loader called directly: aliases are read as declared, and a missing or
+    empty file declares nobody."""
+
     def test_load(self, tmp_path):
         path = tmp_path / "collaborators.yaml"
         path.write_text('- name: "Priya Patel"\n  aliases: ["P. Patel"]\n'
@@ -699,6 +731,10 @@ class TestPeopleAndProjectsFiles:
 
 
 class TestSharedDeclarations:
+    """Which declared spellings count as one name across people. Each boundary
+    (run-together initials, a suffix, a comma, a hyphen) is a way to miss an
+    ambiguous alias or to invent one; the ambiguous_alias fixture writes one shape."""
+
     def test_a_name_shared_with_an_alias_is_reported_once(self):
         people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
                   Person(id="aadamson", name="A. Adams", aliases=[]),

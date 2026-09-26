@@ -1,4 +1,7 @@
-"""Tests for the BibTeX parsing pipeline."""
+"""Tests for the BibTeX parsing pipeline.
+
+Isolated on purpose: each class names the boundary the conformance corpus would
+need a fixture per case to reach."""
 
 import pytest
 from pathlib import Path
@@ -36,6 +39,9 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 class TestBuildVenue:
+    """One field name, two kinds of container: the entry type and the field order
+    decide the venue. The corpus writes one entry per type, not their collisions."""
+
     def test_incollection_is_a_book_not_a_conference(self):
         """One field name, two kinds of container: the entry type decides."""
         venue = build_venue({"ENTRYTYPE": "incollection",
@@ -54,6 +60,9 @@ class TestBuildVenue:
 
 
 class TestBareDoi:
+    """Only registered resolver prefixes are stripped; stripping any other URL would
+    corrupt an identifier. The corpus writes two spellings."""
+
     def test_written_as_a_dx_resolver_url(self):
         assert bare_doi("http://dx.doi.org/10.1/x") == "10.1/x"
 
@@ -63,6 +72,10 @@ class TestBareDoi:
 
 
 class TestBuildLinks:
+    """A `url` is classified by its parsed host. Lookalike hosts (in a path, a query, a
+    fragment, as userinfo, or with a malformed authority) must never become video
+    links: an escape matrix too wide to write as fixtures."""
+
     def test_no_base_and_no_fields(self):
         assert build_links({}, "k", {}, None) == {}
 
@@ -87,6 +100,9 @@ class TestBuildLinks:
 
 
 class TestPdfLink:
+    """A remote `pdf_base_url` is never fetched. Asserted with no network in reach,
+    which the conformance run cannot guarantee."""
+
     def test_a_remote_base_is_never_fetched(self):
         link = pdf_link("k", "https://example.org/pdfs")
         assert link.url == "https://example.org/pdfs/k.pdf"
@@ -94,6 +110,9 @@ class TestPdfLink:
 
 
 class TestExtractNote:
+    """Note text at its boundaries: a trailing period is dropped, and a blank note is
+    no note."""
+
     def test_with_note(self):
         entry = {"note": "Best Paper Award."}
         assert extract_note(entry) == "Best Paper Award"
@@ -105,6 +124,8 @@ class TestExtractNote:
 
 
 class TestParseProjectIds:
+    """The `project` field at its boundaries: brace-wrapped and empty values."""
+
     def test_braces(self):
         assert parse_project_ids({"project": "{gardenbot, planning}"}) == [
             "gardenbot", "planning"
@@ -116,7 +137,12 @@ class TestParseProjectIds:
 
 
 class TestParseAllWorks:
+    """The order of `works`, and a work with no year, at the parser's own boundary."""
+
     def test_parse_fixtures(self):
+        """SPEC.md section 3 orders `works` newest first. Nothing in the
+        conformance suite asserts the document order, so a reversed or
+        unsorted result would pass everything else."""
         bib_files = [
             {"name": "sample.bib", "category": "Test Papers"},
         ]
@@ -266,6 +292,9 @@ class TestCrossref:
 
 
 class TestDuplicateCitationKeys:
+    """Duplicate keys compare without case across files, and the first spelling is the
+    one the diagnostic keeps."""
+
     def test_cross_file_duplicate_preserves_the_first_key_spelling(self, tmp_path):
         """Citation keys compare without case, but diagnostics retain both sources."""
         first = tmp_path / "first.bib"
@@ -570,6 +599,9 @@ class TestLocatedParserDiagnostics:
 
 
 class TestUnknownCommands:
+    """Which LaTeX commands count as unknown, each named once and in order. The corpus
+    holds one unknown macro; this holds the boundary between known and unknown."""
+
     def test_known_commands_math_and_links_are_not_reported(self):
         value = r"\textbf{a} \'e \v c $\alpha$ \href{http://x_y}{site} 50\%"
         assert unknown_commands(value) == []

@@ -45,6 +45,11 @@ def sample_data():
 
 
 class TestExportToJson:
+    """Two boundaries of the JSON exporter that the CLI tests reach only
+    through YAML or a non-empty lab: parent directories are created for a
+    JSON destination, and a `LabData` with nothing in it still serializes to
+    a complete document."""
+
     def test_creates_parent_dirs(self, tmp_path, sample_data):
         out = str(tmp_path / "nested" / "dir" / "output.json")
         export_to_json(sample_data, out)

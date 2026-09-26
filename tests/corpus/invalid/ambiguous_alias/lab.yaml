@@ -1,5 +1,4 @@
 # CASE identity.ambiguous_alias
-# CASE diag.ambiguous_alias
 # Fictional invalid input for tests/COVERAGE.md.
 bib_dir: "."
 bib_files:

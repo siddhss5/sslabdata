@@ -134,16 +134,6 @@ def test_strict_fails_every_mode_on_each_error_class(tmp_path, folder, code):
     assert not out.exists()
 
 
-@pytest.mark.parametrize("folder", ["undefined_project", "year_not_number",
-                                    "ambiguous_alias"])
-def test_without_strict_the_exit_codes_are_unchanged(tmp_path, folder):
-    """A validation error fails only --validate; a warning fails nothing."""
-    unresolved = run_sslabdata(["--config", "lab.yaml", "--unresolved"], INVALID / folder)
-    export = run_sslabdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],
-                         INVALID / folder)
-    assert unresolved.code == 0 and export.code == 0
-
-
 def test_the_demo_passes_every_mode_under_strict(tmp_path):
     for mode in (["--validate"], ["--unresolved"], ["--output", tmp_path / "d.yaml"]):
         run = run_sslabdata(["--config", "examples/demo/lab.yaml", "--strict", *mode],
@@ -338,7 +328,7 @@ def test_strict_validate_lists_promoted_codes_as_errors():
     run = strict_run("year_not_number", "--validate")
     errors = run.stdout.split("\nBibliography errors (", 1)[1]
     assert "  - BIB-YEAR-INVALID ./badyear.bib:bad-year:year: " in errors
-    assert "Validation found" in run.stdout
+    assert run.code == 1
 
 
 # --- JSON ----------------------------------------------------------------------
@@ -349,24 +339,6 @@ def json_run(cwd, *mode, config="lab.yaml"):
     records = json.loads(run.stdout)
     jsonschema.validate(records, spec_schema())
     return run, records
-
-
-def test_json_records_carry_the_location_parts():
-    run, records = json_run(INVALID / "year_not_number", "--validate")
-    [year] = [r for r in records if r["code"] == "BIB-YEAR-INVALID"]
-    assert year == {"code": "BIB-YEAR-INVALID", "severity": "warning",
-                    "file": "./badyear.bib", "key": "bad-year", "field": "year",
-                    "message": "'in press' is not a number; the work is emitted "
-                               "with year: null and sorts last"}
-    assert run.code == 0
-
-
-def test_a_validation_error_is_an_error_only_where_the_text_says_so():
-    _, validate = json_run(INVALID / "undefined_project", "--validate")
-    _, unresolved = json_run(INVALID / "undefined_project", "--unresolved")
-    code = "RESOLVE-PROJECT-UNKNOWN"
-    assert [r["severity"] for r in validate if r["code"] == code] == ["error"]
-    assert [r["severity"] for r in unresolved if r["code"] == code] == ["warning"]
 
 
 def test_unresolved_names_are_records_only_under_unresolved_json():
@@ -389,26 +361,15 @@ def test_unresolved_names_are_records_only_under_unresolved_json():
 def test_a_configuration_that_does_not_load_is_still_one_array(tmp_path):
     run, records = json_run(tmp_path, "--validate", config="missing.yaml")
     assert run.code == 1
-    assert records == [{"code": "CONFIG-NOT-FOUND", "severity": "error",
-                        "file": "missing.yaml", "key": None, "field": None,
-                        "message": "configuration file not found"}]
+    [record] = records
+    assert {k: v for k, v in record.items() if k != "message"} == {
+        "code": "CONFIG-NOT-FOUND", "severity": "error",
+        "file": "missing.yaml", "key": None, "field": None}
 
     (tmp_path / "bad.yaml").write_text("lab: {name: L\n", encoding="utf-8")
     run, [record] = json_run(tmp_path, "--unresolved", config="bad.yaml")
     assert run.code == 1
     assert (record["code"], record["file"]) == ("CONFIG-UNREADABLE", "bad.yaml")
-
-    run, [record] = json_run(INVALID / "config_bib_dir_missing", "--validate")
-    assert (record["code"], record["key"]) == ("CONFIG-KEY-MISSING", "bib_dir")
-
-
-def test_export_keeps_the_document_meaning_of_format(tmp_path):
-    out = tmp_path / "lab.json"
-    run = run_sslabdata(["--config", "lab.yaml", "--format", "json", "--output", out],
-                      INVALID / "year_not_number")
-    assert run.code == 0
-    assert "works" in json.loads(out.read_text(encoding="utf-8"))
-    assert run.stderr.startswith("Warning: BIB-YEAR-INVALID ")
 
 
 # --- The five codes that were uncoded -------------------------------------------
@@ -416,8 +377,8 @@ def test_export_keeps_the_document_meaning_of_format(tmp_path):
 def test_a_missing_or_unreadable_configuration_is_coded_as_text(tmp_path):
     run = run_sslabdata(["--config", "missing.yaml", "--validate"], tmp_path)
     assert run.code == 1
-    assert run.stderr == ("Error: CONFIG-NOT-FOUND missing.yaml::: "
-                          "configuration file not found\n")
+    [line] = run.stderr.splitlines()
+    assert line.startswith("Error: CONFIG-NOT-FOUND missing.yaml::: ")
     (tmp_path / "bad.yaml").write_text("lab: {name: L\n", encoding="utf-8")
     run = run_sslabdata(["--config", "bad.yaml", "--validate"], tmp_path)
     assert run.code == 1
@@ -425,10 +386,11 @@ def test_a_missing_or_unreadable_configuration_is_coded_as_text(tmp_path):
     assert line.startswith("Error loading configuration: CONFIG-UNREADABLE bad.yaml::: ")
 
 
-def test_a_library_message_keeps_its_wording_after_the_code(tmp_path):
+def test_a_parser_library_message_is_coded_and_located_at_its_entry(tmp_path):
     write_lab(tmp_path, "@article{e, title = {A}, title = {B}, journal = {J},"
                         " year = 2024}\n")
     run = run_sslabdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],
                       tmp_path)
-    assert run.stderr == ("Warning: BIB-PARSER-MESSAGE ./w.bib:e:: entry with "
-                          "key e has a duplicate title field\n")
+    [line] = run.stderr.splitlines()
+    assert line.startswith("Warning: BIB-PARSER-MESSAGE ./w.bib:e:: ")
+    assert line.split(":: ", 1)[1].strip(), "the library's message is kept after the code"

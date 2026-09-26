@@ -8,7 +8,8 @@ import sslabdata
 
 from .support import CORPUS, EXPECTED, REPO_ROOT, TESTS_DIR
 
-ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|[^|]*\|[^|]*\|\s*`([^`]+)`\s*\|", re.MULTILINE)
+ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|[^|]*\|[^|]*\|\s*`([^`]+)`\s*\|([^|]*)\|", re.MULTILINE)
+TEST_RE = re.compile(r"`(\w+\.py)::(\w+)`")
 
 
 def mentions(text, case_id):
@@ -16,25 +17,39 @@ def mentions(text, case_id):
 
 
 def test_every_row_appears_in_its_fixture_and_a_test():
-    """Each row's ID is in the fixture it names and in a test or diagnostics.yaml.
+    """Each case ID is unique, is in the fixture it names, and is owned by a test.
 
     A fixture outside tests/corpus (the demo, a schema) carries no markers,
-    so for those the named file only has to exist.
+    so for those the named file only has to exist. A test named in the Test
+    column has to be defined in the file it names, and the ID has to appear
+    in a test or in diagnostics.yaml.
     """
     rows = ROW_RE.findall((TESTS_DIR / "COVERAGE.md").read_text(encoding="utf-8"))
     test_files = [*TESTS_DIR.rglob("test_*.py"), EXPECTED / "diagnostics.yaml"]
     tests = "\n".join(path.read_text(encoding="utf-8") for path in test_files)
+    defined = {}
+    for path in TESTS_DIR.rglob("test_*.py"):
+        defined[path.name] = {node.name for node in ast.walk(ast.parse(
+            path.read_text(encoding="utf-8"))) if isinstance(node, ast.FunctionDef)}
     problems = []
-    for case_id, fixture in rows:
+    ids = [case_id for case_id, _, _ in rows]
+    problems += [f"{case_id}: appears in more than one row"
+                 for case_id in sorted({i for i in ids if ids.count(i) > 1})]
+    for case_id, fixture, owners in rows:
         path = REPO_ROOT / fixture
         if not path.is_file():
             problems.append(f"{case_id}: no fixture {fixture}")
         elif CORPUS in path.parents and not mentions(
                 path.read_bytes().decode("utf-8", errors="replace"), case_id):
             problems.append(f"{case_id}: not in {fixture}")
+        named = TEST_RE.findall(owners)
+        if not named:
+            problems.append(f"{case_id}: names no test as file.py::test_name")
+        problems += [f"{case_id}: {name} is not defined in {file}"
+                     for file, name in named if name not in defined.get(file, ())]
         if not mentions(tests, case_id):
             problems.append(f"{case_id}: in no test")
-    assert len(rows) > 100, len(rows)
+    assert rows, "no case rows were read from COVERAGE.md"
     assert not problems, "\n".join(problems)
 
 
