@@ -406,7 +406,7 @@ would write syntax rather than text, sslabdata replaces the rule
 
 | Command | The converter's own rule | What sslabdata emits |
 |---|---|---|
-| `\url{u}` | `<u>` | `u` |
+| `\url{u}` | `<u>` | `u`, exactly as written: it is set aside before conversion, as an `\href` URL is, so `~`, `%`, `_`, `#` and `&` in it are kept |
 | `\footnote{n}` | `[n]` | ` (n)`: one space, then the footnote in parentheses |
 | `\item` | a new line, `  * ` | a new line, `• ` |
 | `\item[l]` | a new line, `  l` | a new line, `l` |

@@ -55,6 +55,7 @@ def _item(node, l2tobj):
 # list item as a Markdown bullet. Each is replaced by plain text or by nothing
 # (SPEC.md section 2).
 _PLAIN_TEXT_RULES = [
+    # A `\url` whose argument holds braces is not set aside by `_prepared()`.
     MacroTextSpec("url", "%s"),
     MacroTextSpec("footnote", _footnote),
     MacroTextSpec("item", _item),
@@ -92,6 +93,9 @@ _DOCUMENTED = frozenset({"textsuperscript", "*"})
 # not LaTeX, and characters such as _ or % would not survive the converter.
 _HREF_URL_TEXT = re.compile(r'\\href\s*\{([^{}]*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}')
 _HREF_URL_ONLY = re.compile(r'\\href\s*\{([^{}]*)\}')
+# `\url{u}` is emitted as `u` exactly: the URL is set aside the same way, so a
+# `~`, `%`, `_`, `#` or `&` in it is kept rather than converted.
+_URL = re.compile(r'\\url\s*\{([^{}]*)\}')
 
 # An unescaped & in a BibTeX field is a literal ampersand, not an alignment tab.
 _BARE_AMPERSAND = re.compile(r'(?<!\\)&')
@@ -129,6 +133,7 @@ def _prepared(text: str, set_aside) -> str:
     """The value as the converter is given it: links rewritten, bare & and % escaped."""
     text = _HREF_URL_TEXT.sub(lambda m: f'{m.group(2)} ({set_aside(m.group(1))})', text)
     text = _HREF_URL_ONLY.sub(lambda m: set_aside(m.group(1)), text)
+    text = _URL.sub(lambda m: set_aside(m.group(1)), text)
     text = _BARE_PERCENT.sub(r'\1\\%', text)
     return _BARE_AMPERSAND.sub(r'\&', text)
 

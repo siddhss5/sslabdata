@@ -224,7 +224,8 @@ to `<cit.>` and `<ref>`, a list `\item` to a Markdown `* ` bullet,
 `\includegraphics` and `\maketitle` to placeholder blocks, and
 `\textfrac{a}{b}` to `%s/%s` followed by its arguments. Each now becomes
 plain text or nothing, as [`SPEC.md` §2](SPEC.md#2-the-text-rule) lists:
-`\url{u}` is `u`, a footnote is written in parentheses, `\item` starts a line
+`\url{u}` is `u` exactly as written (a `~` in it is no longer a no-break
+space), a footnote is written in parentheses, `\item` starts a line
 with `•`, `\textfrac{a}{b}` is `a/b`, and the rest are left out. Only works
 whose converted fields use one of these commands emit different text.
 
