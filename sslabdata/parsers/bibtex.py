@@ -34,10 +34,13 @@ from ..models import Author, Contributor, Link, Venue, Work
 
 
 # Field values that hold prose and are converted from LaTeX to plain text.
-# Everything else (url, doi, eprint, project, ...) is data, and is kept raw.
+# The repository fields are among them because they name a venue, and braces
+# around `{arXiv}` are grouping, not part of the name. Everything else (url,
+# doi, eprint, project, ...) is data, and is kept raw.
 TEXT_FIELDS = frozenset({
     "title", "abstract", "note", "journal", "booktitle", "school",
     "institution", "type", "series", "publisher", "address", "organization",
+    "archiveprefix", "eprinttype",
 })
 
 # A name list ending in "and others" means "et al."; it is not an author.
@@ -700,7 +703,7 @@ BOOKTITLE_KINDS = {"inproceedings": "conference", "conference": "conference",
 OTHER_KIND = "other"
 
 # A preprint's venue is the repository it sits in, which is what
-# `archivePrefix` names. arXiv is the default, because a bare `eprint` is
+# `archivePrefix` or `eprinttype` names. arXiv is the default, because a bare `eprint` is
 # read as an arXiv identifier (`build_identifiers`) and linked as one.
 ARXIV = "arXiv"
 REPOSITORY_KIND = "repository"
@@ -762,9 +765,16 @@ def build_venue(entry: dict) -> Optional[Venue]:
 
 
 def _archive_prefix(entry: dict) -> str:
-    """The repository an `eprint` belongs to, as the entry names it."""
-    prefix = entry.get("archivePrefix", entry.get("archiveprefix", ""))
-    return prefix.strip() or ARXIV
+    """The repository an `eprint` belongs to, as the entry names it.
+
+    biblatex names it in `eprinttype`, of which `archivePrefix` is an alias;
+    an entry carrying both is read from `archivePrefix`.
+    """
+    for field_name in ("archiveprefix", "eprinttype"):
+        prefix = (entry.get(field_name) or "").strip()
+        if prefix:
+            return prefix
+    return ARXIV
 
 
 def bare_doi(doi: str) -> str:

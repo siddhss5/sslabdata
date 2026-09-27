@@ -53,6 +53,34 @@
   year   = {2023}
 }
 
+% biblatex names the repository in eprinttype, which archivePrefix aliases.
+% CASE fields.eprinttype
+@misc{link-eprinttype-hal,
+  title      = {A HAL Preprint Named by eprinttype},
+  author     = {Adams, Alice},
+  eprint     = {hal-01234567},
+  eprinttype = {hal},
+  year       = {2023}
+}
+
+% CASE fields.eprinttype
+@misc{link-eprinttype-pubmed,
+  title      = {A PubMed Record Named by eprinttype},
+  author     = {Adams, Alice},
+  eprint     = {12345678},
+  eprinttype = {pubmed},
+  year       = {2023}
+}
+
+% CASE fields.archiveprefix_latex
+@misc{link-arxiv-braced,
+  title         = {arXiv with a Braced archivePrefix},
+  author        = {Adams, Alice},
+  eprint        = {2401.00003},
+  archivePrefix = {{arXiv}},
+  year          = {2023}
+}
+
 % CASE links.youtube
 % CASE fields.url
 % CASE output.work.links
