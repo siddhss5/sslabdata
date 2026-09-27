@@ -15,15 +15,15 @@ it against.
 sslabdata --config lab.yaml --output lab.yml
 ```
 
-- [`SPEC.md`](SPEC.md) — the normative contract: what the strings are, what
+- [`SPEC.md`](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md) — the normative contract: what the strings are, what
   order the lists are in, which fields are derived, when the version changes.
-- [`CHANGELOG.md`](CHANGELOG.md) — what changed at each release, and what it
+- [`CHANGELOG.md`](https://github.com/siddhss5/sslabdata/blob/main/CHANGELOG.md) — what changed at each release, and what it
   replaced.
-- [`schema/v5/output.schema.json`](schema/v5/output.schema.json) — the
+- [`schema/v5/output.schema.json`](https://github.com/siddhss5/sslabdata/blob/main/schema/v5/output.schema.json) — the
   document's JSON Schema. Published versions are immutable and live at their
-  own paths; [`schema/v3/`](schema/v3/output.schema.json) and
-  [`schema/v4/`](schema/v4/output.schema.json) are still there.
-- [`tests/COVERAGE.md`](tests/COVERAGE.md) — every input case sslabdata
+  own paths; [`schema/v3/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v3/output.schema.json) and
+  [`schema/v4/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v4/output.schema.json) are still there.
+- [`tests/COVERAGE.md`](https://github.com/siddhss5/sslabdata/blob/main/tests/COVERAGE.md) — every input case sslabdata
   supports, and every case it does not, with the fixture and test for each.
 
 ## What sslabdata is not
@@ -31,7 +31,7 @@ sslabdata --config lab.yaml --output lab.yml
 **sslabdata is not a CMS and not a site generator.** It does not build a
 website, own your pages or manage your content. News, openings, teaching
 pages, press and galleries are prose with no shared structure to compile, and
-they belong in your site repository. [`SPEC.md` §8](SPEC.md#8-the-entity-boundary-and-the-evidence-for-it) gives the
+they belong in your site repository. [`SPEC.md` §8](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#8-the-entity-boundary-and-the-evidence-for-it) gives the
 evidence for that boundary and the destination for each content type it
 leaves out.
 
@@ -40,7 +40,15 @@ sslabdata emits data. Rendering it is your renderer's job.
 ## Install
 
 ```bash
-pip install git+https://github.com/siddhss5/sslabdata.git
+pip install sslabdata
+```
+
+To work on sslabdata itself, install from a clone instead:
+
+```bash
+git clone https://github.com/siddhss5/sslabdata.git
+cd sslabdata
+pip install -e .
 ```
 
 ## Write `lab.yaml`
@@ -68,11 +76,11 @@ collaborators_file: "data/collaborators.yaml"  # optional
 Each `bib_files` entry's `name` is a name under `bib_dir`: it is emitted as
 the work's `source.file`, so it may be neither absolute nor leave `bib_dir`,
 and sslabdata rejects such a name rather than rewriting it
-([`SPEC.md` §5](SPEC.md#5-input-versus-derived)).
+([`SPEC.md` §5](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#5-input-versus-derived)).
 
 Paths are relative to the directory you run `sslabdata` from.
-[`examples/demo/lab.yaml`](examples/demo/lab.yaml) is a complete example,
-built from the fictional Example Lab in [`examples/demo/`](examples/demo/).
+[`examples/demo/lab.yaml`](https://github.com/siddhss5/sslabdata/blob/main/examples/demo/lab.yaml) is a complete example,
+built from the fictional Example Lab in [`examples/demo/`](https://github.com/siddhss5/sslabdata/tree/main/examples/demo/).
 
 Then compile it:
 
@@ -95,10 +103,10 @@ Schema. Every problem is reported under a stable code.
 authors who matched no lab member and redefined `@string` macros; an error
 exits `1` and an export then writes nothing. With `--validate` or
 `--unresolved`, `--format json` prints the problems as one JSON array on
-standard output. [`SPEC.md` §1](SPEC.md#1-contract-hierarchy) owns the flags,
+standard output. [`SPEC.md` §1](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#1-contract-hierarchy) owns the flags,
 exit codes, streams and precedence when you pass more than one mode, the
-[diagnostic codes](SPEC.md#diagnostic-codes) with their classes, and the
-[JSON shape](SPEC.md#diagnostics-as-json).
+[diagnostic codes](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#diagnostic-codes) with their classes, and the
+[JSON shape](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#diagnostics-as-json).
 
 ## Inputs
 
@@ -127,7 +135,7 @@ nothing else:
 
 The entry is also re-serialized into a `bibtex` field, so fields sslabdata does
 not interpret are still carried. It is a re-serialization, not a copy
-([`SPEC.md` §5](SPEC.md#5-input-versus-derived)).
+([`SPEC.md` §5](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#5-input-versus-derived)).
 
 ### The `project` tag
 
@@ -222,7 +230,7 @@ than one person gets no `person_id` and is reported under
 `RESOLVE-AMBIGUOUS-NAME`; a near miss is never linked and is reported under
 `RESOLVE-SUGGESTION` with the ids it might be. Both are warnings, so
 `--validate` lists them and still exits `0`. To resolve one, add the spelling
-to that person's `aliases`. [`SPEC.md`](SPEC.md#how-a-name-is-matched) gives
+to that person's `aliases`. [`SPEC.md`](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#how-a-name-is-matched) gives
 the normalisation and the order the match decides in.
 
 A name that matches nobody keeps `person_id: null` and its authorship
@@ -237,7 +245,7 @@ wrong in both directions, so sslabdata reports a key that spans more than one
 spelling and an initials-only key that could be any of several fuller ones,
 and `collaborators_file` lets you join spellings yourself. What the grouping
 does and does not promise is in
-[`SPEC.md` §5](SPEC.md#5-input-versus-derived).
+[`SPEC.md` §5](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#5-input-versus-derived).
 
 ## Reading the document
 
@@ -250,7 +258,7 @@ delimited by `$…$`. `bibtex`, identifiers and URLs are not display text.
 sslabdata enforces that rule only where it converts LaTeX from BibTeX. Strings
 you supply directly in YAML, and everything under `lab`, are copied through as
 written and never checked, so keeping them plain is on you.
-[`SPEC.md` §2](SPEC.md#2-the-text-rule) draws the line precisely.
+[`SPEC.md` §2](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#2-the-text-rule) draws the line precisely.
 
 Validate a document against the schema with any JSON Schema tool. sslabdata
 does not do this for you, and does not depend on a validator — `jsonschema`

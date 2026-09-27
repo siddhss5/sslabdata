@@ -8,7 +8,18 @@ Two version numbers move independently
 ([`SPEC.md` §6](SPEC.md#6-version-policy)): the document's `schema_version`,
 whose releases are the git tags `schema-v4` and `schema-v5`, and the package
 version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
-newest first. Numbers such as #101 are issue or pull request numbers in this repository.
+newest first, and the package release that ships them comes before all of
+them. Numbers such as #101 are issue or pull request numbers in this repository.
+
+## Package 3.0.0 (not yet released)
+
+The first package release since `v2.0.0`. It has no tag and no release date
+yet. It emits `schema_version` 5 and carries the `schema_version` 4 and 5
+changes and the package changes below. The project is named `sslabdata`
+(#82), and the Python API's `Publication` is `Work`. It requires Python 3.10 or
+later. Its distribution metadata carries the README as the long description, an
+MIT license expression and links to the specification, the changelog and the
+issue tracker (#111).
 
 ## `schema_version` 5 (tag `schema-v5`, 2026-09-25)
 
