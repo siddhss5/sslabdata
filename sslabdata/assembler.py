@@ -440,13 +440,16 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
             "no bib_files are configured, so the document has no works"))
 
     # Every file the configuration names, checked before any is read, so a
-    # missing one is reported against the key that names it.
+    # missing one is reported against the key that names it. Only a key left
+    # out means no file: an empty path is more likely a mistake than that,
+    # and it names no file.
     def present(path: Optional[str], key: str, field_name=None) -> bool:
-        if not path or Path(path).is_file():
+        if path is None or Path(path).is_file():
             return True
         found.append(diagnostic(
             FILE_NOT_FOUND, source, key, field_name,
-            f"'{path}' does not exist"))
+            f"'{path}' does not exist" if path else
+            f"the path is empty; name a file, or leave {key} out for none"))
         return False
 
     bib_files = [{'name': bf.name, 'category': bf.category}

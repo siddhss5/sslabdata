@@ -1,0 +1,11 @@
+# CASE config.data_file.empty
+# Fictional invalid input for tests/COVERAGE.md.
+# Each data file is named by an empty path. Leaving a key out means no file;
+# an empty value is more likely a mistake.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+people_file: ""
+projects_file: ""
+collaborators_file: ""
