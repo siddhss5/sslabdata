@@ -43,6 +43,11 @@ TEXT_FIELDS = frozenset({
 # A name list ending in "and others" means "et al."; it is not an author.
 OTHERS = "others"
 
+# `and others` anywhere but at the end of a name list. It names nobody there
+# either, so it is dropped as a terminal one is, and reported: the list may
+# have been cut or pasted wrongly.
+OTHERS_NOT_LAST = "BIB-OTHERS-NOT-LAST"
+
 # A stable code makes validation output suitable for CI and tooling without
 # making callers depend on its English wording. The code names the condition
 # only: the same duplicate is an error under --validate and a warning
@@ -601,22 +606,33 @@ def readable_name(parts: Dict[str, Optional[str]]) -> str:
 def _contributors(entry: Entry, role: str, on_unknown) -> List[Dict]:
     """The entry's names for one role, in source order, as parts plus position.
 
-    A terminal ``and others`` is BibTeX's "et al." and is dropped rather than
-    emitted as a person. A name that reads as empty is dropped too, so
-    ``position`` counts the names that reach the document and nothing else.
+    ``and others`` is BibTeX's "et al." and is dropped rather than emitted as
+    a person, wherever it is (``check_others`` reports one that is not last).
+    A name that reads as empty is dropped too, so ``position`` counts the
+    names that reach the document and nothing else.
     """
-    persons = list(entry.persons.get(role, []))
-    if persons and _is_others(persons[-1]):
-        persons.pop()
-
     found = []
-    for person in persons:
+    for person in entry.persons.get(role, []):
+        if _is_others(person):
+            continue
         parts = person_name_parts(person, on_unknown)
         name = readable_name(parts)
         if name:
             found.append({"name": name, "position": len(found) + 1,
                           "parts": parts, "person": person})
     return found
+
+
+def check_others(entry: Entry, bib_id: str, source: str, report) -> None:
+    """Report each author or editor list with ``and others`` before its end."""
+    for role in ("author", "editor"):
+        persons = entry.persons.get(role, [])
+        if any(_is_others(person) for person in persons[:-1]):
+            report(diagnostic(
+                OTHERS_NOT_LAST, source, bib_id, role,
+                f"'and others' is not the last name in the {role} list, where "
+                "it would mean 'et al.'; it is dropped, and the names around "
+                "it are kept"))
 
 
 def parse_author_list(entry: Entry, on_unknown) -> List[Author]:
@@ -961,6 +977,7 @@ def entry_to_work(
     fields = entry_fields(bib_id, entry, unknown_in)
     identifiers = build_identifiers(fields)
     check_entry_type(fields, source, report)
+    check_others(entry, bib_id, source, report)
 
     return Work(
         bib_id=bib_id,

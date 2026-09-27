@@ -164,6 +164,26 @@ structure.not_utf8:
 
 # --- Projects, people and identity -------------------------------------------
 
+# "and others" before the end of a name list is reported and dropped; at the
+# end it is "et al.", as ever, and says nothing.
+names.others_mid_list:
+  dir: others_mid_list
+  exit: 0
+  diagnostics:
+    - {code: BIB-OTHERS-NOT-LAST, severity: warning, file: ./others.bib, key: others-mid-author, field: author}
+    - {code: BIB-OTHERS-NOT-LAST, severity: warning, file: ./others.bib, key: others-mid-editor, field: editor}
+  unresolved_only:
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./others.bib, key: others-mid-author, field: author, values: [Bob Brown]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./others.bib, key: others-mid-author, field: author, values: [Cy Cee]}
+  kept: [others-mid-author, others-mid-editor, others-last]
+  emits:
+    - work: others-mid-author
+      expect: {authors.*.name: [Alice Adams, Bob Brown, Cy Cee], authors.*.position: [1, 2, 3]}
+    - work: others-mid-editor
+      expect: {editors.*.name: [Bob Brown], editors.*.position: [1]}
+    - work: others-last
+      expect: {authors.*.name: [Alice Adams, Bob Brown]}
+
 projects.undefined:
   dir: undefined_project
   exit: 1
