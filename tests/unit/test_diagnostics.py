@@ -58,7 +58,7 @@ def test_an_entry_that_cannot_be_written_back_is_located(tmp_path, monkeypatch):
     Serializing a parsed entry fails only on a fault, so it is injected."""
     def refuse(self, *args, **kwargs):
         raise ValueError("cannot write")
-    monkeypatch.setattr("sslabdata.parsers.bibtex.Entry.to_string", refuse)
+    monkeypatch.setattr("sslabdata.parsers.bibtex._VerbatimWriter.to_string", refuse)
     write_lab(tmp_path, "@article{e, title = {T}, journal = {J}, year = 2024}\n")
     run, [record] = json_run(tmp_path, "--validate")
     assert (record["code"], record["file"], record["key"], record["field"]) == (

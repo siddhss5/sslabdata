@@ -6,12 +6,14 @@ mark describe the intended behavior, which the issue in the reason delivers.
 """
 
 import json
+import re
 
 import pytest
+import yaml
 
 from .support import (
-    VALID, AllOf, Contains, Excludes, assert_field, case, export, item,
-    run_sslabdata, work, write_variant,
+    REPO_ROOT, VALID, AllOf, Contains, Excludes, assert_field, case, export,
+    item, run_sslabdata, work, write_variant,
 )
 
 
@@ -795,6 +797,65 @@ OUTPUT_FIELDS = [
 def test_output_fields(valid_output, case_id, section, key, value, path, expected):
     obj = item(valid_output, section, key, value) if section else valid_output
     assert_field(obj, path, expected, where=f"{section} {value}: ")
+
+
+ENTRY = re.compile(r"^@(\w+)\s*\{\s*([^,\s]+)\s*,$(.*?)^\}", re.M | re.S)
+FIELD = re.compile(r"^\s*(\w+)\s*=\s*(.*?)\s*,?\s*$", re.M)
+
+
+def literal(value):
+    """The text of one braced or quoted BibTeX value, or None when ``value`` is
+    anything else: a macro, a number, or a concatenation of several parts."""
+    if len(value) < 2 or (value[0], value[-1]) not in (("{", "}"), ('"', '"')):
+        return None
+    depth = 0
+    for char in value[1:-1]:
+        depth += {"{": 1, "}": -1}.get(char, 0)
+        if depth < 0 or (char == '"' and value[0] == '"' and depth == 0):
+            return None
+    return value[1:-1] if depth == 0 else None
+
+
+def literal_fields(text):
+    """{citation key: {field: value}} for every field that ``text`` writes as
+    one braced or quoted value on one line, with each run of whitespace read
+    as one space, as BibTeX reads it. Names are left out: they are written
+    back from their parts, so only their parts, not their spelling, survive."""
+    entries = {}
+    for _, key, body in ENTRY.findall(text):
+        entries[key] = {name.lower(): " ".join(value.split())
+                        for name, raw in FIELD.findall(body)
+                        if name.lower() not in ("author", "editor")
+                        for value in [literal(raw)] if value is not None}
+    return entries
+
+
+# Covers output.work.bibtex_round_trip
+@pytest.mark.parametrize("cwd, config", [(VALID, "lab.yaml"),
+                                         (REPO_ROOT, "examples/demo/lab.yaml")])
+def test_bibtex_round_trips_every_field(tmp_path, cwd, config):
+    """Each work's `bibtex` holds every field its entry wrote as one literal
+    value, byte for byte, for the valid corpus and the demo: nothing escaped
+    is escaped again, and nothing bare is escaped."""
+    run, data = export(cwd, tmp_path, config)
+    assert run.code == 0 and run.crash is None, run.output
+    settings = yaml.safe_load((cwd / config).read_text(encoding="utf-8"))
+    source = {}
+    for bib_file in settings["bib_files"]:
+        path = cwd / settings["bib_dir"] / bib_file["name"]
+        source.update(literal_fields(path.read_text(encoding="utf-8-sig")))
+    compared = 0
+    for found in data["works"]:
+        (emitted,) = literal_fields(found["bibtex"] + "\n").values()
+        written = source[found["bib_id"]]
+        assert {name: emitted.get(name) for name in written} == written, \
+            found["bib_id"]
+        compared += len(written)
+    assert compared > len(data["works"])
+    if cwd == VALID:
+        # A brace-protected name is one part, so it too comes back as written.
+        assert 'author = "Adams, Alice and {R\\&D Robotics}"' in work(
+            data, "struct-escapes")["bibtex"]
 
 
 # Covers output.collaborators.order
