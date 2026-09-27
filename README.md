@@ -262,13 +262,15 @@ written and never checked, so keeping them plain is on you.
 
 Validate a document against the schema with any JSON Schema tool. sslabdata
 does not do this for you, and does not depend on a validator — `jsonschema`
-is a test-only dependency, so install it first:
+is a test-only dependency, so install it first. The installed package carries
+the current schema:
 
 ```bash
 pip install jsonschema
 python -c "
 import json, yaml, jsonschema
-schema = json.load(open('schema/v5/output.schema.json'))
+from importlib.resources import files
+schema = json.loads(files('sslabdata.schema').joinpath('v5/output.schema.json').read_text())
 jsonschema.Draft202012Validator(schema).validate(yaml.safe_load(open('lab.yml')))
 print('valid')
 "

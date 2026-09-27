@@ -32,7 +32,8 @@ dependencies = [
 test = [
     "pytest",
     "pytest-cov",
-    "jsonschema>=4"
+    "jsonschema>=4",
+    "setuptools>=77"
 ]
 
 [project.scripts]
@@ -49,9 +50,19 @@ Changelog = "https://github.com/siddhss5/sslabdata/blob/main/CHANGELOG.md"
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["sslabdata*"]
+# The current output schema is public wheel data, installed at
+# sslabdata/schema/v5/output.schema.json. The package directory is mapped onto
+# the repository's schema/ directory so the frozen file has one copy and one
+# path; earlier versions stay in the sdist only.
+[tool.setuptools]
+include-package-data = false
+packages = ["sslabdata", "sslabdata.parsers", "sslabdata.schema"]
+
+[tool.setuptools.package-dir]
+"sslabdata.schema" = "schema"
+
+[tool.setuptools.package-data]
+"sslabdata.schema" = ["v5/output.schema.json"]
 
 [tool.pytest.ini_options]
 addopts = "--cov --cov-report=term-missing"
