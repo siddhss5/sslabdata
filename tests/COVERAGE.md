@@ -44,11 +44,13 @@ and host data. To reproduce it, from the repository root:
 
 ```
 SSLABDATA_CONFORMANCE_RESULTS=conformance-results.json \
-  uv run --frozen --extra test pytest tests/conformance/test_invalid_corpus.py
+  uv run --frozen --extra test pytest --no-cov tests/conformance/test_invalid_corpus.py
 ```
 
 `pytest` is in the optional `test` extra, so a bare `uv run pytest` fails in a
-clean environment.
+clean environment. `--no-cov` is needed too: the repository always enables
+coverage with a 92% floor, which this one file does not reach, so without it
+the command exits 1 although every test passes and the artifact is written.
 
 The file is replaced atomically, only once every case has run, and it is the
 same on every host, so `sha256sum` of two runs is the way to compare them. CI
