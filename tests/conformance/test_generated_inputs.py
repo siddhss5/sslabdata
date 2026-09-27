@@ -51,7 +51,7 @@ from .support import SCHEMA_PATH, working_dir, write_atomically
 
 SEED = 143
 CASES_ENV = "SSLABDATA_GENERATED_CASES"
-DEFAULT_CASES = 300
+DEFAULT_CASES = 1000
 FAILURES_ENV = "SSLABDATA_GENERATED_FAILURES"
 # Candidate inputs tried while reducing one failure, so a run on a broken
 # tree stays bounded. A count, not a time, so the artifact is repeatable.
@@ -94,10 +94,16 @@ class Seq:
 
 @dataclass
 class Sentinel:
-    """Text that must reach the output: a word, or a name holding one. `form`
-    is the name form it was written in, or `text`."""
+    """Text that must reach the output: a word, or a name or a LaTeX command
+    holding one. `form` is the name form it was written in, the command whose
+    braced argument it is (`\\texttt`), or `text`."""
     word: str
     form: str
+
+
+def bare_word(p: Sentinel) -> str:
+    """The sentinel word itself, without the name or command around it."""
+    return re.search(r"(?<![\\A-Za-z])[Zz]q[a-z]+", p.word).group(0)
 
 
 @dataclass
@@ -211,6 +217,27 @@ SNIPPETS = {
               "**b**", ",", "=", "0"],
 }
 
+# Commands a sentinel word is placed inside, as `\cmd{word}`, so that text
+# lost with a command's argument shows. SPEC.md keeps the argument of each of
+# these as text: the converter has a rule that keeps it, or the command is
+# reported as LATEX-COMMAND-UNKNOWN, which drops the command and keeps "a
+# braced argument after it ... as plain text" (issue #174). That holds for a
+# command whose argument is not prose too, such as a label or a colour name.
+KEEPS_ARGUMENT = {
+    "formatting": [r"\texttt", r"\mbox", r"\textsc", r"\emph", r"\hbox",
+                   r"\underline", r"\fbox"],
+    "not text": [r"\label", r"\color", r"\citeauthor"],
+}
+# The only commands whose braced argument may leave nothing in the document:
+# SPEC.md section 2 lists each as a rule that emits "nothing"
+# (`sslabdata.parsers.latex._PLAIN_TEXT_RULES`). A sentinel inside one must
+# still reach the work's `bibtex`, and the text after it must survive.
+DROPS_ARGUMENT = (r"\cite", r"\citep", r"\citet", r"\ref", r"\autoref",
+                  r"\cref", r"\Cref", r"\eqref", r"\includegraphics")
+# The form every generated command name is recorded under, so that they are
+# one cause when a failure is reduced.
+GENERATED_COMMAND = r"\<generated>"
+
 # An unbalanced brace changes where a value ends, so the rest of its entry
 # reads differently; it is drawn rarely enough that most entries have none.
 GROUP_WEIGHTS = {"unbalanced": 0.15}
@@ -289,7 +316,23 @@ class Generator:
             if delim == '"' and '"' in snippet:
                 continue
             parts.append(snippet)
+        if r.random() < 0.3:
+            parts.insert(r.randint(0, len(parts)), self.in_command())
         return parts + [Sentinel(self.word(), "text")]
+
+    def in_command(self) -> Sentinel:
+        """A sentinel word as the braced argument of a LaTeX command."""
+        r = self.r
+        kind = r.choice(["formatting", "formatting", "not text", "drops",
+                         "generated"])
+        if kind == "generated":
+            # `zq` starts no real command, so the name is surely unknown.
+            name = "\\zq" + "".join(r.choice("bcdfghjkmnpqrstvwxyz")
+                                    for _ in range(r.randint(1, 6)))
+            return Sentinel(f"{name}{{{self.word()}}}", GENERATED_COMMAND)
+        command = r.choice(DROPS_ARGUMENT if kind == "drops" else
+                           KEEPS_ARGUMENT[kind])
+        return Sentinel(f"{command}{{{self.word()}}}", command)
 
     def names_field(self, name) -> Field:
         r = self.r
@@ -762,11 +805,14 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
             if not isinstance(p, Sentinel):
                 continue
             names = name in ("author", "editor")
-            word = re.search(r"Zq[a-z]+", p.word).group(0) if names else p.word
-            evidence = [p.form] if names else pieces
+            word = bare_word(p)
+            argument = p.form.startswith("\\")
+            evidence = [p.form] if names or argument else pieces
             if places is not None and not any(word in (v or "") for v in places) \
+                    and p.form not in DROPS_ARGUMENT \
                     and not excused(name, LOSS_EXPLAINED):
-                fail(f"5 {_group(name)} loses text",
+                fail(f"5 {_group(name)} loses "
+                     f"{'a command argument' if argument else 'text'}",
                      f"{e.key}.{name}: {value_text(f)!r}: {word!r} not in "
                      f"{places!r}"[:400], evidence)
             if word not in bibtex and not excused(name, LOSS_EXPLAINED):
@@ -873,19 +919,25 @@ def _specials(source):
 
 
 # The diagnostics that explain text missing from a field: the value could not
-# be read as BibTeX or as LaTeX. A command reported unknown is dropped with a
-# braced argument kept (SPEC.md), which loses no text around it.
+# be read as BibTeX or as LaTeX, its braces moved it into another field, or
+# control characters were removed from it. A command reported unknown is
+# dropped with a braced argument kept (SPEC.md), which loses no text.
 LOSS_EXPLAINED = frozenset({"BIB-SYNTAX-ERROR", "BIB-PARSER-MESSAGE",
+                            "BIB-BRACE-MISMATCH", "TEXT-CONTROL-CHARACTER",
                             "LATEX-CONVERSION-FAILED", "BIB-WRITE-BACK-FAILED"})
 
 
 def _excuse(records, file, key):
     """Whether a diagnostic explains a change to this entry: a syntax error in
     its file, or one at the entry and field (any field for None), of `codes`
-    when given."""
+    when given. A brace mismatch is reported once per entry, at the first
+    field it moved (SPEC.md), so it explains every field of its entry."""
     def excused(field_name, codes=None):
         for r in records:
             if r.get("code") == "BIB-SYNTAX-ERROR" and (r.get("file") or "").endswith(file):
+                return True
+            if r.get("code") == "BIB-BRACE-MISMATCH" and r.get("key") == key \
+                    and (codes is None or r.get("code") in codes):
                 return True
             if (r.get("key") == key and (codes is None or r.get("code") in codes)
                     and (field_name is None

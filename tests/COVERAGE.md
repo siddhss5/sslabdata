@@ -89,10 +89,17 @@ invariants:
 3. A run that exits 1 reports at least one coded error.
 4. `--validate` exits 0 only where `--output` in the same format writes.
 5. No text is lost silently. A sentinel word follows the special characters
-   in each generated value. It must reach the value's place in the document
-   and the work's `bibtex`, and `bibtex` must carry each field value as it
-   was written. A URL inside `\url` or `\href` must reach the text
-   unchanged. A value can lose text only with a coded diagnostic that
+   in each generated value, and some values hold one as the braced argument
+   of a LaTeX command: a formatting command such as `\texttt` or `\mbox`, a
+   command whose argument is not prose such as `\label` or `\color`, or a
+   generated unknown name. Every word must reach the work's `bibtex`, and
+   `bibtex` must carry each field value as it was written. Every word must
+   reach the value's place in the document too, except one inside a command
+   that §2 of SPEC.md turns into nothing (`\cite`, `\ref`,
+   `\includegraphics` and their variants, listed as `DROPS_ARGUMENT` in the
+   test): an unknown command keeps its braced argument as text
+   (`LATEX-COMMAND-UNKNOWN`). A URL inside `\url` or `\href` must reach the
+   text unchanged. A value can lose text only with a coded diagnostic that
    explains the loss at its entry, or a syntax error in its file.
 6. No input is silently read as something else. A year that is not an
    unsigned run of ASCII digits is never a number. An `eprint` is filed
@@ -114,8 +121,8 @@ SSLABDATA_GENERATED_FAILURES=generated-failures.json \
   uv run --frozen --extra test pytest --no-cov tests/conformance/test_generated_inputs.py
 ```
 
-The default is 300 inputs and runs in well under a minute.
-`SSLABDATA_GENERATED_CASES=3000` runs a longer search. The first 300 of
+The default is 1000 inputs and runs in well under a minute.
+`SSLABDATA_GENERATED_CASES=3000` runs a longer search. The first 1000 of
 those inputs are the default ones, because each input is seeded by its
 index. The artifact is a JSON file. Each entry of its `failures` gives:
 
