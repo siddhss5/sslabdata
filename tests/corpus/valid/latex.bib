@@ -59,6 +59,18 @@
   year    = {2021}
 }
 
+% A bare % is a literal percent in BibTeX, not the start of a comment: in a
+% title, at the end of an abstract, doubled, and inside a \url.
+% CASE latex.percent_bare
+@article{tex-percent-bare,
+  title    = {50% Faster Robots},
+  author   = {Adams, Alice},
+  journal  = {Journal of Fictional Robots},
+  year     = {2021},
+  abstract = {Accuracy rose 12% over prior work, a 100%% gain in $O(n)$ time, to 99%},
+  note     = {See \url{https://example.org/a%20b_c}}
+}
+
 % CASE latex.underscore
 @article{tex-underscore,
   title   = {The robot\_arm Package},

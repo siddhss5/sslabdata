@@ -48,8 +48,11 @@ To work on sslabdata itself, install from a clone instead:
 ```bash
 git clone https://github.com/siddhss5/sslabdata.git
 cd sslabdata
-pip install -e .
+pip install -e ".[test]"
+pytest
 ```
+
+The `test` extra installs `pytest` and `jsonschema`, which the tests need.
 
 ## Write `lab.yaml`
 
@@ -307,6 +310,9 @@ what sslabdata promises; it installs sslabdata from a pinned tag or commit and k
 copy of the demo. sslabdata ignores a `site:` section in `lab.yaml`, so a
 renderer can keep its own settings there.
 
+### Before a release (maintainers)
+
+These steps are run from a clone: `tools/` is not in the published package.
 Before publishing a sslabdata release, build sslabdata-site against the candidate:
 run its **Release gate** workflow with the candidate's git ref as
 `sslabdata_ref`. It builds without deploying, and keeps the renderer's toolchain

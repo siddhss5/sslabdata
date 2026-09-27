@@ -1,0 +1,212 @@
+name: Release
+
+# Builds and checks the wheel and sdist on every change, and publishes those
+# exact files: to PyPI from a v* tag, or to TestPyPI as a manual rehearsal.
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artifacts:
+    name: build and check distributions
+    runs-on: ubuntu-latest
+    env:
+      # The minimum supported Python, from requires-python in pyproject.toml.
+      UV_PYTHON: '3.10'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    # Outside the checkout, so nothing built or installed lands in it.
+    - name: Set work directories
+      run: |
+        echo "DIST=$RUNNER_TEMP/dist" >> "$GITHUB_ENV"
+        echo "SMOKE=$RUNNER_TEMP/smoke" >> "$GITHUB_ENV"
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: '3.10'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      with:
+        version: "0.12.15"
+
+    # The distribution test builds the sdist from the checkout, builds the
+    # wheel from the extracted sdist and checks both carry the public files;
+    # SSLABDATA_DIST_DIR keeps them, and they are the files published below.
+    # Tests are not shipped in the sdist, so there are none to run from it.
+    - name: Build and check distribution contents
+      run: |
+        uv sync --frozen --extra test
+        SSLABDATA_DIST_DIR="$DIST" uv run --frozen pytest --no-cov tests/test_distribution.py
+        ls -l "$DIST"
+        test "$(find "$DIST" -type f | wc -l)" -eq 2
+
+    - name: Check package metadata
+      run: |
+        uvx --from twine==7.0.0 twine check --strict "$DIST"/*
+
+    - name: Read version
+      id: version
+      run: |
+        wheel=$(basename "$DIST"/sslabdata-*-py3-none-any.whl)
+        version=${wheel#sslabdata-}
+        version=${version%%-*}
+        test -f "$DIST/sslabdata-$version.tar.gz"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Install the wheel into a clean environment
+      run: |
+        uv venv "$SMOKE"
+        uv pip install --python "$SMOKE/bin/python" "$DIST"/sslabdata-*.whl "jsonschema>=4"
+
+    # The demo's paths are relative to the repository root, so the installed
+    # command runs from the checkout; a console script does not put the
+    # working directory on sys.path, so it imports the installed package.
+    - name: Run the strict demo with the installed wheel
+      run: |
+        "$SMOKE/bin/sslabdata" --config examples/demo/lab.yaml --strict \
+          --format json --output "$RUNNER_TEMP/lab.json"
+
+    # Run outside the checkout so the checkout cannot shadow site-packages.
+    - name: Validate the demo document against the installed schema
+      working-directory: ${{ runner.temp }}
+      run: |
+        "$SMOKE/bin/python" - "$RUNNER_TEMP/lab.json" <<'EOF'
+        import json
+        import sys
+        import sysconfig
+        from importlib.resources import files
+        from pathlib import Path
+
+        import jsonschema
+        import sslabdata
+
+        assert sys.version_info[:2] == (3, 10), sys.version
+        site = Path(sysconfig.get_paths()["purelib"]).resolve()
+        where = Path(sslabdata.__file__).resolve()
+        assert site in where.parents, f"{where} is not in {site}"
+
+        schema = json.loads(files("sslabdata.schema")
+                            .joinpath("v5/output.schema.json")
+                            .read_text(encoding="utf-8"))
+        document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+        jsonschema.validate(document, schema)
+        print(f"{sys.argv[1]} matches schema v5 from {where.parent}")
+        EOF
+
+    - name: Upload distributions
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: dist
+        path: ${{ env.DIST }}/
+        if-no-files-found: error
+
+  # The full suite on the commit being published. Pull requests and pushes to
+  # main already run it through test.yml, so it runs here only when a publish
+  # job will: its condition is the union of theirs.
+  tests:
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+      || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/test.yml
+
+  publish-pypi:
+    name: publish to PyPI
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [ artifacts, tests ]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/sslabdata/${{ needs.artifacts.outputs.version }}/
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download the checked distributions
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: dist
+        path: dist/
+
+    - name: Check the tag matches the package version
+      env:
+        VERSION: ${{ needs.artifacts.outputs.version }}
+      run: |
+        if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+          echo "::error::tag $GITHUB_REF_NAME does not match package version $VERSION"
+          exit 1
+        fi
+        ls -l dist
+
+    - name: Publish
+      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  publish-testpypi:
+    name: publish to TestPyPI
+    if: github.event_name == 'workflow_dispatch'
+    needs: [ artifacts, tests ]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/sslabdata/${{ needs.artifacts.outputs.version }}/
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download the checked distributions
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: dist
+        path: dist/
+
+    - name: Publish
+      uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+      with:
+        repository-url: https://test.pypi.org/legacy/
+
+  install-testpypi:
+    name: install from TestPyPI
+    needs: [ artifacts, publish-testpypi ]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: '3.10'
+
+    # The package comes from TestPyPI by name, its dependencies from PyPI.
+    # pip merges both indexes, so rehearse a version before it exists on PyPI.
+    # A new upload can take a few minutes to appear in the index.
+    - name: Install sslabdata by name
+      env:
+        VERSION: ${{ needs.artifacts.outputs.version }}
+      run: |
+        python -m venv "$RUNNER_TEMP/venv"
+        for attempt in 1 2 3 4 5 6; do
+          "$RUNNER_TEMP/venv/bin/pip" install --no-cache-dir \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "sslabdata==$VERSION" && break
+          if [ "$attempt" -eq 6 ]; then exit 1; fi
+          sleep 30
+        done
+        cd "$RUNNER_TEMP"
+        "$RUNNER_TEMP/venv/bin/sslabdata" --help
+        "$RUNNER_TEMP/venv/bin/python" -c "import sslabdata; print(sslabdata.__file__)"
+        installed=$("$RUNNER_TEMP/venv/bin/python" -c "from importlib.metadata import version; print(version('sslabdata'))")
+        test "$installed" = "$VERSION"

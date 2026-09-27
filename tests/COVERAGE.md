@@ -233,6 +233,7 @@ the source text are not markup and must survive unchanged.
 | `latex.dotless_i` | `Mar\'\i a` | `María` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.ampersand` | `Pick \& Place` | `Pick & Place` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.percent` | `A 50\% Speedup` | `A 50% Speedup` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.percent_bare` | A bare `%` in a title, at the end of an abstract, doubled as `%%`, and in `\url{https://example.org/a%20b_c}` | A literal `%` each time; the text after it and the whole URL are kept, not read as a comment | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.underscore` | `robot\_arm` | `robot_arm` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.endash` | `1--10` | `1–10` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.emdash` | `Robots---and People` | `Robots—and People` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |

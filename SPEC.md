@@ -400,7 +400,10 @@ BibTeX are converted from LaTeX to Unicode by
 and `\textbf{Best Paper}` arrives as `Best Paper`. Beside the converter's own
 table, a few common text macros have a rule (`sslabdata.parsers.latex._TEXT_MACROS`):
 `\TeX`, `\LaTeX`, `\LaTeXe` and `\BibTeX` become their names, `\emdash` and
-`\endash` their dashes, and `\slash` a `/`. Exactly the fields in
+`\endash` their dashes, and `\slash` a `/`. An unescaped `&` or `%` is a
+literal character, as in BibTeX, not an alignment tab or the start of a
+comment: `50% faster` arrives as `50% faster`, a `%` inside `\url{…}` stays in
+the URL, and in math it is escaped to `\&` or `\%`. Exactly the fields in
 `sslabdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
 `note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
 `publisher`, `address`, `organization` — applied in `entry_fields()`. Name
