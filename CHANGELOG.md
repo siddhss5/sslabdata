@@ -25,6 +25,46 @@ earlier schemas are not in the wheel, and their tagged URLs stay their access
 path. The source distribution holds the package, `README.md`, `LICENSE`,
 `SPEC.md` and every schema in `schema/`, and no tests (#112).
 
+**Upgrading from 2.0.0.** Beyond the document's shape (`schema_version` 4 and
+5 below), these changes can make a working 2.0.0 setup fail or behave
+differently:
+
+- **Names.** The distribution, the import package and the console command are
+  `sslabdata`, not `labdata` (#84). `pip install sslabdata`, `import
+  sslabdata`, and the command `sslabdata --config lab.yaml ...`.
+- **Dependencies.** `bibtexparser` is replaced by `pybtex` and `pylatexenc`
+  (#51). Several inputs 2.0.0 got wrong now convert correctly, among them
+  `{\v c}`, `\&`, `---`, `Smith, Jr., John` and braced corporate names, so
+  the emitted text of such works changes.
+- **The Jekyll site is gone** (#73). sslabdata is the compiler only. The demo
+  renderer is [sslabdata-site](https://github.com/siddhss5/sslabdata-site), and
+  sslabdata ignores a `site:` section in `lab.yaml`.
+- **Stricter input.** A configuration 2.0.0 accepted can now stop the run:
+  - malformed input that ended in a traceback or was silently dropped is a
+    coded, located diagnostic, and a `.bib` file that is not UTF-8 is fatal
+    under `BIB-ENCODING-INVALID` (#94);
+  - every configuration and record field has its YAML type checked, fatal at
+    load under `CONFIG-TYPE-INVALID` in `lab.yaml` (#120);
+  - a `bib_files` name that leaves `bib_dir`, by `..`, a drive or a symlink,
+    is fatal under `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR` (#122);
+  - an unknown key in the people, projects or collaborators file is reported
+    under `RECORD-KEY-UNKNOWN`, a warning that `--strict` makes an error (#103);
+  - a value under `lab` that JSON cannot carry is fatal at load under
+    `CONFIG-VALUE-NOT-JSON` (see below).
+- **Links.** A BibTeX `video` field is read as a video link (#105), and a `pdf`
+  field as the work's PDF link, replacing the one guessed from `pdf_base_url`
+  (#107). A `url` is a video link only when its parsed hostname is a video
+  host or a subdomain of one, so `notyoutube.com` and `?next=youtube.com` are
+  no longer videos (#123).
+- **Author matching.** Run-together initials match like spaced ones: `S.S.
+  Adams` and `S. S. Adams` are the same name (#83). How matching changed more
+  broadly is under *Author matching reads the structured full name* below.
+- **Output.** `--output` writes atomically: on any failure the file already
+  there is left as it was, and no partial file is written (#124).
+- **Python API.** The elements of `AssemblyResult.diagnostics` and
+  `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
+  below).
+
 ## `schema_version` 5 (tag `schema-v5`, 2026-09-25)
 
 Three changes, and nothing else in the document moves (#101):
@@ -166,6 +206,51 @@ Through commit `cf9e055`, `--unresolved` printed `All authors resolved.` when
 no `people_file` was configured, where nothing had been attempted. Since #61
 it prints `Author resolution is not configured (no people_file).` and exits
 `0`.
+
+### A bare `%` in a field value is kept (#133)
+
+Before 3.0.0 the LaTeX converter read a bare `%` inside a braced field value
+as the start of a comment, so everything after it was silently dropped: `50%
+faster robots` was emitted as `50`, and an abstract or a `\url` stopped at its
+first `%`. A bare `%` is now a literal percent sign, as it is to BibTeX, and
+`\%` is unchanged. Only works containing a bare `%` emit different text. In
+math, a bare `%` is written back as `\%`, as a bare `&` already was.
+
+### Values under `lab`, `--validate`, and output write failures (#121, #134, #142)
+
+Before 3.0.0, `lab` was copied into the document unchanged, and three problems
+followed from that:
+
+- **Dates.** An unquoted date such as `founded: 2010-01-01` crashed JSON
+  export with a traceback, even though `--validate --strict` had passed.
+- **NaN.** `.nan` was written into JSON output as `NaN`, which is not JSON.
+- **Other YAML types.** A set or binary value was written into YAML output
+  with Python-specific tags.
+
+Now every value under `lab` and `lab.links`, at any depth, follows one rule.
+A date or timestamp is emitted as ISO 8601 text in both formats. NaN, the
+infinities, sets, binary values, any other type JSON cannot carry, and a
+mapping key that is not a string are refused, fatal at load under
+`CONFIG-VALUE-NOT-JSON` and located at `lab.yaml:lab:<path>`. The last of
+these can reject a `lab.yaml` that 2.0.0 exported, for example a year used as
+a key.
+
+`--validate` now builds the document in memory, in `--format`, with the same
+code `--output` writes it with, so it cannot pass a document that `--output`
+would refuse. A destination `--output` cannot write, such as a directory, a
+path under a file, or a directory without permission, is reported under
+`OUTPUT-WRITE-FAILED` with exit `1` instead of a traceback, and the file
+already there is left as it was.
+
+### Diagnostics in the Python API are dataclasses (#141)
+
+A diagnostic was a `str` subclass with its parts attached as attributes, so
+a caller could use it as text. It is now a frozen dataclass with `code`,
+`file`, `key`, `field` and `message` fields. `str()` of one gives exactly the
+line the CLI prints, and a code missing from the registry is refused when the
+diagnostic is built. A caller that tested a diagnostic as text, such as
+`"BIB-" in d`, now reads `d.code` or `str(d)`. The CLI's text and JSON output
+are unchanged.
 
 ### Rename to `sslabdata` (#82)
 
