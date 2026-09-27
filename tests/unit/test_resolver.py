@@ -1,4 +1,7 @@
-"""Tests for the resolver: author matching, collaborator grouping, back-linking."""
+"""Tests for the resolver: author matching, collaborator grouping, back-linking.
+
+Isolated on purpose: each class names the boundary the conformance corpus would
+need a fixture per case to reach."""
 
 import pytest
 
@@ -18,7 +21,25 @@ from sslabdata.resolver import (
 )
 
 
+def places(lines):
+    """The (code, location) of each diagnostic line. SPEC.md: prose is not stable."""
+    return [tuple(line.split(" ", 2)[:2]) for line in lines]
+
+
+def assert_diagnostic(line, code, where, *values):
+    """A diagnostic's code and location, and the essential values in its message."""
+    prefix = f"{code} {where} "
+    assert line.startswith(prefix), line
+    message = line[len(prefix):]
+    missing = [value for value in values if value not in message]
+    assert not missing, (missing, line)
+
+
 class TestNormalizeName:
+    """The matching key. Accent, period, whitespace and footnote-markup variants of one name each
+    need their own corpus entry to reach through the CLI; a wrong key silently links
+    or drops every author it touches."""
+
     def test_basic(self):
         assert normalize_name("A. Adams") == "a adams"
 
@@ -36,6 +57,9 @@ class TestNormalizeName:
 
 
 class TestIsAbbreviated:
+    """The gate on fuzzy matching. A wrong answer lets `H. Zhang` suggest an unrelated
+    person; the spellings that decide it are too many to write as fixtures."""
+
     def test_single_initial_surname(self):
         assert is_abbreviated("a kim") is True
         assert is_abbreviated("h zhang") is True
@@ -51,6 +75,10 @@ class TestIsAbbreviated:
 
 
 class TestSameInitial:
+    """Two members sharing an initial and a family name: an alias one of them never
+    declared must not link an abbreviated name to the wrong person, a silent
+    misattribution."""
+
     def test_same_initial_collision_without_alias(self):
         """An alias shared implicitly with another person's initials is ambiguous.
 
@@ -72,6 +100,10 @@ class TestSameInitial:
 
 
 class TestFuzzyMatches:
+    """The threshold and tie boundaries of a suggestion: abbreviated names are skipped,
+    ties are all returned in sorted order, and a form two people declare suggests
+    neither. Reached through the CLI only by one suggestion per fixture."""
+
     def test_abbreviated_name_skipped(self):
         """Single-initial names should NOT fuzzy match — too ambiguous."""
         assert fuzzy_matches("H. Zhang", Candidates([("yzhang", ["Y. Zhang"])])) == []
@@ -109,7 +141,11 @@ MATCHED_ON_THE_FULL_NAME = [
 
 class TestTheResolverMatchesTheFullName:
     """#24: a full name is matched as written, and never abbreviated to find
-    someone who declared the abbreviation."""
+    someone who declared the abbreviation.
+
+    The failure is silent: the author is linked to the wrong member and no
+    diagnostic is raised, so only an assertion on the resulting `person_id`
+    over several name pairs exposes it."""
 
     PEOPLE = [
         Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
@@ -161,7 +197,10 @@ class TestTheResolverMatchesTheFullName:
 
 
 class TestMatchingPolicy:
-    """The order `match()` applies, and what it reports instead of guessing."""
+    """The order `match()` applies, and what it reports instead of guessing.
+
+    A wrong order links an author to the wrong member with no diagnostic. Each
+    rung of the order is one case; a fixture per rung would repeat the lab."""
 
     def run(self, people, *authors, editors=()):
         work = Work(bib_id="k1", title="T", category="C", entry_type="article",
@@ -183,9 +222,9 @@ class TestMatchingPolicy:
         assert author.resolution_status == "ambiguous"
         assert author.resolution_method is None
         assert unresolved == ["A. Kim", "Bob Brown"]
-        assert warnings == [
-            "RESOLVE-AMBIGUOUS-NAME bib/w.bib:k1:author: position 2, 'A. Kim', "
-            "fits more than one person and is left unresolved: akim, alankim"]
+        [warning] = warnings
+        assert_diagnostic(warning, "RESOLVE-AMBIGUOUS-NAME", "bib/w.bib:k1:author:",
+                          "A. Kim", "akim", "alankim")
 
     def test_two_people_declaring_one_full_name_is_ambiguous(self):
         people = [Person(id="lee1", name="Lin Lee"), Person(id="lee2", name="Lin Lee")]
@@ -203,10 +242,9 @@ class TestMatchingPolicy:
         assert work.authors[0].person_id is None
         assert work.authors[0].resolution_status == "unresolved"
         assert unresolved == ["Dave M. Davis"]
-        assert warnings == [
-            "RESOLVE-SUGGESTION bib/w.bib:k1:author: position 1, 'Dave M. Davis', "
-            "matched no person but may be ddavis; not linked, declare an alias "
-            "if it is"]
+        [warning] = warnings
+        assert_diagnostic(warning, "RESOLVE-SUGGESTION", "bib/w.bib:k1:author:",
+                          "Dave M. Davis", "ddavis")
 
     def test_a_fuller_name_is_not_folded_into_a_declared_initial(self):
         """`Alan Kim` is not the Kim who declared `A. Kim`: a suggestion only."""
@@ -277,10 +315,9 @@ class TestMatchingPolicy:
         assert author.person_id is None
         assert (author.resolution_status, author.resolution_method) == ("unresolved", None)
         assert unresolved == ["Alice Star*"]
-        assert warnings == [
-            "RESOLVE-SUGGESTION bib/w.bib:k1:author: position 1, 'Alice Star*', "
-            "matched no person but may be astar; not linked, declare an alias "
-            "if it is"]
+        [warning] = warnings
+        assert_diagnostic(warning, "RESOLVE-SUGGESTION", "bib/w.bib:k1:author:",
+                          "Alice Star*", "astar")
 
     def test_tied_near_misses_are_all_suggested_in_sorted_order(self):
         """Two people equally close are both suggested, whatever their order
@@ -302,8 +339,8 @@ class TestMatchingPolicy:
                                          family="Kim")])
         assert work.editors[0].person_id is None
         assert unresolved == []
-        assert warnings[0].startswith(
-            "RESOLVE-AMBIGUOUS-NAME bib/w.bib:k1:editor: position 1")
+        assert_diagnostic(warnings[0], "RESOLVE-AMBIGUOUS-NAME",
+                          "bib/w.bib:k1:editor:", "A. Kim")
 
 
 def _resolved(people, **parts):
@@ -316,7 +353,10 @@ def _resolved(people, **parts):
 
 
 class TestRunTogetherInitials:
-    """`S.S.` in a given name is `S. S.`, on both sides of a match (#81)."""
+    """`S.S.` in a given name is `S. S.`, on both sides of a match (#81).
+
+    Read as different spellings, one person splits into two collaborators or a
+    member's alias is missed; each spelling pair is its own case."""
 
     IVERS = [Person(id="sivers", name="Stella Sky Ivers", aliases=["S. S. Ivers"])]
 
@@ -387,6 +427,9 @@ class TestRunTogetherInitials:
 
 
 class TestResolveAuthors:
+    """An editor resolves but is never reported as an unresolved author; the
+    conformance suite reads the author report only."""
+
     def _make_work(self, authors, editors=()):
         return Work(
             bib_id="test",
@@ -413,6 +456,9 @@ class TestResolveAuthors:
 
 
 class TestComputeBacklinks:
+    """Back-links ignore editors and are idempotent. The CLI runs them once, so a
+    second run is unreachable through conformance."""
+
     def _work(self, **changes):
         fields = dict(
             bib_id="adams2024",
@@ -451,16 +497,24 @@ class TestComputeBacklinks:
 
 
 class TestLoadPeople:
+    """The loader called directly, as a caller with a hand-built configuration does,
+    on a file that is not there. The CLI reports it first, as a coded error."""
+
     def test_missing_file(self):
         assert load_people("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadProjects:
+    """The loader called directly on a file that is not there; see TestLoadPeople."""
+
     def test_missing_file(self):
         assert load_projects("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadCollaborators:
+    """The loader called directly: aliases are read as declared, and a missing or
+    empty file declares nobody."""
+
     def test_load(self, tmp_path):
         path = tmp_path / "collaborators.yaml"
         path.write_text('- name: "Priya Patel"\n  aliases: ["P. Patel"]\n'
@@ -477,7 +531,10 @@ class TestLoadCollaborators:
 
 
 class TestDeclaredCollaboratorGrouping:
-    """`collaborators_file` groups spellings; it never produces a person."""
+    """`collaborators_file` groups spellings; it never produces a person.
+
+    A declared collaborator that became a person, or two people written alike
+    that merged, would change every consumer's graph without a diagnostic."""
 
     def assemble(self, people, declared, *authors_by_work):
         from sslabdata.assembler import declared_collaborators, group_collaborators
@@ -528,10 +585,9 @@ class TestDeclaredCollaboratorGrouping:
                          aliases=["S. S. Ivers"])]
         _, _, warnings = self.assemble(
             people, [DeclaredCollaborator("Sam Sol Ivers", ["S.S. Ivers"])])
-        assert warnings == [
-            "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER c.yaml:Sam Sol Ivers:aliases: "
-            "'S.S. Ivers' is also declared by sivers; the member keeps it and "
-            "the collaborator entry is not used for it"]
+        [warning] = warnings
+        assert_diagnostic(warning, "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER",
+                          "c.yaml:Sam Sol Ivers:aliases:", "S.S. Ivers", "sivers")
 
     def test_declared_collaborators_differing_in_the_family_name_stay_apart(self):
         """`S.S. S.S.` spaces its given name only, so it is not `S. S. S. S.`,
@@ -567,11 +623,10 @@ class TestDeclaredCollaboratorGrouping:
             [Author(name="P. Patel", position=2, given="P.", family="Patel")])
         assert [(c.name, c.grouped_by) for c in collaborators] == [
             ("P. Patel", "normalized_name")]
-        assert warnings == [
-            "ID-GROUPING-AMBIGUOUS-DECLARED bib/w.bib:w0:author: position 2, "
-            "'P. Patel', fits more than one collaborators_file entry, or an "
-            "entry and a lab member, and is grouped by its own name: "
-            "collaborator:pradeep patel, collaborator:priya patel"]
+        [warning] = warnings
+        assert_diagnostic(warning, "ID-GROUPING-AMBIGUOUS-DECLARED",
+                          "bib/w.bib:w0:author:", "P. Patel",
+                          "collaborator:pradeep patel", "collaborator:priya patel")
 
     def test_a_member_competes_with_a_declared_collaborator(self):
         """`P. Patel` could be the member as well, so it joins neither.
@@ -599,14 +654,17 @@ class TestDeclaredCollaboratorGrouping:
             [Author(name="Alice Adams", position=1, given="Alice", family="Adams")])
         assert works[0].authors[0].person_id == "aadams"
         assert collaborators == []
-        assert warnings == [
-            "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER c.yaml:Alice Adams:name: "
-            "'Alice Adams' is also declared by aadams; the member keeps it and "
-            "the collaborator entry is not used for it"]
+        [warning] = warnings
+        assert_diagnostic(warning, "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER",
+                          "c.yaml:Alice Adams:name:", "Alice Adams", "aadams")
 
 
 class TestPeopleAndProjectsFiles:
-    """What is wrong with a people or projects file, in its three classes."""
+    """What is wrong with a people or projects file, in its three classes.
+
+    The loaders' per-record checks decide which records enter the document
+    (a blank name, a non-record entry, each status and role value). The corpus
+    holds one bad record per fixture, not each value a check must accept."""
 
     def load(self, tmp_path, loader, text):
         path = tmp_path / "records.yaml"
@@ -627,8 +685,8 @@ class TestPeopleAndProjectsFiles:
             tmp_path, load_people,
             "- {id: q}\n- {id: p, name: ' '}\n- {id: r, name: R, role: x}\n")
         assert [r.id for r in records] == ["r"]
-        assert errors == ["PEOPLE-FIELD-MISSING f.yaml:q:name: entry 1 has no name",
-                          "PEOPLE-FIELD-MISSING f.yaml:p:name: entry 2 has no name"]
+        assert places(errors) == [("PEOPLE-FIELD-MISSING", "f.yaml:q:name:"),
+                                  ("PEOPLE-FIELD-MISSING", "f.yaml:p:name:")]
 
     def test_a_projects_file_that_is_not_a_list_is_fatal(self, tmp_path):
         records, errors, _, _ = self.load(tmp_path, load_projects, "p: {title: T}\n")
@@ -640,25 +698,24 @@ class TestPeopleAndProjectsFiles:
             tmp_path, load_projects, "- just text\n- {title: No id}\n"
             "- {id: q}\n- {id: p, title: P}\n")
         assert [r.id for r in records] == ["p"]
-        assert errors == [
-            "PROJECTS-NOT-A-LIST f.yaml::: entry 1 is a str, not a record",
-            "PROJECTS-FIELD-MISSING f.yaml::id: entry 2 has no id",
-            "PROJECTS-FIELD-MISSING f.yaml:q:title: entry 3 has no title"]
+        assert places(errors) == [("PROJECTS-NOT-A-LIST", "f.yaml:::"),
+                                  ("PROJECTS-FIELD-MISSING", "f.yaml::id:"),
+                                  ("PROJECTS-FIELD-MISSING", "f.yaml:q:title:")]
         _, errors, _, _ = self.load(tmp_path, load_people, "- {name: No Id}\n")
-        assert errors == ["PEOPLE-FIELD-MISSING f.yaml::id: entry 1 has no id"]
+        assert places(errors) == [("PEOPLE-FIELD-MISSING", "f.yaml::id:")]
         declared, errors, _, _ = self.load(
             tmp_path, load_collaborators,
             "- {aliases: [X]}\n- {name: Priya Patel}\n")
         assert [c.name for c in declared] == ["Priya Patel"]
-        assert errors == ["COLLABORATORS-FIELD-MISSING f.yaml::name: entry 1 has no name"]
+        assert places(errors) == [("COLLABORATORS-FIELD-MISSING", "f.yaml::name:")]
 
     def test_duplicate_ids_are_kept_and_reported(self, tmp_path):
         records, _, diagnostics, _ = self.load(
             tmp_path, load_projects,
             "- {id: p, title: A}\n- {id: p, title: B}\n")
         assert [r.title for r in records] == ["A", "B"]
-        assert diagnostics == [
-            "PROJECTS-ID-DUPLICATE f.yaml:p:id: the id 'p' is declared more than once"]
+        [duplicate] = diagnostics
+        assert_diagnostic(duplicate, "PROJECTS-ID-DUPLICATE", "f.yaml:p:id:", "'p'")
 
     @pytest.mark.parametrize("status, reported", [
         ("active", False), ("completed", False), ("paused", True)])
@@ -699,6 +756,10 @@ class TestPeopleAndProjectsFiles:
 
 
 class TestSharedDeclarations:
+    """Which declared spellings count as one name across people. Each boundary
+    (run-together initials, a suffix, a comma, a hyphen) is a way to miss an
+    ambiguous alias or to invent one; the ambiguous_alias fixture writes one shape."""
+
     def test_a_name_shared_with_an_alias_is_reported_once(self):
         people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
                   Person(id="aadamson", name="A. Adams", aliases=[]),

@@ -14,3 +14,6 @@ data/pubs/
 
 # The conformance corpus ships a tiny fictional PDF fixture (tests/corpus).
 !tests/corpus/valid/pdfs/present.pdf
+
+# The conformance-results artifact (tests/COVERAGE.md, "Conformance results").
+conformance-results.json

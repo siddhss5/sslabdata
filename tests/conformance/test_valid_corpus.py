@@ -50,10 +50,9 @@ def test_redefined_strings_reported_once(valid_validate):
     lines = valid_validate.output.splitlines()
     summary = [line for line in lines if all(m in line for m in ("rss", "cfx", "jfx"))]
     assert len(summary) == 1, valid_validate.output
-    assert summary[0] == (
-        "  - BIB-STRING-REDEFINED ./strings.bib::: 3 @string macros redefined "
-        "(last definition used): cfx, jfx, rss "
-        "[./strings.bib:15, ./strings.bib:16, ./strings.bib:17]")
+    assert summary[0].startswith("  - BIB-STRING-REDEFINED ./strings.bib::: ")
+    for value in ("./strings.bib:15", "./strings.bib:16", "./strings.bib:17"):
+        assert value in summary[0]
     warnings = valid_validate.stdout.split("\nWarnings (", 1)[1]
     assert summary[0] in warnings
 

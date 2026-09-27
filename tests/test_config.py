@@ -179,7 +179,12 @@ class TestBibFileNameIsNeverAbsolute:
 
 
 class TestConfigurationShape:
-    """A lab.yaml of the wrong shape is rejected at load, with one coded line."""
+    """A lab.yaml of the wrong shape is rejected at load, with one coded line.
+
+    The invalid corpus owns each configuration key; this owns what it does not
+    write: the YAML value types (an empty file, a boolean, a float, a mapping, a
+    set), any of which a type check keyed on the wrong Python type would let
+    through or crash on."""
 
     def load(self, tmp_path, text):
         path = tmp_path / "lab.yaml"
@@ -189,14 +194,12 @@ class TestConfigurationShape:
         return str(caught.value).replace(str(path), "lab.yaml")
 
     @pytest.mark.parametrize("text, expected", [
-        ("", "CONFIG-NOT-A-MAPPING lab.yaml::: the configuration is empty"),
-        ("bib_dir: 3\n", "CONFIG-TYPE-INVALID lab.yaml:bib_dir:: bib_dir is a number"),
-        ("bib_dir: .\nlab: true\n", "CONFIG-TYPE-INVALID lab.yaml:lab:: lab is a boolean"),
-        ("bib_dir: .\nprojects_file: 1.5\n",
-         "CONFIG-TYPE-INVALID lab.yaml:projects_file:: projects_file is a number"),
-        ("bib_dir: .\npeople_file: {a: b}\n",
-         "CONFIG-TYPE-INVALID lab.yaml:people_file:: people_file is a mapping"),
-        ("bib_dir: !!set {a}\n", "CONFIG-TYPE-INVALID lab.yaml:bib_dir:: bib_dir is a set"),
+        ("", "CONFIG-NOT-A-MAPPING lab.yaml:::"),
+        ("bib_dir: 3\n", "CONFIG-TYPE-INVALID lab.yaml:bib_dir::"),
+        ("bib_dir: .\nlab: true\n", "CONFIG-TYPE-INVALID lab.yaml:lab::"),
+        ("bib_dir: .\nprojects_file: 1.5\n", "CONFIG-TYPE-INVALID lab.yaml:projects_file::"),
+        ("bib_dir: .\npeople_file: {a: b}\n", "CONFIG-TYPE-INVALID lab.yaml:people_file::"),
+        ("bib_dir: !!set {a}\n", "CONFIG-TYPE-INVALID lab.yaml:bib_dir::"),
     ])
     def test_rejected(self, tmp_path, text, expected):
         assert self.load(tmp_path, text).startswith(expected)
@@ -208,10 +211,3 @@ class TestConfigurationShape:
         config = LabDataConfig.from_yaml(str(path))
         assert config.unknown_keys == ["people_fil", "extra"]
         assert config.bib_files == []
-
-    def test_an_empty_bib_files_list_is_reported(self, tmp_path):
-        config = LabDataConfig(bib_dir=str(tmp_path), bib_files=[],
-                               path="lab.yaml")
-        result = assemble(config, diagnostics=True)
-        assert any(w.startswith("CONFIG-BIB-FILES-MISSING lab.yaml:bib_files::")
-                   for w in result.diagnostics), result.diagnostics

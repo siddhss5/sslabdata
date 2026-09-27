@@ -6,7 +6,6 @@ import os
 import stat
 import yaml
 import pytest
-from pathlib import Path
 
 from sslabdata import (
     Author, ConfigurationError, LabData, Person, Project, Venue, Work,
@@ -45,10 +44,10 @@ def sample_data():
 
 
 class TestExportToJson:
-    def test_creates_parent_dirs(self, tmp_path, sample_data):
-        out = str(tmp_path / "nested" / "dir" / "output.json")
-        export_to_json(sample_data, out)
-        assert Path(out).exists()
+    """A `LabData` with nothing in it still serializes to a complete document.
+
+    A section emitted as `null` instead of `[]` for an empty lab passes every
+    conformance run, whose labs are never empty in every section."""
 
     def test_empty_data(self, tmp_path):
         import sslabdata
@@ -234,6 +233,9 @@ def test_replacing_a_private_file_never_exposes_the_document(
                          ids=["json", "yaml"])
 def test_a_directory_destination_raises_oserror_and_leaves_no_file(
         tmp_path, monkeypatch, sample_data, export):
+    """A destination that cannot be replaced fails with the OS error and
+    leaves no temporary file behind: the atomic write's cleanup path, which
+    no CLI fixture can provoke portably."""
     monkeypatch.chdir(tmp_path)
     with pytest.raises(OSError):
         export(sample_data, ".")

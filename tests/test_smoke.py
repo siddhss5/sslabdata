@@ -1,4 +1,7 @@
-"""Smoke test: the package's public names import."""
+"""Smoke test: the package's public names import.
+
+A name dropped from `sslabdata` breaks every consumer that imports it, and
+no conformance test imports all of them."""
 
 
 def test_core_classes_importable():

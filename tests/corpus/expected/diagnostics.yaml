@@ -1,383 +1,493 @@
-# Expected diagnostics for each case in tests/corpus/invalid/<dir>/.
-# test_invalid_corpus.py runs `sslabdata --config lab.yaml --validate` in that
-# folder, and `--format json --output` for `kept`. Checks:
+# The expected outcome of each case in tests/corpus/invalid/<dir>/, one entry
+# per fixture. test_invalid_corpus.py runs each fixture once per mode
+# (`--validate`, `--unresolved`, `--output`) and once through the Python API,
+# and compares everything a user can observe with the entry.
 #
-#   exit     error: sslabdata exits non-zero with a message (no traceback).
-#            ok:    sslabdata exits zero (a warning at most).
-#            any:   either, as long as sslabdata does not crash.
-#   reports  what is wrong: tokens (a value, a config key) the output must name.
-#   locates  where it is: the file, entry key and field, per #26.
-#   kept     bib keys that must still be in the exported output.
-#   xfail    checks that fail today, mapped to the issue that fixes them.
+#   dir          the fixture folder; its lab.yaml is the configuration.
+#   exit         the exit status of `--validate`, 0 or 1. Under `--unresolved`
+#                and `--output` it is 1 only for a fatal case.
+#   fatal        load: the configuration does not load, so `assemble()` is never
+#                reached. assembly: it loads and assembly finds a fatal code.
+#                Absent: nothing is fatal, and a document is written.
+#   diagnostics  the records `--validate --format json` reports, every one of
+#                them, each exactly once: code, severity, and where (file, key,
+#                field; omitted when null). `--unresolved` and the standard
+#                error of `--output` report the same records, as warnings
+#                unless the case is fatal. CONFIG-LAB-NAME-MISSING is left out:
+#                these fixtures declare no lab name, and test_config_cli.py owns
+#                it. `values` are tokens the message must carry: the value that
+#                is wrong, never the wording around it.
+#   unresolved_only
+#                records `--unresolved` adds to those: the names it lists.
+#   kept         every bib key in the exported document, exactly and each as often as
+#                it is exported; a fatal case writes no document.
+#   emits        what the exported document holds for a work, person or project
+#                (by bib key or id): a value, or contains/excludes for text.
+#   not_emitted  tokens the exported document must not contain.
 #
-# Checks look for tokens, never for exact English wording.
+# A `key` that YAML would read as a number or a date is quoted.
 
 # --- BibTeX structure ---------------------------------------------------------
 
-# The field token matters as much as the file and the key: the entry whose
-# brace never closes also loses its year, and the year diagnostic names the
-# same file and key. A row satisfied by that one would be reporting a
-# different defect.
+# The entry whose brace never closes also loses its venue and year, and each
+# of those is its own record on the same file and key.
 structure.unclosed_brace:
   dir: unclosed_brace
-  exit: any
-  locates: [broken.bib, brace-broken, title]
-  kept: [brace-before, brace-after]
+  exit: 0
+  diagnostics:
+    - {code: BIB-SYNTAX-ERROR, severity: warning, file: ./broken.bib, key: brace-broken, field: title}
+    - {code: BIB-VENUE-MISSING, severity: warning, file: ./broken.bib, key: brace-broken, field: journal}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./broken.bib, key: brace-broken, field: year}
+  kept: [brace-before, brace-broken, brace-after]
 
 structure.duplicate_key_file:
   dir: duplicate_key_same_file
-  exit: error
-  reports: [BIB-DUPLICATE-KEY]
-  locates: [dup.bib, dup-key, citation_key]
+  exit: 1
+  diagnostics:
+    - {code: BIB-DUPLICATE-KEY, severity: error, file: ./dup.bib, key: dup-key, field: citation_key}
+  kept: [dup-key]
 
 structure.duplicate_key_across:
   dir: duplicate_key_across_files
-  exit: error
-  reports: [BIB-DUPLICATE-KEY]
-  locates: [first.bib, second.bib, shared-key, citation_key]
+  exit: 1
+  diagnostics:
+    - {code: BIB-DUPLICATE-KEY, severity: error, file: ./second.bib, key: shared-key, field: citation_key, values: [./first.bib]}
+  kept: [shared-key, shared-key]
 
 structure.missing_year:
   dir: missing_year
-  exit: any
-  reports: [BIB-YEAR-MISSING]
-  locates: [noyear.bib, no-year, year]
+  exit: 0
+  diagnostics:
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./noyear.bib, key: no-year, field: year}
   kept: [no-year]
 
 structure.crossref:
   dir: crossref_entry
-  exit: error
-  reports: [BIB-CROSSREF-UNSUPPORTED, proc2024]
-  locates: [crossref.bib, child2024, crossref]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: BIB-CROSSREF-UNSUPPORTED, severity: error, file: ./crossref.bib, key: child2024, field: crossref, values: [proc2024]}
 
 structure.crossref_undefined_parent:
   dir: crossref_undefined_parent
-  exit: error
-  reports: [BIB-CROSSREF-UNSUPPORTED, no-such-parent]
-  locates: [crossref.bib, orphan-child, crossref]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: BIB-CROSSREF-UNSUPPORTED, severity: error, file: ./crossref.bib, key: orphan-child, field: crossref, values: [no-such-parent]}
 
 # The field is rejected on its presence, not on its value, so an empty one
 # and a whitespace-only one are the same error as any other.
 structure.crossref_no_parent:
   dir: crossref_no_parent
-  exit: error
-  reports: [BIB-CROSSREF-UNSUPPORTED]
-  locates: [crossref.bib, empty-crossref, blank-crossref, crossref]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: BIB-CROSSREF-UNSUPPORTED, severity: error, file: ./crossref.bib, key: empty-crossref, field: crossref}
+    - {code: BIB-CROSSREF-UNSUPPORTED, severity: error, file: ./crossref.bib, key: blank-crossref, field: crossref}
 
 structure.year_not_number:
   dir: year_not_number
-  exit: any
-  locates: [badyear.bib, bad-year, year]
+  exit: 0
+  diagnostics:
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./badyear.bib, key: bad-year, field: year, values: [in press]}
   kept: [bad-year, ok-entry]
 
 structure.missing_journal:
   dir: missing_journal
-  exit: any
-  locates: [nojournal.bib, no-journal, journal]
+  exit: 0
+  diagnostics:
+    - {code: BIB-VENUE-MISSING, severity: warning, file: ./nojournal.bib, key: no-journal, field: journal}
   kept: [no-journal]
 
 structure.missing_booktitle:
   dir: missing_booktitle
-  exit: any
-  locates: [nobooktitle.bib, no-booktitle, booktitle]
+  exit: 0
+  diagnostics:
+    - {code: BIB-VENUE-MISSING, severity: warning, file: ./nobooktitle.bib, key: no-booktitle, field: booktitle}
   kept: [no-booktitle]
 
+# The macro is read as empty, so the entry has no booktitle either.
 strings.undefined:
   dir: undefined_string
-  exit: any
-  reports: [nosuchmacro]
-  locates: [macro.bib, undefined-macro, booktitle]
+  exit: 0
+  diagnostics:
+    - {code: BIB-STRING-UNDEFINED, severity: warning, file: ./macro.bib, key: undefined-macro, field: booktitle, values: [nosuchmacro]}
+    - {code: BIB-VENUE-MISSING, severity: warning, file: ./macro.bib, key: undefined-macro, field: booktitle}
   kept: [undefined-macro, ok-entry]
 
 types.unsupported:
   dir: unsupported_entry_type
-  exit: any
-  reports: [unpublished]
-  locates: [entry.bib, draft-note, entry_type]
+  exit: 0
+  diagnostics:
+    - {code: BIB-ENTRY-TYPE-UNSUPPORTED, severity: warning, file: ./entry.bib, key: draft-note, field: entry_type, values: [unpublished]}
   kept: [draft-note]
 
 latex.unknown_macro:
   dir: unknown_macro
-  exit: any
-  reports: [fictionalmacro]
-  locates: [macro.bib, unknown-macro, title]
+  exit: 0
+  diagnostics:
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./macro.bib, key: unknown-macro, field: title, values: ["\\fictionalmacro"]}
   kept: [unknown-macro]
+  emits:
+    - work: unknown-macro
+      expect: {title: {contains: [Strange], excludes: ["\\"]}}
 
-# One line for the command, however many fields use it, with the count and
+# One record for the command, however many fields use it, with the count and
 # the first field in document order.
 latex.unknown_macro_repeated:
   dir: unknown_macro_repeated
-  exit: any
-  reports: [fictionalmacro, 3 fields]
-  locates: [macro.bib, first-use, title]
+  exit: 0
+  diagnostics:
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./macro.bib, key: first-use, field: title, values: ["\\fictionalmacro", 3 fields]}
   kept: [first-use, second-use]
 
-# Valid input kept here as a regression case: on its own it must pass with
-# no LATEX-COMMAND-UNKNOWN, and the valid corpus stays unchanged.
+# Valid input kept here as a regression case: it reports nothing, and the
+# valid corpus stays unchanged.
 latex.text_macros:
   dir: common_text_macros
-  exit: ok
+  exit: 0
+  diagnostics: []
   kept: [text-macros]
+  emits:
+    - work: text-macros
+      expect:
+        title: "The TeX book 1990—2000"
+        note: "Typeset with LaTeX and BibTeX, pages 1–2, read/write"
 
 # The first byte that is not UTF-8 is on line 6 of latin1.bib.
 structure.not_utf8:
   dir: bib_not_utf8
-  exit: error
-  reports: [BIB-ENCODING-INVALID, "0xfc"]
-  locates: [latin1.bib, line 6]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: BIB-ENCODING-INVALID, severity: error, file: ./latin1.bib, values: ["0xfc", line 6]}
 
 # --- Projects, people and identity -------------------------------------------
 
 projects.undefined:
   dir: undefined_project
-  exit: any
-  reports: [nosuchproject]
-  locates: [tagged.bib, proj-undefined, project]
+  exit: 1
+  diagnostics:
+    - {code: RESOLVE-PROJECT-UNKNOWN, severity: error, file: ./tagged.bib, key: proj-undefined, field: project, values: [nosuchproject]}
   kept: [proj-undefined]
 
 people.duplicate_id:
   dir: duplicate_person_id
-  exit: error
-  reports: [aadams]
-  locates: [people.yaml]
+  exit: 1
+  diagnostics:
+    - {code: PEOPLE-ID-DUPLICATE, severity: error, file: people.yaml, key: aadams, field: id}
+  kept: [ok-entry]
 
 projects.duplicate_id:
   dir: duplicate_project_id
-  exit: error
-  reports: [homebot]
-  locates: [projects.yaml]
+  exit: 1
+  diagnostics:
+    - {code: PROJECTS-ID-DUPLICATE, severity: error, file: projects.yaml, key: homebot, field: id}
+  kept: [ok-entry]
 
 # A role is any non-empty string, so what is wrong is the absence of one:
 # missing (bbrown), empty (ccote) or not a string (ddavis).
 people.invalid_role:
   dir: invalid_person_role
-  exit: any
-  reports: [PEOPLE-ROLE-INVALID]
-  locates: [people.yaml, bbrown, ccote, ddavis, role]
+  exit: 0
+  diagnostics:
+    - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: role}
+    - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: ccote, field: role}
+    - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: ddavis, field: role}
+  kept: [ok-entry]
 
 people.invalid_status:
   dir: invalid_person_status
-  exit: any
-  reports: [retired]
-  locates: [people.yaml, bbrown, status]
-
-records.unknown_key:
-  dir: record_unknown_key
-  exit: ok
-  reports: [RECORD-KEY-UNKNOWN, webiste, funding, affiliation]
-
-records.optional_type_invalid:
-  dir: record_field_types
-  exit: ok
-  reports: [RECORD-TYPE-INVALID]
-
-records.required_type_invalid:
-  dir: record_id_types
-  exit: error
-  reports: [PEOPLE-FIELD-MISSING, PROJECTS-FIELD-MISSING, COLLABORATORS-FIELD-MISSING]
+  exit: 0
+  diagnostics:
+    - {code: PEOPLE-STATUS-INVALID, severity: warning, file: people.yaml, key: bbrown, field: status, values: [retired]}
+  kept: [ok-entry]
 
 projects.invalid_status:
   dir: invalid_project_status
-  exit: any
-  reports: [sometimes]
-  locates: [projects.yaml, sharedarm, status]
+  exit: 0
+  diagnostics:
+    - {code: PROJECTS-STATUS-INVALID, severity: warning, file: projects.yaml, key: sharedarm, field: status, values: [sometimes]}
+  kept: [ok-entry]
+
+# One key in each file: a warning at the file, the record and the key, and no
+# key reaches the document.
+records.unknown_key:
+  dir: record_unknown_key
+  exit: 0
+  diagnostics:
+    - {code: RECORD-KEY-UNKNOWN, severity: warning, file: people.yaml, key: aadams, field: webiste}
+    - {code: RECORD-KEY-UNKNOWN, severity: warning, file: projects.yaml, key: homebot, field: funding}
+    - {code: RECORD-KEY-UNKNOWN, severity: warning, file: collaborators.yaml, key: Priya Patel, field: affiliation}
+  not_emitted: [webiste, funding, affiliation]
+  kept: [ok-entry]
+
+# Each wrong-typed optional field is one located warning and a null in the
+# document; a status that is not a string reads as the default, and aliases
+# that are not a list of strings declare none. The record is kept.
+records.optional_type_invalid:
+  dir: record_field_types
+  exit: 0
+  diagnostics:
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: aadams, field: photo}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: aadams, field: website}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: aadams, field: start_year}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: aadams, field: aliases}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: email}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: end_year}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: aliases}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: projects.yaml, key: homebot, field: description}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: projects.yaml, key: homebot, field: website}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: projects.yaml, key: homebot, field: image}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: collaborators.yaml, key: Priya Patel, field: aliases}
+    - {code: PEOPLE-STATUS-INVALID, severity: warning, file: people.yaml, key: aadams, field: status}
+    - {code: PROJECTS-STATUS-INVALID, severity: warning, file: projects.yaml, key: homebot, field: status}
+  emits:
+    - person: aadams
+      expect: {status: current, role: professor, photo: null, website: null, start_year: null}
+    - person: bbrown
+      expect: {email: null, end_year: null}
+    - project: homebot
+      expect: {status: active, description: null, website: null, image: null}
+  kept: [ok-entry]
+
+# An `id`, `name` or `title` is never coerced: a number, a list or a boolean
+# makes the record unusable, one located error per file.
+records.required_type_invalid:
+  dir: record_id_types
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: PEOPLE-FIELD-MISSING, severity: error, file: people.yaml, field: id}
+    - {code: PEOPLE-FIELD-MISSING, severity: error, file: people.yaml, key: bbrown, field: name}
+    - {code: PROJECTS-FIELD-MISSING, severity: error, file: projects.yaml, field: id}
+    - {code: COLLABORATORS-FIELD-MISSING, severity: error, file: collaborators.yaml, field: name}
 
 people.missing_name:
   dir: people_missing_name
-  exit: error
-  locates: [people.yaml, bbrown, name]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: PEOPLE-FIELD-MISSING, severity: error, file: people.yaml, key: bbrown, field: name}
 
 people.not_a_list:
   dir: people_not_a_list
-  exit: error
-  locates: [people.yaml]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: PEOPLE-NOT-A-LIST, severity: error, file: people.yaml}
 
 people.invalid_yaml:
   dir: people_invalid_yaml
-  exit: error
-  reports: [PEOPLE-YAML-INVALID]
-  locates: [people.yaml, line 5]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: PEOPLE-YAML-INVALID, severity: error, file: people.yaml, values: [line 5]}
 
 projects.invalid_yaml:
   dir: projects_invalid_yaml
-  exit: error
-  reports: [PROJECTS-YAML-INVALID]
-  locates: [projects.yaml, line 3]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: PROJECTS-YAML-INVALID, severity: error, file: projects.yaml, values: [line 3]}
 
 collaborators.invalid_yaml:
   dir: collaborators_invalid_yaml
-  exit: error
-  reports: [COLLABORATORS-YAML-INVALID]
-  locates: [collaborators.yaml, line 4]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: COLLABORATORS-YAML-INVALID, severity: error, file: collaborators.yaml, values: [line 4]}
 
 projects.missing_id:
   dir: projects_missing_id
-  exit: error
-  reports: [PROJECTS-FIELD-MISSING]
-  locates: ["projects.yaml::id"]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: PROJECTS-FIELD-MISSING, severity: error, file: projects.yaml, field: id}
 
+# The name both people declare is linked to nobody, and the record says why.
 identity.ambiguous_alias:
   dir: ambiguous_alias
-  exit: any
-  reports: [bbrown, bbrowning, B. Brown]
-  locates: [people.yaml]
+  exit: 0
+  diagnostics:
+    - {code: PEOPLE-ALIAS-AMBIGUOUS, severity: warning, file: people.yaml, key: bbrowning, field: aliases, values: [bbrown, bbrowning, B. Brown]}
+    - {code: RESOLVE-AMBIGUOUS-NAME, severity: warning, file: ./brown.bib, key: brown-initial, field: author, values: [bbrown, bbrowning]}
   kept: [brown-initial]
+  emits:
+    - work: brown-initial
+      expect: {authors.0.person_id: null, authors.0.resolution.status: ambiguous}
+  unresolved_only:
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./brown.bib, key: brown-initial, field: author, values: [B. Brown]}
 
 # --- Config -------------------------------------------------------------------
 
 config.people_file.not_found:
   dir: people_file_not_found
-  exit: error
-  reports: [people_file]
-  locates: [nobody.yaml]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: people_file, values: [nobody.yaml]}
 
 config.projects_file.not_found:
   dir: projects_file_not_found
-  exit: error
-  reports: [projects_file]
-  locates: [noprojects.yaml]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: projects_file, values: [noprojects.yaml]}
 
 config.collaborators_file.not_found:
   dir: collaborators_file_not_found
-  exit: error
-  reports: [CONFIG-FILE-NOT-FOUND, collaborators_file]
-  locates: [nocollaborators.yaml]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: collaborators_file, values: [nocollaborators.yaml]}
 
 config.collaborators_file.wrong_type:
   dir: config_collaborators_file_type
-  exit: error
-  reports: [CONFIG-TYPE-INVALID]
-  locates: ["lab.yaml:collaborators_file:"]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: collaborators_file}
 
 config.bib_files.not_found:
   dir: bib_file_not_found
-  exit: error
-  locates: [absent.bib]
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: bib_files, field: name, values: [absent.bib]}
 
 config.bib_dir.missing:
   dir: config_bib_dir_missing
-  exit: error
-  reports: [bib_dir]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-KEY-MISSING, severity: error, file: lab.yaml, key: bib_dir}
 
 config.bib_dir.wrong_type:
   dir: config_bib_dir_type
-  exit: error
-  reports: [bib_dir]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: bib_dir}
 
 config.bib_files.missing:
   dir: config_bib_files_missing
-  exit: any
-  reports: [bib_files]
-  locates: [lab.yaml, bib_files]
+  exit: 0
+  diagnostics:
+    - {code: CONFIG-BIB-FILES-MISSING, severity: warning, file: lab.yaml, key: bib_files}
+  kept: []
 
 config.bib_files.wrong_type:
   dir: config_bib_files_type
-  exit: error
-  reports: [bib_files]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: bib_files}
 
 config.bib_files.name_missing:
   dir: config_bib_file_no_name
-  exit: error
-  reports: [name]
-  locates: [lab.yaml, bib_files]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-KEY-MISSING, severity: error, file: lab.yaml, key: bib_files, field: name}
 
 config.bib_files.category_missing:
   dir: config_bib_file_no_category
-  exit: error
-  reports: [category]
-  locates: [lab.yaml, bib_files]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-KEY-MISSING, severity: error, file: lab.yaml, key: bib_files, field: category}
 
 config.bib_files.name_absolute:
   dir: config_bib_file_absolute
-  exit: error
-  reports: [CONFIG-BIB-FILE-ABSOLUTE, /etc/ok.bib]
-  locates: [lab.yaml, bib_files, name]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-BIB-FILE-ABSOLUTE, severity: error, file: lab.yaml, key: bib_files, field: name, values: [/etc/ok.bib]}
 
 config.bib_files.name_outside_bib_dir:
   dir: config_bib_file_outside
-  exit: error
-  reports: [CONFIG-BIB-FILE-OUTSIDE-BIB-DIR, ../outside.bib]
-  locates: [lab.yaml, bib_files, name]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-BIB-FILE-OUTSIDE-BIB-DIR, severity: error, file: lab.yaml, key: bib_files, field: name, values: [../outside.bib]}
 
 config.bib_files.name_wrong_type:
   dir: config_bib_file_name_type
-  exit: error
-  reports: [CONFIG-TYPE-INVALID, name]
-  locates: [lab.yaml, bib_files, name]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: bib_files, field: name}
 
 config.bib_files.category_wrong_type:
   dir: config_bib_file_category_type
-  exit: error
-  reports: [CONFIG-TYPE-INVALID, category]
-  locates: [lab.yaml, bib_files, category]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: bib_files, field: category}
 
 config.bib_files.entry_wrong_type:
   dir: config_bib_file_entry_type
-  exit: error
-  reports: [CONFIG-TYPE-INVALID, mapping]
-  locates: [lab.yaml, bib_files]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: bib_files}
 
 config.bib_files.entry_unknown_key:
   dir: config_bib_file_unknown_key
-  exit: error
-  reports: [CONFIG-TYPE-INVALID, comment]
-  locates: [lab.yaml, bib_files]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: bib_files, field: comment}
 
 config.pdf_base_url.wrong_type:
   dir: config_pdf_base_url_type
-  exit: error
-  reports: [pdf_base_url]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: pdf_base_url}
 
 config.people_file.wrong_type:
   dir: config_people_file_type
-  exit: error
-  reports: [people_file]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: people_file}
 
 config.projects_file.wrong_type:
   dir: config_projects_file_type
-  exit: error
-  reports: [projects_file]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: projects_file}
 
 config.lab.wrong_type:
   dir: config_lab_type
-  exit: error
-  reports: [lab]
-  locates: [lab.yaml]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: lab}
 
 config.lab.value_wrong_type:
   dir: config_lab_value_type
-  exit: error
-  reports: [CONFIG-TYPE-INVALID]
-  locates: [lab.yaml, lab, name]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: lab, field: name}
 
+# Three keys, one of them a number and one a date: each is named as text.
 config.unknown_key:
   dir: config_unknown_key
-  exit: any
-  reports: [people_fil]
-  locates: [lab.yaml, people_fil, "2025-01-01"]
+  exit: 0
+  diagnostics:
+    - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: people_fil}
+    - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: "7"}
+    - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: "2025-01-01"}
+  kept: [ok-entry]
 
 config.not_a_mapping:
   dir: config_not_a_mapping
-  exit: error
-  locates: [lab.yaml]
-
-# --- Messages sslabdata prints today --------------------------------------------
-
-diag.config_error:
-  dir: config_not_a_mapping
-  exit: error
-
-diag.unknown_projects:
-  dir: undefined_project
-  exit: error
-  reports: [nosuchproject]
-
-diag.ambiguous_alias:
-  dir: ambiguous_alias
-  exit: ok
-  reports: [bbrown, bbrowning]
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-NOT-A-MAPPING, severity: error, file: lab.yaml}

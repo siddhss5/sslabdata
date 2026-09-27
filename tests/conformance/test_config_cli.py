@@ -151,7 +151,7 @@ def test_unresolved_without_people_file(tmp_path):
     assert "people_file" in run.output
     assert "All authors resolved" not in run.stdout, run.stdout
     validate = run_sslabdata(["--config", variant, "--validate"], VALID)
-    assert "Unresolved authors" not in validate.stdout, validate.stdout
+    assert "Quentin Quinn" not in validate.stdout, validate.stdout
 
 
 # Covers config.projects_file.missing

@@ -44,12 +44,16 @@ def read_by(load, record, monkeypatch, tmp_path):
 
 
 def test_person_keys_are_the_keys_load_people_reads(monkeypatch, tmp_path):
+    """A key `load_people` reads but `PERSON_KEYS` lacks warns as unknown on
+    valid data; the reverse silently drops a key. The corpus writes one
+    unknown key, not every key a loader reads."""
     read = read_by(load_people, {"id": "aadams", "name": "Alice Adams"},
                    monkeypatch, tmp_path)
     assert read == set(PERSON_KEYS)
 
 
 def test_project_keys_are_the_keys_load_projects_reads(monkeypatch, tmp_path):
+    """As for people: `PROJECT_KEYS` and `load_projects` drifting apart."""
     read = read_by(load_projects, {"id": "homebot", "title": "HomeBot"},
                    monkeypatch, tmp_path)
     assert read == set(PROJECT_KEYS)
@@ -57,6 +61,7 @@ def test_project_keys_are_the_keys_load_projects_reads(monkeypatch, tmp_path):
 
 def test_collaborator_keys_are_the_keys_load_collaborators_reads(
         monkeypatch, tmp_path):
+    """As for people: `COLLABORATOR_KEYS` and `load_collaborators` drifting apart."""
     read = read_by(load_collaborators, {"name": "Priya Patel"},
                    monkeypatch, tmp_path)
     assert read == set(COLLABORATOR_KEYS)
