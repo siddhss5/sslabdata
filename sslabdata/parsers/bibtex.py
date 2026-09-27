@@ -167,7 +167,7 @@ def _redefined_macros(text: str,
     return repeated
 
 
-def redefined_summary(redefinitions: List[Tuple[str, str, int]]) -> Optional[str]:
+def redefined_summary(redefinitions: List[Tuple[str, str, int]]) -> Optional[Diagnostic]:
     """One `STRING_REDEFINED` line for ``(file, name, line)`` redefinitions.
 
     The macros are named once each, sorted, and every redefinition is listed
@@ -317,7 +317,7 @@ def _duplicate_key_error(
     key: str,
     first_path: Optional[str] = None,
     first_key: Optional[str] = None,
-) -> str:
+) -> Diagnostic:
     """One stable duplicate-key diagnostic, with both locations when known."""
     message = "duplicate citation key"
     if first_path is not None:
@@ -343,7 +343,7 @@ def _on_comment_line(text: str, position: Optional[int]) -> bool:
 
 
 def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
-                       key: Optional[str], field_name: Optional[str]) -> str:
+                       key: Optional[str], field_name: Optional[str]) -> Diagnostic:
     """One parser-library syntax error, in sslabdata's voice and located."""
     if isinstance(error, UndefinedMacro):
         macro = str(error).rsplit(": ", 1)[-1]
@@ -426,7 +426,7 @@ def _convert(value: str, on_unknown) -> str:
 
 
 def unknown_command_diagnostic(command: str, where: Tuple[str, str, str],
-                               fields: int) -> str:
+                               fields: int) -> Diagnostic:
     """One `LATEX_COMMAND_UNKNOWN` line for a whole run: how many fields use
     the command, located at ``(file, key, field)``, the first of them."""
     uses = (f"; used in {fields} field{'s' if fields != 1 else ''}, "
@@ -982,7 +982,7 @@ def entry_to_work(
     )
 
 
-def _encoding_error(path: str, error: UnicodeDecodeError) -> str:
+def _encoding_error(path: str, error: UnicodeDecodeError) -> Diagnostic:
     """The one diagnostic for a `.bib` file that is not UTF-8.
 
     No other encoding is tried: a wrong guess would silently change names.
@@ -994,7 +994,7 @@ def _encoding_error(path: str, error: UnicodeDecodeError) -> str:
                       "cannot be read. Save the file as UTF-8.")
 
 
-def _crossref_error(path: str, bib_id: str, parent: str) -> str:
+def _crossref_error(path: str, bib_id: str, parent: str) -> Diagnostic:
     """The one diagnostic for an entry that carries a ``crossref`` field.
 
     A field that is there but empty is reported as what it is rather than as

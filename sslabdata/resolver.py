@@ -208,7 +208,7 @@ def is_abbreviated(name: str) -> bool:
     return bool(_ABBREVIATED_NAME_RE.match(name))
 
 
-def shared_declarations(people: List[Person], source: str) -> List[str]:
+def shared_declarations(people: List[Person], source: str) -> List[Diagnostic]:
     """One `ALIAS_AMBIGUOUS` warning per spelling more than one person declares.
 
     Compared through `declared_form()`, so `S.S. Ivers` and `S. S. Ivers`

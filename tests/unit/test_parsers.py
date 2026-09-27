@@ -154,8 +154,8 @@ class TestParseAllWorks:
         assert [w.bib_id for w in works] == ["old", "no-year"]
         assert works[-1].year is None
         assert len(warnings) == 1
-        assert warnings[0].startswith(YEAR_MISSING)
-        assert "y.bib:no-year:year" in warnings[0]
+        assert warnings[0].code == YEAR_MISSING
+        assert "y.bib:no-year:year" in str(warnings[0])
 
 
 class TestCrossref:
@@ -188,9 +188,9 @@ class TestCrossref:
         works = self.parse(tmp_path, self.CHILD, errors)
         assert [w.bib_id for w in works] == ["a-parent"]
         assert len(errors) == 1
-        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
-        assert "child.bib:a-child:crossref" in errors[0]
-        assert "a-parent" in errors[0]
+        assert errors[0].code == CROSSREF_UNSUPPORTED
+        assert "child.bib:a-child:crossref" in str(errors[0])
+        assert "a-parent" in errors[0].message
 
     EMPTY = ("@inproceedings{empty-child,\n"
              "  title    = {A Child With an Empty Crossref},\n"
@@ -214,8 +214,8 @@ class TestCrossref:
                            errors)
         assert works == []
         assert len(errors) == 1, errors
-        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
-        assert "child.bib:empty-child:crossref" in errors[0]
+        assert errors[0].code == CROSSREF_UNSUPPORTED
+        assert "child.bib:empty-child:crossref" in str(errors[0])
 
     def test_an_empty_crossref_is_not_reported_as_a_blank_parent(self, tmp_path):
         """The diagnostic says the entry names no parent rather than quoting one.
@@ -225,12 +225,12 @@ class TestCrossref:
         """
         errors = []
         self.parse(tmp_path, self.EMPTY, errors)
-        assert "''" not in errors[0] and '""' not in errors[0], errors[0]
+        assert "''" not in errors[0].message and '""' not in errors[0].message, errors[0]
         # A named parent is still quoted, so the check above is about the
         # empty case and not about quoting in general.
         named = []
         self.parse(tmp_path, self.CHILD, named)
-        assert "'a-parent'" in named[0], named[0]
+        assert "'a-parent'" in named[0].message, named[0]
 
 
 class TestDuplicateCitationKeys:
@@ -254,7 +254,7 @@ class TestDuplicateCitationKeys:
             diagnostics=errors,
         )
 
-        assert errors == [
+        assert [str(e) for e in errors] == [
             f"{DUPLICATE_CITATION_KEY} {second}:firstkey:citation_key: "
             f"duplicate citation key; first defined in "
             f"{first}:FirstKey:citation_key"
@@ -432,7 +432,7 @@ def located(tmp_path, source, name="hazard.bib"):
                             diagnostics=warnings)
     by_code = {}
     for warning in warnings:
-        by_code.setdefault(warning.split(" ", 1)[0], []).append(warning)
+        by_code.setdefault(warning.code, []).append(warning)
     return by_code, {work.bib_id: work for work in works}
 
 
@@ -447,18 +447,18 @@ class TestLocatedParserDiagnostics:
     def test_an_undefined_macro_inside_a_string_names_no_entry(self, tmp_path):
         found, _ = located(tmp_path, "@string{alias = nosuchmacro}\n" + entry("e"))
         [line] = found[STRING_UNDEFINED]
-        assert line.startswith(f"{STRING_UNDEFINED} {tmp_path}/hazard.bib::: ")
+        assert str(line).startswith(f"{STRING_UNDEFINED} {tmp_path}/hazard.bib::: ")
 
     def test_an_error_inside_an_entry_before_any_field(self, tmp_path):
         found, _ = located(tmp_path, "@article{early, = {x}}\n" + entry("after"))
         [line] = found[SYNTAX_ERROR]
-        assert f"{tmp_path}/hazard.bib:early::" in line
-        assert "after the value" not in line
+        assert f"{tmp_path}/hazard.bib:early::" in str(line)
+        assert "after the value" not in line.message
 
     def test_text_outside_any_entry_is_located_at_the_file(self, tmp_path):
         found, works = located(tmp_path, "@article with no body\n" + entry("e"))
         [line] = found[SYNTAX_ERROR]
-        assert f"{tmp_path}/hazard.bib::: " in line and "line 1" in line
+        assert f"{tmp_path}/hazard.bib::: " in str(line) and "line 1" in line.message
         assert list(works) == ["e"]
 
     @pytest.mark.parametrize("comment", [
@@ -504,7 +504,7 @@ class TestLocatedParserDiagnostics:
     def test_a_year_that_is_not_a_number_is_null(self, tmp_path):
         found, works = located(tmp_path, entry("e").replace("{2024}", "{in press}"))
         [line] = found[YEAR_INVALID]
-        assert f"{tmp_path}/hazard.bib:e:year:" in line and "in press" in line
+        assert f"{tmp_path}/hazard.bib:e:year:" in str(line) and "in press" in line.message
         assert works["e"].year is None
 
     @pytest.mark.parametrize("entry_type, field", [
@@ -513,7 +513,7 @@ class TestLocatedParserDiagnostics:
         found, works = located(
             tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
         [line] = found[VENUE_MISSING]
-        assert f"{tmp_path}/hazard.bib:e:{field}:" in line
+        assert f"{tmp_path}/hazard.bib:e:{field}:" in str(line)
         assert works["e"].venue is None
 
     @pytest.mark.parametrize("entry_type", [
@@ -527,7 +527,7 @@ class TestLocatedParserDiagnostics:
     def test_an_undocumented_type_is_kept_and_named(self, tmp_path):
         found, works = located(tmp_path, "@booklet{e, title = {T}, year = 2024}\n")
         [line] = found[ENTRY_TYPE_UNSUPPORTED]
-        assert f"{tmp_path}/hazard.bib:e:entry_type:" in line and "@booklet" in line
+        assert f"{tmp_path}/hazard.bib:e:entry_type:" in str(line) and "@booklet" in line.message
         assert works["e"].entry_type == "booklet"
 
     def test_an_unknown_command_is_named_once_per_field(self, tmp_path):
@@ -536,8 +536,8 @@ class TestLocatedParserDiagnostics:
         found, works = located(tmp_path, source)
         lines = found[LATEX_COMMAND_UNKNOWN]
         assert len(lines) == 2, lines
-        assert any(":e:title:" in l and "\\fictional" in l for l in lines)
-        assert any(":e:author:" in l and "\\strange" in l for l in lines)
+        assert any(":e:title:" in str(l) and "\\fictional" in l.message for l in lines)
+        assert any(":e:author:" in str(l) and "\\strange" in l.message for l in lines)
         assert works["e"].title == "A and B"
 
     def test_a_citation_key_with_a_colon_keeps_its_parts(self, tmp_path):
@@ -584,20 +584,20 @@ class TestRedefinedStringSummary:
         warnings = []
         parse_all_works(bib_dir=str(tmp_path), diagnostics=warnings,
                         bib_files=[{"name": n, "category": "C"} for n in files])
-        return [w for w in warnings if w.startswith(STRING_REDEFINED)]
+        return [w for w in warnings if w.code == STRING_REDEFINED]
 
     @staticmethod
     def sites(line, tmp_path):
         """The `<file>:<line>` sites a summary lists, in the order it lists them."""
-        return re.findall(rf"{re.escape(str(tmp_path))}/\w+\.bib:\d+", line)
+        return re.findall(rf"{re.escape(str(tmp_path))}/\w+\.bib:\d+", str(line))
 
     def test_one_line_across_files_with_every_site(self, tmp_path):
         [line] = self.run(tmp_path, {
             "a.bib": "@string{b = 1}\n@string{a = 1}\n@string{B = 2}\n@string{b = 3}\n",
             "c.bib": "@string{a = 1}\n@string{a = 2}\n@string{once = 1}\n",
         })
-        assert line.startswith(f"{STRING_REDEFINED} ::: ") and line.file is None
-        assert "a, b" in line and "once" not in line
+        assert str(line).startswith(f"{STRING_REDEFINED} ::: ") and line.file is None
+        assert "a, b" in line.message and "once" not in line.message
         assert self.sites(line, tmp_path) == [
             f"{tmp_path}/a.bib:3", f"{tmp_path}/a.bib:4", f"{tmp_path}/c.bib:2"]
 
@@ -629,8 +629,8 @@ class TestRedefinitionsFollowTheParser:
         data = b"\xef\xbb\xbf" + "\r\n".join(lines).encode("utf-8") + b"\r\n"
         path, warnings, works = self.parse(tmp_path, data)
         [line] = warnings
-        assert line.startswith(f"{STRING_REDEFINED} {path}::: ") and "rss" in line
-        assert re.findall(rf"{re.escape(path)}:\d+", line) == [f"{path}:5", f"{path}:6"]
+        assert str(line).startswith(f"{STRING_REDEFINED} {path}::: ") and "rss" in line.message
+        assert re.findall(rf"{re.escape(path)}:\d+", str(line)) == [f"{path}:5", f"{path}:6"]
         assert works["e"].venue.name == "Three"
 
     def test_a_commented_out_and_a_real_definition_say_nothing(self, tmp_path):
