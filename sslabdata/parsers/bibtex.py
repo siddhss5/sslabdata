@@ -11,7 +11,7 @@ pylatexenc, and nothing here lets a library object or a library message reach
 the rest of sslabdata.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 

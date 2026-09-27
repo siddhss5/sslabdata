@@ -4,7 +4,7 @@ Export utilities for sslabdata.
 Serializes LabData to YAML or JSON files.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 

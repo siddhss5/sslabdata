@@ -6,7 +6,7 @@ where a reader expects them: `CONFIG-NOT-A-MAPPING lab.yaml::: ...` names a
 file and nothing inside it. See "Diagnostic codes" in SPEC.md.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 
