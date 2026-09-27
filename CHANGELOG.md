@@ -216,6 +216,18 @@ first `%`. A bare `%` is now a literal percent sign, as it is to BibTeX, and
 `\%` is unchanged. Only works containing a bare `%` emit different text. In
 math, a bare `%` is written back as `\%`, as a bare `&` already was.
 
+### Converter markup becomes plain text (#18)
+
+Some LaTeX commands were converted to syntax rather than text: `\url{u}` to
+the autolink `<u>`, `\footnote{n}` to `[n]`, citations and cross-references
+to `<cit.>` and `<ref>`, a list `\item` to a Markdown `* ` bullet,
+`\includegraphics` and `\maketitle` to placeholder blocks, and
+`\textfrac{a}{b}` to `%s/%s` followed by its arguments. Each now becomes
+plain text or nothing, as [`SPEC.md` §2](SPEC.md#2-the-text-rule) lists:
+`\url{u}` is `u`, a footnote is written in parentheses, `\item` starts a line
+with `•`, `\textfrac{a}{b}` is `a/b`, and the rest are left out. Only works
+whose converted fields use one of these commands emit different text.
+
 ### Values under `lab`, `--validate`, and output write failures (#121, #134, #142)
 
 Before 3.0.0, `lab` was copied into the document unchanged, and three problems

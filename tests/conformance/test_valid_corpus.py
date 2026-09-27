@@ -377,6 +377,16 @@ LATEX = [
          "Café robots run in $O(n)$ time and are very tidy."),
     case("latex.note_href", "tex-note-href", "note",
          Contains("https://example.org/code", "our site")),
+    case("latex.url", "tex-url", "note", "Code at https://example.org/code"),
+    case("latex.footnote", "tex-footnote", "title",
+         "Tidy Robots (Funded by the Fictional Foundation.)"),
+    case("latex.cite_ref", "tex-cite-ref", "abstract",
+         "Faster than prior planners, as the appendix shows."),
+    case("latex.list_item", "tex-list-item", "abstract",
+         "Two results:\n• fast\n(b) tidy"),
+    case("latex.layout_dropped", "tex-layout", "note",
+         "A figure and a title block are left out"),
+    case("latex.textfrac", "tex-textfrac", "title", "A 3/2-Approximation"),
 ]
 
 

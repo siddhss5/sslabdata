@@ -60,9 +60,7 @@ entry of the same ID.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
 #20 (verifying a remote link), #27 (explicit link and award fields), #28
-(`keywords` project tags). #18 is still open for
-renderers — escaping, attribute-safe escaping and the checks on rendered
-output — but every LaTeX-to-text row below passes.
+(`keywords` project tags).
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -247,6 +245,12 @@ the source text are not markup and must survive unchanged.
 | `latex.unicode_raw` | Raw CJK and emoji | Passed through unchanged | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.abstract` | An abstract with accents, math and `\emph` | Same rules as a title: plain text with math left as TeX | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.note_href` | `note = {Code at \href{url}{our site}}` | The link and its text both survive; the entry is never dropped | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.url` | `note = {Code at \url{https://example.org/code}.}` | `Code at https://example.org/code`: the URL as plain text, not the autolink `<…>` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.footnote` | `Tidy Robots\footnote{Funded by …}` | `Tidy Robots (Funded by …)`: the footnote in parentheses, not `[…]` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.cite_ref` | `planners~\cite{k1,k2}` and `shows~\ref{app}` | Both left out with the space before them, not `<cit.>` or `<ref>` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.list_item` | `\item fast` and `\item[(b)] tidy` in `itemize` | A line `• fast` and a line `(b) tidy`, not a Markdown `* ` bullet | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.layout_dropped` | `\includegraphics{fig.png}` and `\maketitle{}` | Both left out, not `< g r a p h i c s >` or a `[NO \title GIVEN]` block | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.textfrac` | `A \textfrac{3}{2}-Approximation` | `A 3/2-Approximation`, not `%s/%s32` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.text_macros` | `\TeX{}`, `\LaTeX\ `, `\BibTeX`, `\emdash`, `\endash`, `\slash` | `TeX`, `LaTeX`, `BibTeX`, `—`, `–`, `/`, with no `LATEX-COMMAND-UNKNOWN` warning | `tests/corpus/invalid/common_text_macros/macros.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro_repeated` | One unknown macro in three fields of two entries | One warning line for the macro, with the count of fields and the first of them as the location | `tests/corpus/invalid/unknown_macro_repeated/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
@@ -450,7 +454,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.collaborator.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.no_duplicate_counts` | A person's works, and a collaborator's works and occurrences | No `work_count` or `authorship_count` anywhere: each would be the length of the `work_ids` or `authorships` emitted beside it | `tests/corpus/valid/names.bib` | `test_output_format.py::test_no_count_repeats_the_length_of_a_list` | pass |
 | `output.collaborators.order` | Several collaborators, including three that share a year and a work count whose name order and key order disagree, two of them sharing a readable name | Sorted by last year descending with null last, then the number of `work_ids` descending, then name ascending, then key ascending. `key` is appended after `name`, not a replacement for it | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_collaborators_order` | pass |
-| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
+| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text, and no string in the corpus or the demo holds `<http`, an autolink or a Markdown link the input did not write | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
 | `output.derived_is_empty` | The corpus and the demo | Every `derived` bag is `{}`, so the region cannot quietly fill | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_every_derived_bag_is_empty` | pass |
 | `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields and an authorship carrying two contributor references or none | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
 | `output.versioned_schema` | The published schemas | v5 lives at its own path, and v3 and v4 stay reachable byte for byte, still saying 3 and 4 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |

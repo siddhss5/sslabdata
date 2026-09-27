@@ -400,7 +400,29 @@ BibTeX are converted from LaTeX to Unicode by
 and `\textbf{Best Paper}` arrives as `Best Paper`. Beside the converter's own
 table, a few common text macros have a rule (`sslabdata.parsers.latex._TEXT_MACROS`):
 `\TeX`, `\LaTeX`, `\LaTeXe` and `\BibTeX` become their names, `\emdash` and
-`\endash` their dashes, and `\slash` a `/`. An unescaped `&` or `%` is a
+`\endash` their dashes, and `\slash` a `/`. Where the converter's own table
+would write syntax rather than text, sslabdata replaces the rule
+(`sslabdata.parsers.latex._PLAIN_TEXT_RULES`):
+
+| Command | The converter's own rule | What sslabdata emits |
+|---|---|---|
+| `\url{u}` | `<u>` | `u` |
+| `\footnote{n}` | `[n]` | ` (n)`: one space, then the footnote in parentheses |
+| `\item` | a new line, `  * ` | a new line, `• ` |
+| `\item[l]` | a new line, `  l` | a new line, `l` |
+| `\cite`, `\citep`, `\citet` | `<cit.>` | nothing |
+| `\ref`, `\autoref`, `\cref`, `\eqref` | `<ref>`; `\eqref` gives `(<ref>)` | nothing |
+| `\Cref` | `<Ref>` | nothing |
+| `\includegraphics` | `< g r a p h i c s >` on its own line | nothing |
+| `\maketitle` | a `[NO \title GIVEN]` block underlined with `=` | nothing |
+| `\textfrac{a}{b}` | `%s/%s` followed by `ab` | `a/b` |
+
+A command that becomes nothing, a footnote and an item also take the spaces
+before them, so `planners~\cite{k}.` arrives as `planners.`: sslabdata has no
+bibliography, numbering or figure to resolve them against. A rule that writes
+one literal character — `\_`, `\#`, `\{`, `\}`, `\textbackslash`,
+`\textasciitilde`, `\textasciigrave`, `\vert` — keeps it, because the author
+asked for that character. An unescaped `&` or `%` is a
 literal character, as in BibTeX, not an alignment tab or the start of a
 comment: `50% faster` arrives as `50% faster`, a `%` inside `\url{…}` stays in
 the URL, and in math it is escaped to `\&` or `\%`. Exactly the fields in
