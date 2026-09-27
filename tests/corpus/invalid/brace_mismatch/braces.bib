@@ -21,6 +21,13 @@
   year         = {2024}
 }
 
+% BibTeX counts `\}` as a brace: the title ends there, `# w` names an
+% undefined @string, and the next `}` ends the entry, losing `url`.
+@misc{brace-escaped,
+  title = {\} # w},
+  url = {https://example.org}
+}
+
 @misc{brace-after,
   title = {Read As Written},
   year  = {2024}

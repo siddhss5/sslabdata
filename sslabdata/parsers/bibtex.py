@@ -359,9 +359,11 @@ class _Parser(PybtexParser):
                 self.process_preamble(*arguments)
             elif kind != "string":
                 # An entry with a syntax error already says its values may
-                # hold text meant for later fields.
+                # hold text meant for later fields. An undefined macro is
+                # kept as a syntax error too, but says nothing of the kind.
                 key = arguments[0]
-                if all(error[1] != key for error in self.syntax_errors[read:]):
+                if all(error[1] != key or isinstance(error[0], UndefinedMacro)
+                       for error in self.syntax_errors[read:]):
                     self._check_braces(commands, *arguments)
                 self.process_entry(command, *arguments)
             read = len(self.syntax_errors)
