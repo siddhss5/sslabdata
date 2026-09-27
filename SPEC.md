@@ -429,7 +429,8 @@ comment: `50% faster` arrives as `50% faster`, a `%` inside `\url{…}` stays in
 the URL, and in math it is escaped to `\&` or `\%`. Exactly the fields in
 `sslabdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
 `note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
-`publisher`, `address`, `organization` — applied in `entry_fields()`. Name
+`publisher`, `address`, `organization`, `archivePrefix` and `eprinttype` —
+applied in `entry_fields()`. Name
 parts are converted the same way, in `person_name_parts()`, for authors and
 editors alike.
 
@@ -438,7 +439,8 @@ Being converted is not the same as being emitted. Of these fields, `title`,
 `organization` are emitted under their own names; `journal`, `booktitle`,
 `school` and `institution` are consumed by `build_venue()` and reach the
 document as `venue.name`, which is the one place sslabdata normalises across
-entry types.
+entry types; `archivePrefix` and `eprinttype` name a preprint's repository,
+its scheme and its `venue.name`.
 
 **2. Emitted without conversion — the rule is a requirement on the input.**
 These strings do reach the document, exactly as written, and sslabdata neither
@@ -480,8 +482,8 @@ rule does not apply to the input itself — only to whatever it produces.
 | Input | What becomes of it |
 |---|---|
 | `doi` | Becomes `identifiers.doi`, with a resolver prefix taken off if it was written as a URL, and a link of kind `doi` built from it (`bare_doi()`, `build_identifiers()`, `build_links()`). A resolver with nothing after it names no DOI: it yields neither, and is reported as `BIB-DOI-INVALID`. |
-| `eprint` | Becomes an identifier under the scheme `archivePrefix` names, and a link of kind `arxiv` when that scheme is arXiv (`build_identifiers()`, `build_links()`). |
-| `archivePrefix` (or `archiveprefix`) | Becomes the **scheme** of the `eprint` identifier, **lower-cased**, and the `venue.name` of a preprint, as written (`_archive_prefix()`). It has no property of its own, because naming the repository is what a scheme does. An entry that names no prefix is read as an arXiv one, which is the only case the default covers; an entry that names `HAL` is filed under `hal` and gets no arXiv link. |
+| `eprint` | Becomes an identifier under the scheme `archivePrefix` or `eprinttype` names, and a link of kind `arxiv` when that scheme is arXiv (`build_identifiers()`, `build_links()`). |
+| `archivePrefix` (or `archiveprefix`), and `eprinttype` | Becomes the **scheme** of the `eprint` identifier, **lower-cased**, and the `venue.name` of a preprint, converted from LaTeX (§2) and otherwise as written (`_archive_prefix()`), so `archivePrefix = {{arXiv}}` is read as `arXiv`. biblatex's `eprinttype` is an alias of `archivePrefix`; an entry that writes both is read from `archivePrefix`. It has no property of its own, because naming the repository is what a scheme does. An entry that names neither is read as an arXiv one, which is the only case the default covers; an entry that names `HAL` or `eprinttype = {pubmed}` is filed under `hal` or `pubmed` and gets no arXiv link. |
 | `isbn`, `issn` | Become `identifiers.isbn` and `identifiers.issn` (`build_identifiers()`). |
 | `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
 | `url` | Becomes a link of kind `video` when its host is youtube.com, youtu.be or vimeo.com or a subdomain of one, and of kind `url` otherwise, with `origin: input` (`is_video_url()`, `build_links()`). |
@@ -695,7 +697,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `work.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`sslabdata.config.BibFile`, read by `parse_all_works()`). |
 | `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`sslabdata.parsers.bibtex.build_venue()`). See below. |
 | `work.volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Input — the BibTeX fields of those names, under BibTeX's names and with BibTeX's meanings (`FLAT_FIELDS`, read in `entry_to_work()`). Those in `TEXT_FIELDS` are converted from LaTeX (§2); the rest are emitted as written. |
-| `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
+| `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix` or `eprinttype`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` or `eprinttype` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
 | `work.links` | **Derived** — a map from kind to link records, built from the entry's `url`, `video` and `pdf`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
 | `work.project_ids` | Input — the `project` field, split on commas (`parse_project_ids()`). |
 | `work.bibtex` | **Derived** — the entry re-serialized as BibTeX, or `null` when that failed (`format_bibtex()`). See below. |
@@ -814,7 +816,7 @@ well: `journal` for a journal, `conference` for `@inproceedings`,
 `@book`, `other` for any other entry type carrying a `booktitle`, and
 `institution` for a `school` or an `institution`. An entry with none of the
 four but with an `eprint` gets `{kind: "repository", name: <archivePrefix>}`,
-defaulting to `arXiv`, because the repository is what the preprint's
+the repository `archivePrefix` or `eprinttype` names, defaulting to `arXiv`, because the repository is what the preprint's
 container is. Anything else gets `null`: sslabdata does not invent a container
 the entry did not name. `kind` is an **open string**, deliberately not a JSON
 Schema enum, so a new work type (#31) needs no version bump.
