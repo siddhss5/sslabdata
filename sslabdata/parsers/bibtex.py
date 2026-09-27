@@ -65,6 +65,10 @@ YEAR_MISSING = "BIB-YEAR-MISSING"
 YEAR_INVALID = "BIB-YEAR-INVALID"
 YEAR_DIGITS = re.compile(r"[0-9]+")
 
+# A `doi` that is a resolver URL with nothing after it. It names no DOI, so
+# the work gets no DOI identifier and no link rather than an empty one.
+DOI_INVALID = "BIB-DOI-INVALID"
+
 # A value naming an `@string` macro that nothing defines. The parser library
 # reads it as empty, as BibTeX does; the entry is kept.
 STRING_UNDEFINED = "BIB-STRING-UNDEFINED"
@@ -795,19 +799,29 @@ def bare_doi(doi: str) -> str:
     return doi
 
 
-def build_identifiers(entry: dict) -> Dict[str, List[str]]:
+def build_identifiers(entry: dict, source: str, report) -> Dict[str, List[str]]:
     """The entry's identifiers, as a map from scheme to a list of identifiers.
 
     The list shape is there because ISBN and ISSN genuinely repeat — a print
     and an electronic one are two values of one identifier — even though a
-    BibTeX field holds one value, so v4 emits at most one per scheme.
+    BibTeX field holds one value, so v4 emits at most one per scheme. A `doi`
+    that is a resolver and nothing after it names no DOI, and is reported
+    rather than emitted empty.
     """
     identifiers: Dict[str, List[str]] = {}
     for scheme, field_name in IDENTIFIER_FIELDS.items():
         value = (entry.get(field_name) or "").strip()
         if not value:
             continue
-        identifiers[scheme] = [bare_doi(value) if scheme == "doi" else value]
+        if scheme == "doi":
+            if not bare_doi(value):
+                report(diagnostic(
+                    DOI_INVALID, source, entry.get("ID"), field_name,
+                    f"'{value}' is a DOI resolver with no DOI after it; the "
+                    "work gets no DOI identifier and no DOI link"))
+                continue
+            value = bare_doi(value)
+        identifiers[scheme] = [value]
 
     eprint = (entry.get("eprint") or "").strip()
     if eprint:
@@ -980,7 +994,7 @@ def entry_to_work(
     unknown_in = _unknown_command_reporter(report, source, bib_id,
                                            unknown_commands_seen)
     fields = entry_fields(bib_id, entry, unknown_in)
-    identifiers = build_identifiers(fields)
+    identifiers = build_identifiers(fields, source, report)
     check_entry_type(fields, source, report)
 
     return Work(
