@@ -1,0 +1,15 @@
+% CASE latex.definition_commands
+% Commands that define other commands mean nothing in a field. The parser
+% library knows the arguments of \newcommand, and would read the words, a
+% link or a URL after it as the name and body being defined. An accent read
+% onto a URL is a command reading part of it the same way: that field cannot
+% be converted, and is kept as written.
+
+@article{definition-commands,
+  title    = {\newcommand zqx Tidy Robots},
+  author   = {Adams, Alice},
+  journal  = {\newcommand \url{https://x.org/x} Letters},
+  note     = {\newcommand \href{https://x.org/y}{site} and \def\x{y} z},
+  abstract = {Accented \'\url{https://x.org/z} link},
+  year     = {2024}
+}
