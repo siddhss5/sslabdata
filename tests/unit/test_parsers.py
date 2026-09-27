@@ -98,8 +98,8 @@ class TestPdfLink:
     """A remote `pdf_base_url` is labelled `unchecked`, because a build never fetches.
 
     Read as a local path, every remote PDF would be labelled `missing`. The
-    conformance case for this (#20) is an expected failure, so only this test
-    pins today's behaviour; it changes with #20."""
+    conformance case for verifying a remote link (#20) is an expected
+    failure, so only this test pins the `unchecked` label."""
 
     def test_a_remote_base_is_never_fetched(self):
         link = pdf_link("k", "https://example.org/pdfs")
@@ -472,11 +472,11 @@ class TestLocatedParserDiagnostics:
         assert list(works) == ["e"]
 
     def test_a_well_formed_command_on_a_percent_line_is_read(self, tmp_path):
-        """Records the current behaviour, not an endorsement of it (#78).
+        """A well-formed entry on a `%` line is an entry.
 
         The parser library has no `%` comment outside an entry, as classic
-        BibTeX has none, so a well-formed entry on a `%` line is an entry.
-        Only a syntax error on such a line goes unreported.
+        BibTeX has none. Only a syntax error on such a line goes unreported;
+        an entry lost to a `%` prefix would vanish without a diagnostic.
         """
         source = ("% @article{hidden, title = {H}, journal = {J}, year = 2024}\n"
                   + entry("visible"))

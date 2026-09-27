@@ -232,11 +232,11 @@ aliases — or, if you have configured no `people_file`, tells you resolution
 was never attempted.
 
 `collaborators` is a grouping over unresolved authorships, not a list of
-humans, and its `key` is a lookup key, not an identity. Two spellings of one
-person are two keys unless `collaborators_file` declares the alias, and
-sslabdata reports a key that spans more than one spelling and an initials-only
-key that could be any of several fuller ones. What the grouping does and does
-not promise is in
+humans, and its `key` is a lookup key, not an identity. The grouping can be
+wrong in both directions, so sslabdata reports a key that spans more than one
+spelling and an initials-only key that could be any of several fuller ones,
+and `collaborators_file` lets you join spellings yourself. What the grouping
+does and does not promise is in
 [`SPEC.md` §5](SPEC.md#5-input-versus-derived).
 
 ## Reading the document

@@ -988,14 +988,12 @@ the tag is the closest thing that can be written down at the time the file is
 written. Each later version gets its own tag, at its own path, under the same
 rule.
 
-**The published addresses carry the old repository name.** The project was
-once called `labdata`, and its repository with it. The v3 and v4 schema files
-were published under that name, so their `$id`s, and the titles and
-descriptions inside them, say `labdata`, and they are left byte for byte as
-published rather than rewritten. v4's raw `$id` still resolves: GitHub redirects the old repository
-name to the new one. v3's `blob/main` `$id` still does not resolve, as above.
-v5 is the first schema published under the new name: its `$id`, title and
-descriptions say `sslabdata`.
+**The v3 and v4 addresses say `labdata`.** Their `$id`s, and the titles and
+descriptions inside those files, name the repository `labdata`, and the files
+are left byte for byte as published rather than rewritten. v4's raw `$id`
+resolves, because GitHub redirects `labdata` to `sslabdata`. v3's `blob/main`
+`$id` does not resolve, as above. v5's `$id`, title and descriptions say
+`sslabdata`.
 
 **Version history.** What each `schema_version` changed is in
 [`CHANGELOG.md`](CHANGELOG.md).
