@@ -91,13 +91,15 @@ invariants:
 5. No text is lost silently. A sentinel word follows the special characters
    in each generated value, and some values hold one as the braced argument
    of a LaTeX command: a formatting command such as `\texttt` or `\mbox`, a
-   command whose argument is not prose such as `\label` or `\color`, or a
-   generated unknown name. Every word must reach the work's `bibtex`, and
-   `bibtex` must carry each field value as it was written. Every word must
-   reach the value's place in the document too, except one inside a command
-   that §2 of SPEC.md turns into nothing (`\cite`, `\ref`,
-   `\includegraphics` and their variants, listed as `DROPS_ARGUMENT` in the
-   test): an unknown command keeps its braced argument as text
+   command whose arguments are not text such as `\label`, `\color` or
+   `\setcounter`, or a generated unknown name. Every word must reach the
+   work's `bibtex`, and `bibtex` must carry each field value as it was
+   written. Every word must reach the value's place in the document too,
+   except one inside a command that §2 of SPEC.md turns into nothing: a
+   citation, label or cross-reference, a setting, or `\includegraphics`.
+   The test writes these out as `DROPS_ARGUMENT`, with the number of
+   arguments each takes, rather than importing them, so that the list
+   checks the code. An unknown command keeps its braced argument as text
    (`LATEX-COMMAND-UNKNOWN`). A URL inside `\url` or `\href` must reach the
    text unchanged. A value can lose text only with a coded diagnostic that
    explains the loss at its entry, or a syntax error in its file.

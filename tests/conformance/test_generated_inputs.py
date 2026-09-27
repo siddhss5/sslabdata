@@ -101,9 +101,10 @@ class Sentinel:
     form: str
 
 
-def bare_word(p: Sentinel) -> str:
-    """The sentinel word itself, without the name or command around it."""
-    return re.search(r"(?<![\\A-Za-z])[Zz]q[a-z]+", p.word).group(0)
+def bare_words(p: Sentinel) -> list:
+    """The sentinel words themselves, without the name or command around
+    them: one, or one per braced argument of a command."""
+    return re.findall(r"(?<![\\A-Za-z])[Zz]q[a-z]+", p.word)
 
 
 @dataclass
@@ -217,26 +218,45 @@ SNIPPETS = {
               "**b**", ",", "=", "0"],
 }
 
-# Commands a sentinel word is placed inside, as `\cmd{word}`, so that text
-# lost with a command's argument shows. SPEC.md keeps the argument of each of
-# these as text: the converter has a rule that keeps it, or the command is
-# reported as LATEX-COMMAND-UNKNOWN, which drops the command and keeps "a
-# braced argument after it ... as plain text" (issue #174). That holds for a
-# command whose argument is not prose too, such as a label or a colour name.
-KEEPS_ARGUMENT = {
-    "formatting": [r"\texttt", r"\mbox", r"\textsc", r"\emph", r"\hbox",
-                   r"\underline", r"\fbox"],
-    "not text": [r"\label", r"\color", r"\citeauthor"],
+# Sentinel words are also placed inside the braced arguments of LaTeX
+# commands, as `\cmd{word}`, so that text lost with an argument shows.
+#
+# Commands whose argument is the text itself, in another face or box: SPEC.md
+# section 2 keeps the argument as plain text. A generated unknown name keeps
+# its braced argument too (LATEX-COMMAND-UNKNOWN, issue #174).
+KEEPS_ARGUMENT = (r"\texttt", r"\textsf", r"\textsc", r"\emph", r"\underline",
+                  r"\mbox", r"\hbox", r"\fbox")
+# The only commands whose arguments may leave nothing in the document, with
+# the number of braced arguments LaTeX gives each. This is SPEC.md section 2,
+# written out here rather than imported so that it checks the code: the rules
+# that emit "nothing" (`\cite` ... `\includegraphics`), then the citations,
+# labels and cross-references, then the settings whose arguments are not text.
+# A word inside one must still reach the work's `bibtex`, and the text after
+# it must survive. `\nopagecolor` takes no argument, so a braced group after
+# it is text and must survive.
+DROPS_ARGUMENT = {
+    r"\cite": 1, r"\citep": 1, r"\citet": 1, r"\ref": 1, r"\autoref": 1,
+    r"\cref": 1, r"\Cref": 1, r"\eqref": 1, r"\includegraphics": 1,
+    r"\citealp": 1, r"\citealt": 1, r"\citeauthor": 1, r"\citefullauthor": 1,
+    r"\citenum": 1, r"\citeyear": 1, r"\citeyearpar": 1, r"\citepalias": 1,
+    r"\citetalias": 1, r"\Citealp": 1, r"\Citealt": 1, r"\Citeauthor": 1,
+    r"\Citep": 1, r"\Citet": 1, r"\nocite": 1, r"\label": 1, r"\pageref": 1,
+    r"\nameref": 1,
+    r"\color": 1, r"\colorlet": 2, r"\definecolor": 3, r"\providecolor": 3,
+    r"\pagecolor": 1, r"\nopagecolor": 0, r"\rowcolors": 3,
+    r"\documentclass": 1, r"\usepackage": 1, r"\RequirePackage": 1,
+    r"\bibliography": 1, r"\hypersetup": 1, r"\selectlanguage": 1,
+    r"\setcounter": 2, r"\addcounter": 2, r"\setlength": 2, r"\addlength": 2,
+    r"\defcitealias": 2, r"\hphantom": 1, r"\vphantom": 1,
 }
-# The only commands whose braced argument may leave nothing in the document:
-# SPEC.md section 2 lists each as a rule that emits "nothing"
-# (`sslabdata.parsers.latex._PLAIN_TEXT_RULES`). A sentinel inside one must
-# still reach the work's `bibtex`, and the text after it must survive.
-DROPS_ARGUMENT = (r"\cite", r"\citep", r"\citet", r"\ref", r"\autoref",
-                  r"\cref", r"\Cref", r"\eqref", r"\includegraphics")
 # The form every generated command name is recorded under, so that they are
 # one cause when a failure is reduced.
 GENERATED_COMMAND = r"\<generated>"
+
+
+def drops(form: str) -> bool:
+    """Whether a sentinel's words may be missing from the document."""
+    return DROPS_ARGUMENT.get(form, 0) > 0
 
 # An unbalanced brace changes where a value ends, so the rest of its entry
 # reads differently; it is drawn rarely enough that most entries have none.
@@ -321,18 +341,22 @@ class Generator:
         return parts + [Sentinel(self.word(), "text")]
 
     def in_command(self) -> Sentinel:
-        """A sentinel word as the braced argument of a LaTeX command."""
+        """Sentinel words as the braced arguments of a LaTeX command: one
+        each, or one for a command that takes none."""
         r = self.r
-        kind = r.choice(["formatting", "formatting", "not text", "drops",
-                         "generated"])
+        kind = r.choice(["keeps", "keeps", "drops", "drops", "generated"])
         if kind == "generated":
             # `zq` starts no real command, so the name is surely unknown.
             name = "\\zq" + "".join(r.choice("bcdfghjkmnpqrstvwxyz")
                                     for _ in range(r.randint(1, 6)))
             return Sentinel(f"{name}{{{self.word()}}}", GENERATED_COMMAND)
-        command = r.choice(DROPS_ARGUMENT if kind == "drops" else
-                           KEEPS_ARGUMENT[kind])
-        return Sentinel(f"{command}{{{self.word()}}}", command)
+        if kind == "keeps":
+            command, count = r.choice(KEEPS_ARGUMENT), 1
+        else:
+            command = r.choice(sorted(DROPS_ARGUMENT))
+            count = max(DROPS_ARGUMENT[command], 1)
+        return Sentinel(command + "".join(f"{{{self.word()}}}"
+                                          for _ in range(count)), command)
 
     def names_field(self, name) -> Field:
         r = self.r
@@ -805,19 +829,20 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
             if not isinstance(p, Sentinel):
                 continue
             names = name in ("author", "editor")
-            word = bare_word(p)
             argument = p.form.startswith("\\")
             evidence = [p.form] if names or argument else pieces
-            if places is not None and not any(word in (v or "") for v in places) \
-                    and p.form not in DROPS_ARGUMENT \
-                    and not excused(name, LOSS_EXPLAINED):
-                fail(f"5 {_group(name)} loses "
-                     f"{'a command argument' if argument else 'text'}",
-                     f"{e.key}.{name}: {value_text(f)!r}: {word!r} not in "
-                     f"{places!r}"[:400], evidence)
-            if word not in bibtex and not excused(name, LOSS_EXPLAINED):
-                fail("5 bibtex loses text", f"{e.key}.{name}: {value_text(f)!r}"[:400],
-                     evidence)
+            for word in bare_words(p):
+                if places is not None \
+                        and not any(word in (v or "") for v in places) \
+                        and not drops(p.form) \
+                        and not excused(name, LOSS_EXPLAINED):
+                    fail(f"5 {_group(name)} loses "
+                         f"{'a command argument' if argument else 'text'}",
+                         f"{e.key}.{name}: {value_text(f)!r}: {word!r} not in "
+                         f"{places!r}"[:400], evidence)
+                if word not in bibtex and not excused(name, LOSS_EXPLAINED):
+                    fail("5 bibtex loses text",
+                         f"{e.key}.{name}: {value_text(f)!r}"[:400], evidence)
         if f.delim and name not in ("author", "editor") \
                 and not excused(name, LOSS_EXPLAINED):
             source = " ".join(value_text(f).split())
@@ -919,11 +944,13 @@ def _specials(source):
 
 
 # The diagnostics that explain text missing from a field: the value could not
-# be read as BibTeX or as LaTeX, its braces moved it into another field, or
-# control characters were removed from it. A command reported unknown is
+# be read as BibTeX or as LaTeX, its braces moved it into another field,
+# control characters were removed from it, or a word in it was read as an
+# undefined `@string` macro. A command reported unknown is
 # dropped with a braced argument kept (SPEC.md), which loses no text.
 LOSS_EXPLAINED = frozenset({"BIB-SYNTAX-ERROR", "BIB-PARSER-MESSAGE",
                             "BIB-BRACE-MISMATCH", "TEXT-CONTROL-CHARACTER",
+                            "BIB-STRING-UNDEFINED",
                             "LATEX-CONVERSION-FAILED", "BIB-WRITE-BACK-FAILED"})
 
 
