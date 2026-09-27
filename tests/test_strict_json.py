@@ -198,8 +198,8 @@ def test_strict_passes_when_only_outside_co_authors_are_unresolved(tmp_path):
 
 
 def test_a_suggestion_alone_leaves_strict_at_exit_0(tmp_path):
-    """Decision 10: an author who matched no lab member is never an error
-    under --strict, even when the name is close to a member's."""
+    """An author who matched no lab member is never an error under --strict,
+    even when the name is close to a member's."""
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Davis, Dave M.}}\n",
