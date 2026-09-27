@@ -54,6 +54,10 @@ _HREF_URL_ONLY = re.compile(r'\\href\s*\{([^{}]*)\}')
 
 # An unescaped & in a BibTeX field is a literal ampersand, not an alignment tab.
 _BARE_AMPERSAND = re.compile(r'(?<!\\)&')
+# An unescaped % is a literal percent, not a comment: BibTeX keeps the rest of
+# the value. It is escaped when an even run of backslashes (`\\`, a line
+# break) or none comes before it, and left alone after `\%`.
+_BARE_PERCENT = re.compile(r'(?<!\\)((?:\\\\)*)%')
 
 _PLACEHOLDER = '\x01'
 _PLACEHOLDER_RE = re.compile(f'{_PLACEHOLDER}(\\d+){_PLACEHOLDER}')
@@ -79,9 +83,10 @@ def latex_to_text(text: str) -> str:
 
 
 def _prepared(text: str, set_aside) -> str:
-    """The value as the converter is given it: links rewritten, bare & escaped."""
+    """The value as the converter is given it: links rewritten, bare & and % escaped."""
     text = _HREF_URL_TEXT.sub(lambda m: f'{m.group(2)} ({set_aside(m.group(1))})', text)
     text = _HREF_URL_ONLY.sub(lambda m: set_aside(m.group(1)), text)
+    text = _BARE_PERCENT.sub(r'\1\\%', text)
     return _BARE_AMPERSAND.sub(r'\&', text)
 
 
