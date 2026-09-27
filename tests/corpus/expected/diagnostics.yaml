@@ -446,6 +446,35 @@ config.bib_dir.missing:
   diagnostics:
     - {code: CONFIG-KEY-MISSING, severity: error, file: lab.yaml, key: bib_dir}
 
+# A path that exists but is the wrong kind is not reported as missing: a
+# directory where each key names a file, and a file where bib_dir names a
+# directory.
+config.path.is_directory:
+  dir: config_path_is_directory
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-PATH-WRONG-KIND, severity: error, file: lab.yaml, key: bib_files, field: name, values: [./shelf, directory]}
+    - {code: CONFIG-PATH-WRONG-KIND, severity: error, file: lab.yaml, key: people_file, values: [shelf, directory]}
+    - {code: CONFIG-PATH-WRONG-KIND, severity: error, file: lab.yaml, key: projects_file, values: [shelf, directory]}
+    - {code: CONFIG-PATH-WRONG-KIND, severity: error, file: lab.yaml, key: collaborators_file, values: [shelf, directory]}
+
+config.bib_dir.not_a_directory:
+  dir: config_bib_dir_not_a_directory
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-PATH-WRONG-KIND, severity: error, file: lab.yaml, key: bib_dir, values: [ok.bib, not a directory]}
+
+# A bib_dir that is not there is one diagnostic at bib_dir, not one for each
+# file under it.
+config.bib_dir.not_found:
+  dir: config_bib_dir_not_found
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: bib_dir, values: [nowhere]}
+
 config.bib_dir.wrong_type:
   dir: config_bib_dir_type
   exit: 1

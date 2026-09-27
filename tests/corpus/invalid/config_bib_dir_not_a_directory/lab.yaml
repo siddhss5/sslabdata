@@ -1,0 +1,7 @@
+# CASE config.bib_dir.not_a_directory
+# Fictional invalid input for tests/COVERAGE.md.
+# `bib_dir` names a file where a directory is expected.
+bib_dir: "ok.bib"
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
