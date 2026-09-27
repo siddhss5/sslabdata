@@ -62,6 +62,7 @@ YEAR_MISSING = "BIB-YEAR-MISSING"
 # A year that is present but is not a number is treated as no year, and says
 # so, rather than stopping the run: the entry is still a work.
 YEAR_INVALID = "BIB-YEAR-INVALID"
+YEAR_DIGITS = re.compile(r"[0-9]+")
 
 # A value naming an `@string` macro that nothing defines. The parser library
 # reads it as empty, as BibTeX does; the entry is kept.
@@ -895,20 +896,22 @@ def entry_year(entry: dict, source: str, report) -> Optional[int]:
 
     A work with no year sorts last, and its year is None rather than 0, so a
     consumer can tell "no year" from "the year zero". A year that is not a
-    number is reported and read as no year.
+    number is reported and read as no year. Only an unsigned run of ASCII
+    digits is a number here: `int()` would also read `-5`, `+2020`, `2_020`
+    and full-width `２０２０`.
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
         report(diagnostic(YEAR_MISSING, source, entry.get("ID"), "year",
                           "entry has no year"))
         return None
-    try:
+    if YEAR_DIGITS.fullmatch(raw):
         return int(raw)
-    except ValueError:
-        report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
-                          f"'{raw}' is not a number; the work is emitted "
-                          "with year: null and sorts last"))
-        return None
+    report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
+                      f"'{raw}' is not a year, which is written in the "
+                      "digits 0-9 alone; the work is emitted with year: null "
+                      "and sorts last"))
+    return None
 
 
 # The container field checked for an entry type, and the entry types sslabdata

@@ -1,0 +1,38 @@
+% CASE structure.year_not_digits
+% Years int() would read as a number but that are not a run of ASCII digits:
+% a sign, a digit-group underscore and full-width digits.
+
+@article{year-negative,
+  title   = {A Negative Year},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {-5}
+}
+
+@article{year-plus,
+  title   = {A Signed Year},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {+2020}
+}
+
+@article{year-underscore,
+  title   = {A Grouped Year},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2_020}
+}
+
+@article{year-fullwidth,
+  title   = {A Full-Width Year},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {２０２０}
+}
+
+@article{year-digits,
+  title   = {A Plain Year},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2020}
+}
