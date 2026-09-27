@@ -19,7 +19,11 @@ changes and the package changes below. The project is named `sslabdata`
 (#82), and the Python API's `Publication` is `Work`. It requires Python 3.10 or
 later. Its distribution metadata carries the README as the long description, an
 MIT license expression and links to the specification, the changelog and the
-issue tracker (#111).
+issue tracker (#111). The wheel installs the current output schema, readable
+as `sslabdata/schema/v5/output.schema.json` through `importlib.resources`; the
+earlier schemas are not in the wheel, and their tagged URLs stay their access
+path. The source distribution holds the package, `README.md`, `LICENSE`,
+`SPEC.md` and every schema in `schema/`, and no tests (#112).
 
 ## `schema_version` 5 (tag `schema-v5`, 2026-09-25)
 
