@@ -1,0 +1,8 @@
+# CASE links.doi_resolver_only
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "doi.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

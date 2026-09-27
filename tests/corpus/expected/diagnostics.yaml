@@ -92,6 +92,29 @@ structure.year_not_number:
     - {code: BIB-YEAR-INVALID, severity: warning, file: ./badyear.bib, key: bad-year, field: year, values: [in press]}
   kept: [bad-year, ok-entry]
 
+# A year is an unsigned run of ASCII digits; int() would read each of these
+# four as a number.
+structure.year_not_digits:
+  dir: year_not_digits
+  exit: 0
+  diagnostics:
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-negative, field: year, values: ["-5"]}
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-plus, field: year, values: ["+2020"]}
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-underscore, field: year, values: ["2_020"]}
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-fullwidth, field: year, values: [２０２０]}
+  kept: [year-digits, year-negative, year-plus, year-underscore, year-fullwidth]
+  emits:
+    - work: year-negative
+      expect: {year: null}
+    - work: year-plus
+      expect: {year: null}
+    - work: year-underscore
+      expect: {year: null}
+    - work: year-fullwidth
+      expect: {year: null}
+    - work: year-digits
+      expect: {year: 2020}
+
 structure.missing_journal:
   dir: missing_journal
   exit: 0
@@ -161,6 +184,22 @@ structure.not_utf8:
   fatal: assembly
   diagnostics:
     - {code: BIB-ENCODING-INVALID, severity: error, file: ./latin1.bib, values: ["0xfc", line 6]}
+
+# A resolver with nothing after it names no DOI: no identifier, no link.
+links.doi_resolver_only:
+  dir: doi_resolver_only
+  exit: 0
+  diagnostics:
+    - {code: BIB-DOI-INVALID, severity: warning, file: ./doi.bib, key: doi-resolver-only, field: doi, values: ["https://doi.org/"]}
+    - {code: BIB-DOI-INVALID, severity: warning, file: ./doi.bib, key: doi-dx-resolver-only, field: doi, values: ["http://dx.doi.org/"]}
+  kept: [doi-resolver-only, doi-dx-resolver-only, doi-present]
+  emits:
+    - work: doi-resolver-only
+      expect: {identifiers: {}, links: {}}
+    - work: doi-dx-resolver-only
+      expect: {identifiers: {}, links: {}}
+    - work: doi-present
+      expect: {identifiers.doi: [10.5555/corpus.0003], links.doi.0.url: "https://doi.org/10.5555/corpus.0003"}
 
 # --- Projects, people and identity -------------------------------------------
 
