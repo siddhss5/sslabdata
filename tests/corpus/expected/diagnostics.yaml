@@ -52,7 +52,10 @@ structure.brace_mismatch:
     - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-trailing, field: howpublished, values: [and more, line 20]}
     - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-dropped, field: year}
     - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-trailing, field: year}
-  kept: [brace-merged, brace-dropped, brace-trailing, brace-after]
+    - {code: BIB-STRING-UNDEFINED, severity: warning, file: ./braces.bib, key: brace-escaped, field: title, values: [w]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-escaped, field: url, values: [title, line 27]}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-escaped, field: year}
+  kept: [brace-merged, brace-dropped, brace-trailing, brace-escaped, brace-after]
   emits:
     - work: brace-merged
       expect: {abstract: null, organization: {contains: [abstract]}}
