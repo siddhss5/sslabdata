@@ -21,8 +21,9 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 import pybtex.errors
-from pybtex.database import Entry, Person
+from pybtex.database import BibliographyData, Entry, Person
 from pybtex.exceptions import PybtexError
+from pybtex.database.output.bibtex import Writer as BibTeXWriter
 from pybtex.database.input.bibtex import (
     LowLevelParser, Parser as PybtexParser, SkipEntry, UndefinedMacro,
 )
@@ -249,8 +250,9 @@ class _Parser(PybtexParser):
     """pybtex's BibTeX parser, reading ``@comment`` groups as comments.
 
     ``Parser.parse_string`` names ``LowLevelParser`` directly, so swapping the
-    tokenizer means restating that loop. It is the one place sslabdata touches a
-    pybtex internal, which is why ``pybtex~=0.26`` is pinned.
+    tokenizer means restating that loop. It and `_VerbatimWriter` are the two
+    places sslabdata touches a pybtex internal, which is why ``pybtex~=0.26``
+    is pinned.
     """
 
     def __init__(self, *args, duplicate_keys=None, **kwargs):
@@ -663,17 +665,33 @@ def entry_fields(bib_id: str, entry: Entry, unknown_in) -> Dict[str, str]:
     return read
 
 
+class _VerbatimWriter(BibTeXWriter):
+    """pybtex's BibTeX writer, writing each value exactly as it was read.
+
+    The library's writer encodes every value as LaTeX, which escapes `%`, `&`,
+    `_` and `#` whether or not they already were: `20\\%` came back as
+    `20\\\\%`, a line break and a comment. A value read from a `.bib` file is
+    BibTeX already, so it is written as it stands. The braces are still
+    checked, so a value that cannot be written back is still reported.
+    """
+
+    def _encode(self, text):
+        return text
+
+
 def format_bibtex(bib_id: str, entry: Entry, source: str,
                   report) -> Optional[str]:
     """The entry written back out as BibTeX, for readers to copy.
 
     This is the entry as it was read, before LaTeX conversion, so fields
-    sslabdata does not emit as properties are preserved rather than rewritten.
-    It is a re-serialization of the entry's data and explicitly not a source
-    of properties: nothing in sslabdata reads a value back out of it.
+    sslabdata does not emit as properties are preserved rather than rewritten,
+    each value byte for byte. It is a re-serialization of the entry's data and
+    explicitly not a source of properties: nothing in sslabdata reads a value
+    back out of it.
     """
     try:
-        return entry.to_string("bibtex").strip()
+        return _VerbatimWriter().to_string(
+            BibliographyData(entries={bib_id: entry})).strip()
     except Exception:  # noqa: BLE001 - a copyable string is not worth an entry
         report(diagnostic(
             WRITE_BACK_FAILED, source, bib_id, "bibtex",

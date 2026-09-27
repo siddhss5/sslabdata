@@ -844,9 +844,17 @@ with its kind and its origin, and it would be a cross-record constraint JSON
 Schema cannot express and sslabdata would have to police by hand.
 
 **`work.bibtex` is re-serialized, not verbatim.** It is produced by
-`format_bibtex()`, which calls pybtex's `Entry.to_string("bibtex")` on the
-*parsed* entry. What survives is the set of fields and their values. What does
-**not** survive is how they were written: field order, brace-versus-quote
+`format_bibtex()`, which writes the *parsed* entry out with pybtex's BibTeX
+writer. What survives is the set of fields and their values, and **every
+field value is the value the entry was read with, byte for byte** — as BibTeX
+reads a value, each run of whitespace, line breaks included, is one space.
+Nothing is escaped on the way out, so `20\%`, `\&`, `\_`, `\#`, a bare `%`
+or `&`, math and nested braces all come back as written, and the `bibtex`
+record, read again, gives each field the value the source gave it
+(`tests/COVERAGE.md` row `output.work.bibtex_round_trip`). Names are the exception to "as written":
+each is written back from the parts BibTeX split it into, as
+`von Last, Jr, First`, so it reads back as the same parts. What does **not**
+survive is how the entry was written: field order, brace-versus-quote
 delimiters, whitespace and indentation are all the serializer's, and
 `@string` macros are gone — a field written `journal = j` comes back as
 `journal = "Expanded Journal"`. Verified directly.
