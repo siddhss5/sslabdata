@@ -125,13 +125,11 @@ class TestFuzzyMatches:
         assert fuzzy_matches("Ab Kim", candidates) == []
 
 
-# The three corpus authorships #56 section 7 predicted would move once
-# matching read the full name rather than the abbreviated form:
-# (given, von, family, who the abbreviated form found, who they resolve to
-# now). The first two are rows #24 owned (`identity.full_name` and
-# `names.same_initial_alan`). The third is the one #56 predicted would move
-# through a fuzzy match on the full name; a fuzzy match now links nothing, so
-# it stays unresolved and is reported as a suggestion instead.
+# Corpus authorships whose match depends on reading the full name rather than
+# the abbreviated form: (given, von, family, who the abbreviated form finds,
+# who they resolve to). The first two are the rows `identity.full_name` and
+# `names.same_initial_alan`. The third is a near miss on the full name, which
+# links nothing: it stays unresolved and is reported as a suggestion.
 MATCHED_ON_THE_FULL_NAME = [
     ("Frank", None, "Fischer", None, "ffischer"),
     ("Alan", None, "Kim", "akim", "alankim"),
@@ -140,7 +138,7 @@ MATCHED_ON_THE_FULL_NAME = [
 
 
 class TestTheResolverMatchesTheFullName:
-    """#24: a full name is matched as written, and never abbreviated to find
+    """A full name is matched as written, and never abbreviated to find
     someone who declared the abbreviation.
 
     The failure is silent: the author is linked to the wrong member and no
@@ -353,7 +351,7 @@ def _resolved(people, **parts):
 
 
 class TestRunTogetherInitials:
-    """`S.S.` in a given name is `S. S.`, on both sides of a match (#81).
+    """`S.S.` in a given name is `S. S.`, on both sides of a match.
 
     Read as different spellings, one person splits into two collaborators or a
     member's alias is missed; each spelling pair is its own case."""
@@ -632,7 +630,7 @@ class TestDeclaredCollaboratorGrouping:
         """`P. Patel` could be the member as well, so it joins neither.
 
         It fits one lab member, not more than one, so it is not
-        `RESOLVE-AMBIGUOUS-NAME` (#26 decision 6): it is reported with the
+        `RESOLVE-AMBIGUOUS-NAME`: it is reported with the
         other grouping ambiguity, as an unresolved outside co-author may be.
         """
         from sslabdata.loaders import DeclaredCollaborator

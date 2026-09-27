@@ -12,18 +12,15 @@ MIT License - see LICENSE file for details.
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-# The one guarantee about an emitted value that the input can break: a
-# configured `.bib` name reaches the document as `work.source.file`, and is
-# promised never to be absolute. `sslabdata.config` owns the code and the
-# exception type because the condition is a configuration mistake; the check
-# is made here as well because this is the boundary every emitted document
-# passes through, whatever built the objects.
+# `work.source.file` must never be absolute (SPEC.md section 5).
+# `sslabdata.config` owns the code and the exception type because the
+# condition is a configuration mistake; `Work.to_dict()` checks as well.
 from .config import reject_absolute_name
 
 
 # Version of the output format (see schema/v5/output.schema.json). Bump it when
-# a change to to_dict() output could break a consumer. SPEC.md section 6 says
-# what each version changed.
+# a change to to_dict() output could break a consumer (SPEC.md section 6).
+# CHANGELOG.md says what each version changed.
 SCHEMA_VERSION = 5
 
 # The name of the compiler, as the document's `generator` record reports it.
@@ -162,9 +159,8 @@ class Work:
     category: str
     entry_type: str
 
-    # The configured `bib_files[].name` the entry was read from. A relative
-    # directory is fine -- `sub/journal.bib` is a name under `bib_dir` -- and
-    # an absolute path is not: see `to_dict()`.
+    # The configured `bib_files[].name` the entry was read from, relative to
+    # `bib_dir`: see `to_dict()`.
     source_file: str = ""
 
     editors: List[Contributor] = field(default_factory=list)
@@ -202,12 +198,9 @@ class Work:
         again: a consumer holding only the provenance record can still find
         the entry it came from.
 
-        ``source.file`` is checked here rather than only where it was set.
-        This is the boundary every emitted document passes through — both
-        exporters and the CLI serialize through it — so a `Work` built by
-        hand, or one parsed straight from `sslabdata.parsers`, cannot carry a
-        compiling machine's directory layout into a document that is shared.
-        A relative directory is not absolute and passes.
+        ``source.file`` is checked here rather than only where it was set:
+        both exporters and the CLI serialize through this method, so a `Work`
+        built by hand cannot carry an absolute path into the document.
         """
         reject_absolute_name(self.source_file)
         return {

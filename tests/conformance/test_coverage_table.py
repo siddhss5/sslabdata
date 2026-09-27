@@ -53,7 +53,7 @@ def test_every_row_appears_in_its_fixture_and_a_test():
     assert not problems, "\n".join(problems)
 
 
-# --- Test-suite hygiene (acceptance criteria of #43) ------------------------
+# --- Test-suite hygiene -----------------------------------------------------
 
 PUBLIC = set(sslabdata.__all__) | {"main"}
 
@@ -69,7 +69,7 @@ def imports(path):
                 yield alias.name, None
 
 
-# The adapter of #23: the only place pybtex and pylatexenc may be imported.
+# The adapter: the only place pybtex and pylatexenc may be imported.
 ADAPTER = {"sslabdata/parsers/bibtex.py", "sslabdata/parsers/latex.py"}
 PARSER_LIBRARIES = {"pybtex", "pylatexenc", "bibtexparser"}
 
@@ -82,7 +82,7 @@ def test_no_test_imports_a_parser_library():
 
 
 def test_only_the_adapter_imports_a_parser_library():
-    """pybtex and pylatexenc stay behind the adapter, as #23 requires."""
+    """pybtex and pylatexenc stay behind the adapter."""
     offenders = []
     for path in sorted((REPO_ROOT / "sslabdata").rglob("*.py")):
         relative = path.relative_to(REPO_ROOT).as_posix()

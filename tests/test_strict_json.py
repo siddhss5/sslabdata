@@ -1,4 +1,4 @@
-"""`--strict`, diagnostics as JSON, and every message carrying a code (#26).
+"""`--strict`, diagnostics as JSON, and every message carrying a code.
 
 The classes and the JSON shape are the ones SPEC.md states; these tests read
 SPEC.md for both, so the document and the code cannot drift apart.
@@ -222,7 +222,7 @@ def test_an_initials_only_grouping_alone_leaves_strict_at_exit_0(tmp_path):
     assert exits == {0}
 
 
-# The boundary of ID-GROUPING-AMBIGUOUS-DECLARED (#26 decisions 6 and 10).
+# The boundary of ID-GROUPING-AMBIGUOUS-DECLARED.
 
 def test_a_name_fitting_two_collaborator_entries_is_a_grouping_warning(tmp_path):
     """A name two collaborator entries both declare is one grouping warning,

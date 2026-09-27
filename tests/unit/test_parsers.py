@@ -159,7 +159,7 @@ class TestParseAllWorks:
 
 
 class TestCrossref:
-    """An entry carrying a crossref is rejected rather than resolved (#65).
+    """An entry carrying a crossref is rejected rather than resolved.
 
     Resolving it silently would emit a child with no author of its own. The
     corpus proves the fatal outcome of three fixtures; only this class sees the
@@ -369,11 +369,11 @@ class TestCommentHandling:
         assert not (read & absent), label
 
     def test_a_quoted_value_does_not_end_a_paren_entry(self, tmp_path):
-        """Regression: a ) inside "..." used to end @article(...) early.
+        """A ) inside "..." does not end an @article(...) entry.
 
-        sslabdata read the file itself to find @comment groups, so it could be
-        wrong about where a value ended; the entry then lost every field and
-        the entry after it disappeared. pybtex tokenizes the file now.
+        Were entry boundaries found by scanning the file rather than by the
+        parser, the entry would lose every field and the entry after it would
+        disappear.
         """
         source = ('@article(host,title="Host ) @comment(unclosed",'
                   ' author="Adams, Alice", journal="J", year=2024)\n' + entry("real"))
@@ -472,7 +472,7 @@ class TestLocatedParserDiagnostics:
         assert list(works) == ["e"]
 
     def test_a_well_formed_command_on_a_percent_line_is_read(self, tmp_path):
-        """Records the behaviour on main, not an endorsement of it (#78).
+        """Records the current behaviour, not an endorsement of it (#78).
 
         The parser library has no `%` comment outside an entry, as classic
         BibTeX has none, so a well-formed entry on a `%` line is an entry.

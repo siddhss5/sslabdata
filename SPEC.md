@@ -13,8 +13,8 @@ states the rest.
 Everything here is normative unless it carries a `Target` note. A `Target`
 note marks a rule that the emitted document does **not** satisfy today, and
 names the issue that will make it true. Until that issue lands, the rule is
-the intent and the note is the fact. A `Version note` marks behaviour that
-changed at a known release boundary, and states both sides.
+the intent and the note is the fact. What changed at each release, and what
+it replaced, is in [`CHANGELOG.md`](CHANGELOG.md), not here.
 
 - Applies to: `schema_version` 5 (`sslabdata.models.SCHEMA_VERSION`), package
   version 3.0.0 (`sslabdata.__version__`).
@@ -52,27 +52,11 @@ the document; the fix belongs in the schema, not in the consumer. Recovering
 the property from `work.bibtex` does not close the gap, because that
 record is an opaque re-serialization of the entry rather than a set of
 first-class properties (§5), and neither does taking a composed string such
-as `venue` apart. `examples/consumers/` holds three such probes — a LaTeX CV
-fragment, a CSL-JSON export and a person/project/work edge list — each reading
-the document and nothing else, and
-`tests/conformance/test_consumer_probes.py` runs every one of them against the
-demo output. Under `schema_version` 3 none of them could produce correct
-output; `schema_version` 4 closed every one of those gaps but one. Their
-failing assertions are marked `xfail(strict=True)` against **the issue that
-owns the missing property**. The last of them was #24's, which asked for two
-spellings of one external co-author to be joined — something a grouping keyed
-on a name cannot do by construction — and it passes now that
-`collaborators_file` can declare the alias (§5). A strict `xfail` swallows every failure
-in its test, including one in something the probe already does correctly, so
-such a test is kept to the assertions that name the missing property — and,
-for the prerequisites it cannot avoid relying on, the rule is: **every
-prerequisite an xfailed test already satisfies is independently enforced by a
-test that passes.** The identity test that was xfailed reads the graph's
-`authored` edges; the passing `test_graph_is_well_formed` asserts that every
-one of them matches the document, and the passing
-`test_identity_fixtures_are_present` asserts that the works it is about are
-still there, so neither prerequisite was checked only inside a marker.
-`examples/consumers/README.md` lists what each probe asserts.
+as `venue` apart. `examples/consumers/` holds three probes — a LaTeX CV
+fragment, a CSL-JSON export and a person/project/work edge list — each
+reading the document and nothing else. `tests/conformance/test_consumer_probes.py`
+runs every one against the demo output, and `examples/consumers/README.md`
+lists what each asserts.
 
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.
@@ -138,7 +122,7 @@ below says which class each code belongs to.
 
 **Unresolved authors are not errors**, not even under `--strict`.
 `--validate` lists them and still exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
-is usually an external collaborator, and #26 states the rule (decision 10):
+is usually an external collaborator, so
 **an author who matched no lab member is never an error under `--strict`**,
 because sslabdata cannot tell an outside co-author from a possible member
 until #25 lets an author be declared external. The known cost is that a
@@ -195,17 +179,16 @@ without depending on English wording. Codes obey three rules:
 
    **Under `--strict`**, in every mode, every code is an **error** except
    six, which stay **warnings** (`sslabdata.diagnostics.NEVER_AN_ERROR`). Five
-   of them follow one rule, #26 decision 10: **an author who matched no lab
-   member is never an error under `--strict`**, because sslabdata cannot tell
-   an outside co-author from a possible member until #25 lets an author be
-   declared external.
+   of them follow one rule, stated above under *Unresolved authors are not
+   errors*: an author who matched no lab member is never an error under
+   `--strict`.
 
    | Code | Why it is never an error |
    |---|---|
-   | `BIB-STRING-REDEFINED` | Decided on #26: BibTeX's own last-wins rule settles a redefinition (§7), so it is reported and never fails a run. |
-   | `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `ID-GROUPING-AMBIGUOUS-DECLARED` | Decision 10: each is about how authors who matched no lab member are grouped. |
-   | `RESOLVE-UNRESOLVED-NAME` | Decision 10: it *is* an author who matched no lab member. |
-   | `RESOLVE-SUGGESTION` | Decision 10: it is an author who matched no lab member, whose name is close to a member's. It may be a misspelt member or an outside co-author with a similar name, and sslabdata cannot tell which. The known cost: a misspelt member's name passes `--strict` with this warning, until #25 revisits it. |
+   | `BIB-STRING-REDEFINED` | BibTeX's own last-wins rule settles a redefinition (§7), so it is reported and never fails a run. |
+   | `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `ID-GROUPING-AMBIGUOUS-DECLARED` | Each is about how authors who matched no lab member are grouped. |
+   | `RESOLVE-UNRESOLVED-NAME` | It *is* an author who matched no lab member. |
+   | `RESOLVE-SUGGESTION` | It is an author who matched no lab member, whose name is close to a member's. It may be a misspelt member or an outside co-author with a similar name, and sslabdata cannot tell which. The known cost: a misspelt member's name passes `--strict` with this warning, until #25 revisits it. |
 
    So a fatal code is an error in every mode with or without `--strict`; a
    validation error is an error under `--validate`, and under `--strict` in
@@ -225,18 +208,18 @@ Codes in use:
 | `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. A validation error. |
 | `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. Reported on the field's **presence**, whatever its value: an empty `crossref = {}` is a field the entry carries. The diagnostic names the file, the entry key and the parent key, or says the entry names no parent when the field is empty; the entry is not emitted and the run fails, in every mode. |
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. A warning. |
-| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning, in every mode including under `--strict`: an author who matched no lab member is never an error (#26 decision 10). |
-| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning in every mode, for the same reason. |
-| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one **lab member**, so it is given no `person_id` and `resolution.status` is `ambiguous`. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning; an error under `--strict`, because it is about lab members, whom sslabdata does own. **Narrowed** by #26 decision 6: until then it also covered an unresolved authorship that fits a declared collaborator and someone else, which is now `ID-GROUPING-AMBIGUOUS-DECLARED`. No release carried the wider meaning. |
-| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: an author who matched no lab member is never an error (#26 decision 10), because sslabdata cannot tell an outside co-author from a possible member until #25. The known cost is that a misspelt member's name passes `--strict` with only this warning. |
-| `ID-GROUPING-AMBIGUOUS-DECLARED` | An unresolved name fits more than one `collaborators_file` entry, or one entry and one lab member it did not resolve to, so it joins none of them and is grouped by its own name (#26 decisions 6 and 10). Located like `RESOLVE-AMBIGUOUS-NAME`, naming every candidate (`collaborator:<name>`, `person:<id>`). A warning in every mode, including under `--strict`: an author who matched no lab member is never an error. Two other codes can accompany it for the same authorship. When the name fits one entry and **one** lab member — `Patel, P.` beside an entry declaring `P. Patel` and a member Paul Patel who declares no such alias — the resolver also reports `RESOLVE-SUGGESTION` for that member, before this code; both are warnings under #26 decision 10, so `--strict` passes. When it fits one entry and **more than one** lab member, it is also reported here, and `RESOLVE-AMBIGUOUS-NAME` reports the members' ambiguity first, with no `RESOLVE-SUGGESTION`; that one is an error under `--strict`. |
-| `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict` (#26 decision 10). |
+| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning, in every mode including under `--strict`, as an author who matched no lab member is never an error. |
+| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning in every mode, including under `--strict`. |
+| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one **lab member**, so it is given no `person_id` and `resolution.status` is `ambiguous`. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning; an error under `--strict`, because it is about lab members, whom sslabdata does own. An unresolved authorship that fits a declared collaborator and someone else is `ID-GROUPING-AMBIGUOUS-DECLARED` instead. |
+| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: see *Unresolved authors are not errors* above, which states the known cost. |
+| `ID-GROUPING-AMBIGUOUS-DECLARED` | An unresolved name fits more than one `collaborators_file` entry, or one entry and one lab member it did not resolve to, so it joins none of them and is grouped by its own name. Located like `RESOLVE-AMBIGUOUS-NAME`, naming every candidate (`collaborator:<name>`, `person:<id>`). A warning in every mode, including under `--strict`. Two other codes can accompany it for the same authorship. When the name fits one entry and **one** lab member — `Patel, P.` beside an entry declaring `P. Patel` and a member Paul Patel who declares no such alias — the resolver also reports `RESOLVE-SUGGESTION` for that member, before this code; both are warnings, so `--strict` passes. When it fits one entry and **more than one** lab member, it is also reported here, and `RESOLVE-AMBIGUOUS-NAME` reports the members' ambiguity first, with no `RESOLVE-SUGGESTION`; that one is an error under `--strict`. |
+| `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict`. |
 | `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
-| `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not, while a well-formed `@string{…}` on a `%` line does: the parser reads it, as it does on `main`, and it changes the macro's value. Whether it should be read is #78. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
-| `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A syntax error the parser library raises on a `%` line outside any entry — prose that mentions `@article`, say, which the library reads as the start of a command — is not reported (`sslabdata.parsers.bibtex._on_comment_line()`), so the prose `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` describe says nothing. A **well-formed** command on such a line is read, as it is on `main` and in classic BibTeX, which has no `%` comment outside an entry: `% @article{hidden, …}` is an entry. Whether it should be is #78. The prose gives the line. A warning. |
+| `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not, while a well-formed `@string{…}` on a `%` line does: the parser reads it, and it changes the macro's value. Whether it should be read is #78. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
+| `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A syntax error the parser library raises on a `%` line outside any entry — prose that mentions `@article`, say, which the library reads as the start of a command — is not reported (`sslabdata.parsers.bibtex._on_comment_line()`), so the prose `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` describe says nothing. A **well-formed** command on such a line is read, as in classic BibTeX, which has no `%` comment outside an entry: `% @article{hidden, …}` is an entry. Whether it should be is #78. The prose gives the line. A warning. |
 | `BIB-VENUE-MISSING` | An `@article` has no `journal`, or an `@inproceedings` has no `booktitle` (`sslabdata.parsers.bibtex.REQUIRED_CONTAINER`). No other entry type is checked. A field present but empty counts as missing. The entry is kept, and its venue is read by the usual rule from any other container field it carries, or is `null`. A warning. |
 | `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one sslabdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`sslabdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
 | `LATEX-COMMAND-UNKNOWN` | A text field or a name uses a LaTeX command sslabdata's conversion has no rule for (`sslabdata.parsers.latex.unknown_commands()`): one outside the converter's table and not one of the two whose conversion sslabdata documents, `\textsuperscript{…}`, which becomes its argument, and the escaped star `\*`, which is consumed (`tests/COVERAGE.md` rows `names.equal_contribution` and `names.equal_contribution_escaped`). The command is dropped and a braced argument after it is kept as plain text, so no raw LaTeX reaches the document. Math is not searched. One line per command for the whole run, however many fields use it: the number of fields, located at the first of them in document order. A warning. |
@@ -266,11 +249,10 @@ Codes in use:
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
 | `CONFIG-NOT-FOUND` | The `--config` file does not exist. Located at that path alone; `Error: CONFIG-NOT-FOUND …` on standard error. Fatal at load. |
 | `CONFIG-UNREADABLE` | The `--config` file exists but cannot be read — not valid YAML, not UTF-8, or a file the operating system will not open — or another input file, such as a `people_file`, exists but the operating system will not open it. Located at the `--config` path alone; the prose is the reading library's own wording, on one line. Fatal at load. |
-| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `sslabdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, by `assemble()` on every name it is about to compile, and by `Work.to_dict()`. **The last is the one that holds**, because it is the boundary every emitted document passes through: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked, and a `Work` can be built without a configuration at all. The three earlier checks stay because they fail sooner and say more — `from_yaml()` names the file the user would edit. |
-| `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR` | A `bib_files[].name` that does not stay under `bib_dir`. Fatal at load, because the file would be read from, and its name emitted as `work.source.file` relative to, a directory the configuration never named. Two checks, both made before any `.bib` is parsed and for every configured name. *Lexical*: the name is read by Windows rules on every host, so `/` and `\` both separate components; a `..` component, or a drive (`C:x.bib`, which is relative to a drive's directory and so not caught by `CONFIG-BIB-FILE-ABSOLUTE`), is rejected. *Resolved*: symlinks are followed, and the file, opened as `<bib_dir>/<name>` (so an empty `bib_dir` is the filesystem root), must lie inside the resolved `bib_dir`, compared by path components rather than by string prefix, so a sibling `bib_dir_evil` does not pass; a dangling symlink whose target is outside is rejected. A file that does not exist is not rejected here and keeps `CONFIG-FILE-NOT-FOUND`. An accepted name is emitted unchanged. The diagnostic is located at `lab.yaml:bib_files:name`. Raised as a `sslabdata.config.ConfigurationError` by `LabDataConfig.from_yaml()` and by `assemble()`. |
+| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute (§5). Raised as a `sslabdata.ConfigurationError`, which the Python API paragraphs below say more about. |
+| `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR` | A `bib_files[].name` that does not stay under `bib_dir`. Fatal at load, because the file would be read from, and its name emitted as `work.source.file` relative to, a directory the configuration never named. Two checks, both made before any `.bib` is parsed and for every configured name. *Lexical*: the name is read by Windows rules on every host, so `/` and `\` both separate components; a `..` component, or a drive (`C:x.bib`, which is relative to a drive's directory and so not caught by `CONFIG-BIB-FILE-ABSOLUTE`), is rejected. *Resolved*: symlinks are followed, and the file, opened as `<bib_dir>/<name>` (so an empty `bib_dir` is the filesystem root), must lie inside the resolved `bib_dir`, compared by path components rather than by string prefix, so a sibling `bib_dir_evil` does not pass; a dangling symlink whose target is outside is rejected. A file that does not exist is not rejected here and keeps `CONFIG-FILE-NOT-FOUND`. An accepted name is emitted unchanged. The diagnostic is located at `lab.yaml:bib_files:name`. Raised as a `sslabdata.ConfigurationError`. |
 
-Every diagnostic sslabdata prints carries one of these codes (#26 decision
-8). What is not a diagnostic carries none: the counts and headers of a
+Every diagnostic sslabdata prints carries one of these codes. What is not a diagnostic carries none: the counts and headers of a
 report, the `Wrote …` line, the argument parser's usage errors, and a Python
 traceback, which is a crash (Target (#80) above).
 
@@ -329,66 +311,26 @@ What each mode puts in the array:
 - `--output` with `--format json` is the **document**, not this array; its
   diagnostics stay text on standard error.
 
-> **Version note (#26, PR #64).** Duplicate citation keys were invisible
-> through commit `dd06e37`: the parser library kept the first entry, and a key
-> repeated across two configured files passed `--validate` with exit `0`.
-> Since PR #64 merged, `sslabdata.parsers.bibtex.parse_all_works()`
-> reports each duplicate under the `BIB-DUPLICATE-KEY` code, `--validate`
-> exits `1`, and the other modes emit the same diagnostic as a warning and
-> continue. The code was introduced as `E-BIB-DUPLICATE-KEY` and renamed to
-> drop the severity prefix before any release, under rule 2 above.
-
-> **Version note (#56, #65, PR for `schema_version` 4).** Through commit
-> `78570e6`, the document's works were `publications`, the bibliography was
-> one composed `venue` string, links and identifiers were five flat `*_url`
-> properties, and an entry carrying `crossref` compiled with its parent's
-> fields and none of its own authors. Since `schema_version` 4 the top level
-> is `works`, the bibliography is structured, `links` and `identifiers` are
-> open registries, `collaborators` is a declared grouping over unresolved
-> authorships, and `crossref` is rejected under `BIB-CROSSREF-UNSUPPORTED`.
-> The package version is 3.0.0; a consumer that needs the old document pins
-> `schema_version` 3 and the schema at `schema/v3/output.schema.json`.
->
-> **`collaborators` changes in four ways at once**, because the key changed:
-> v3 grouped on the abbreviated display name, v4 on the normalised full name
-> (§5). Which authorships land together changes, and so does how many entries
-> there are — the demo goes from 7 to 9, one `P. Patel` group of four
-> occurrences becoming `Priya Patel`, `Pradeep Patel` and `P. Patel`. The
-> counts change meaning as well as value: v3's `publication_count` counted
-> occurrences and v4 has both `work_count`, deduplicated per work, and
-> `authorship_count` (v5 removes both; see the version note under §6). The
-> displayed `name` expands, because it is now the parts joined rather than
-> the abbreviated form: `T. Turner` becomes `Trent Turner`. The **order §3 promises keeps its rule** — `last_year`
-> descending, then work count descending, then `name` — with `key` appended
-> after `name`, because two keys can now carry the same readable name and the
-> name alone is no longer total. What moves in the list moves because the
-> names and the groups moved, not because the rule did. All of it follows
-> from the key and the name, and #24 tunes the policy behind them.
-
-> **Version note (#22, PR #61).** Through commit `cf9e055`, `--unresolved`
-> printed `All authors resolved.` when no `people_file` was configured, where
-> nothing had been attempted. Since PR #61 merged, the `--unresolved` branch
-> of `sslabdata.cli.main()` prints `Author resolution is not configured (no
-> people_file).` and exits `0`. `tests/COVERAGE.md` row
-> `config.people_file.missing` records the current behaviour as `pass`.
-
 **The Python API is convenience only.** Public: the names in `sslabdata.__all__`
 — `assemble`, `AssemblyResult`, `AssemblyError`, the models `LabData`,
 `Work`, `Author`, `Contributor`, `Venue`, `Link`, `Person`, `Project`,
 `Collaborator`, the config loader `LabDataConfig` with `BibFile`, and the exporters
 `export_to_yaml` and `export_to_json`, and the exception
-`ConfigurationError`. `Publication` was renamed to `Work` at package version
-3.0.0, when the document's `publications` became `works`.
+`ConfigurationError`.
 
 **`sslabdata.ConfigurationError`** (defined in `sslabdata.config`) is a subclass
 of `ValueError`, raised for a configuration sslabdata will not compile from.
 It has its own type so that a caller can tell a rejected configuration from
-anything else that raises a `ValueError`. For an absolute `bib_files` name
+anything else that raises a `ValueError`, and so that a crash still reaches
+the user as a crash. For an absolute `bib_files` name
 (`CONFIG-BIB-FILE-ABSOLUTE`) it is raised by `LabDataConfig.from_yaml()`, by
 `BibFile`'s constructor, by `assemble()` on every configured name before it
-compiles one, and by `Work.to_dict()` — which is the boundary every emitted
-document passes through, so it is the one that holds whatever built the
-objects. For a name that leaves `bib_dir` (`CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`)
+compiles one, and by `Work.to_dict()`. **The last is the one that holds**: it
+is the boundary every emitted document passes through, and `BibFile` is a
+plain, mutable dataclass, so a name can be set after it was checked, and a
+`Work` can be built without a configuration at all. The earlier checks stay
+because they fail sooner and say more — `from_yaml()` names the file the user
+would edit. For a name that leaves `bib_dir` (`CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`)
 it is raised by `from_yaml()` and by `assemble()`. For a `lab.yaml` of the wrong shape (`CONFIG-NOT-A-MAPPING`,
 `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`) it is raised by `from_yaml()`
 alone. Its message is always one coded diagnostic line.
@@ -521,7 +463,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
 | `person.aliases` | Read for matching by `sslabdata.resolver.match()`, never emitted — `Person.to_dict()` has no `aliases` key. |
 | `collaborators_file` entries | A list of `{name, aliases}` read by `sslabdata.loaders.load_collaborators()`. Read only to decide which unresolved authorships share one `collaborators` grouping (§5); never emitted as such and never a source of `person_id`. |
-| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked: an absolute one is rejected (`sslabdata.config.is_absolute_path()`), at load and again when the document is built, and one that leaves `bib_dir` is rejected at load (`CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`). |
+| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked (`sslabdata.config.is_absolute_path()`, §5). |
 | Any BibTeX field named nowhere in this table or heading 1 — `keywords`, `annote`, `language` and the rest | Not interpreted by sslabdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). |
 
 The fields named in that table and in heading 1 are the complete set sslabdata
@@ -573,19 +515,10 @@ contain markup, and it applies only to the fields under heading 1.
   `sslabdata.parsers.latex.latex_to_text()`, because the converter cannot read
   it. Carrying link content into explicit fields is #27.
 
-> **Version note (#18, #56).** Through `schema_version` 3,
-> `venue` was composed with Markdown emphasis by
-> `format_venue()` — an article in journal `J` published in 2021 yielded the
-> string `*J*, 2021` — and it was the only place sslabdata *generated* markup
-> into a text field, as distinct from the YAML strings above, which it merely
-> passes through. `schema_version` 4 replaced it with a structured container
-> and flat bibliographic properties, so there is nothing left to compose and
-> nothing left to generate. `tests/COVERAGE.md` rows `output.no_markup` and
-> the two tests behind it assert it: nothing in the demo document is Markdown
-> or HTML, and the Markdown punctuation the corpus does carry is input text
-> in a property whose value the input supplies. #18 remains open for
-> renderers — escaping, attribute-safe escaping and the checks on rendered
-> output.
+**sslabdata generates no markup.** Nothing in the document is composed by
+sslabdata with Markdown or HTML: where a text field carries Markdown
+punctuation, an author wrote it. `tests/COVERAGE.md` row `output.no_markup`
+and the tests behind it assert this for the demo document.
 
 ---
 
@@ -606,7 +539,7 @@ accident.
 | `person.work_ids` | The order of the `works` list, filtered to that person's authorships, first occurrence only (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and do not appear. |
 | `project.work_ids` | The order of the `works` list, filtered to that project, first occurrence only (`compute_backlinks()`). |
 | `project.people_ids` | Person id **ascending**, by Unicode code point (`compute_backlinks()` sorts the set it collects). |
-| `collaborators` | `last_year` **descending** with `null` last, then the number of `work_ids` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `sslabdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is no longer total, but it is still what decides. |
+| `collaborators` | `last_year` **descending** with `null` last, then the number of `work_ids` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `sslabdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is not total, but it is still what decides. |
 | `collaborator.authorships` | The order of the `works` list, then `position` within a work (`group_collaborators()`). |
 | `collaborator.work_ids` | The same order, first occurrence only. |
 | `collaborator.name_variants` | **Ascending** by Unicode code point. `collaborator.name` is the *first* spelling in document order, which need not be the first variant. |
@@ -624,10 +557,9 @@ accident.
 
 - Two works of the same year appear in read order. Two entries with the same
   year in the same file appear in source order.
-- A work with **no `year` field has `year: null`** and sorts **last**, which
-  is where `year: 0` used to put it. The position is unchanged; what changed
-  is that `null` is now distinguishable from a genuine year `0`, and that the
-  entry is reported under `BIB-YEAR-MISSING`.
+- A work with **no `year` field has `year: null`** and sorts **last**.
+  `null` is distinguishable from a genuine year `0`, and the entry is
+  reported under `BIB-YEAR-MISSING`.
 - Two collaborators can only tie through all four sort keys if they share a
   `key`, and a `key` is unique by construction, so the order is total. Two
   that tie through the first three are separated by the `key` alone, which is
@@ -692,24 +624,6 @@ This rule is satisfied by `Author.to_dict()`, `Contributor.to_dict()`,
 `Collaborator.to_dict()`, each of which emits every declared key
 unconditionally, and by `LabData.to_dict()`, which always emits `lab`.
 
-> **Version note (#56).** Three deviations existed through `schema_version`
-> 3, and each was a bug against the rule above rather than a second policy.
-> (a) `Person.to_dict()` emitted only `id`, `name`, `role`, `status`,
-> `website` and `publication_count` unconditionally and **omitted** `photo`,
-> `email`, `co_advisor`, `start_year`, `publication_ids` and the alumni
-> fields whenever their value was falsy, with the alumni fields additionally
-> omitted for anyone whose `status` was not `alumni`. (b)
-> `Publication.to_dict()` omitted `bibtex` when the entry could not be
-> written back out as BibTeX. (c) `LabData.to_dict()` omitted top-level `lab`
-> when `lab.yaml` had no `lab` section — and, because it tested the value's
-> truthiness rather than its presence, also when `lab.yaml` supplied an empty
-> `lab: {}`, so a consumer could not tell "no header" from "an empty header".
-> All three are fixed in `schema_version` 4: every declared property is
-> present, `bibtex` is `null` when it could not be produced, and `lab` is
-> always emitted, `{}` when there is nothing in it. Fixing them changed the
-> schema's `required` lists and the nullability of the affected properties,
-> which is breaking under §6, which is why they waited for the bump.
-
 **Where "absent" cannot happen at all.** The schema defines the document
 itself and each entity type as **closed**: `/additionalProperties` and each
 of `/$defs/authorship`, `/$defs/editorship`, `/$defs/work`, `/$defs/person`,
@@ -742,7 +656,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `generator` | Derived — the compiler's name, its package version and the schema version (`LabData.to_dict()`). No timestamp. |
 | `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`LabDataConfig.from_yaml()`), and always emitted. |
 | `work.bib_id`, `work.source.key` | Input — the BibTeX citation key, **as written**. `sslabdata.parsers.bibtex.entry_fields()` preserves its case. |
-| `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. A *relative* directory is fine and is passed through as written: `sub/journal.bib` is a name under `bib_dir`; one that leaves `bib_dir` is rejected under `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`. The guarantee is kept by rejecting the input rather than by rewriting it — rewriting would quietly discard that directory — and it is enforced under `CONFIG-BIB-FILE-ABSOLUTE` at `Work.to_dict()`, the boundary every emitted document passes through, so that it holds whatever built the objects. `LabDataConfig.from_yaml()`, `BibFile`'s constructor and `assemble()` check it earlier as well, for messages that fail sooner and name more. |
+| `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. A *relative* directory is fine and is passed through as written: `sub/journal.bib` is a name under `bib_dir`; one that leaves `bib_dir` is rejected under `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`. The guarantee is kept by rejecting the input rather than by rewriting it, which would quietly discard that directory, and is enforced under `CONFIG-BIB-FILE-ABSOLUTE` (§1, *`sslabdata.ConfigurationError`*). |
 | `work.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. Of it and `bib_id`, it is the only one that is case-folded. |
 | `work.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`sslabdata.parsers.bibtex.extract_note()`). |
 | `work.year` | Input — the BibTeX `year`, as an integer; `null` when the entry supplied none, with a diagnostic (`entry_year()`). |
@@ -758,7 +672,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `author.position` | **Derived** — where the authorship sits in its work's list, 1-based, counting only the names that reach the document. |
 | `author.person_id` | **Derived** — the resolver's match against `people_file` (`sslabdata.resolver.resolve_authors()`): on the structured full name, then — only for a name that is itself abbreviated — on a declared alias, and never when the name fits more than one person or only nearly matches. See *How a name is matched* below. |
 | `author.collaborator_key` | **Derived** — the key of the grouping an unresolved authorship fell into (`sslabdata.assembler.group_collaborators()`). Exactly one of it and `person_id` is non-null. |
-| `author.resolution` | **Derived** — `status` over `resolved`, `unresolved` and `ambiguous`, and `method` `exact`, or `null` when nothing matched (`resolve_authors()`). Both are open strings; `fuzzy` is no longer emitted (Version note under §6). |
+| `author.resolution` | **Derived** — `status` over `resolved`, `unresolved` and `ambiguous`, and `method` `exact`, or `null` when nothing matched (`resolve_authors()`). Both are open strings; `fuzzy` is never emitted. |
 | `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`sslabdata.parsers.bibtex.marks_equal_contribution()`). |
 | `work.editors[*]` | The same, minus `collaborator_key` and `equal_contribution`. An editor that matched nobody is simply `person_id: null` (`parse_editor_list()`). |
 | `person.*` except the two below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). |
@@ -824,7 +738,7 @@ removes their full stops, so `J.-P.` equals `J-P`, but it is not equal to
   `Alice Ivers, S.S.` does not equal `Alice Ivers, S. S.` sslabdata has no
   way to tell a suffix from a given name after a comma, so a declaration
   written `Family, Given` is not spaced at all: `Ivers, S.S.` and
-  `Ivers, S. S.` stay two spellings, as on `main`. Where the parse does not
+  `Ivers, S. S.` stay two spellings. Where the parse does not
   line up with the words, the declaration is compared through
   `normalize_name()` alone.
 - Grouping an unresolved author into a collaborator: the grouping key is
@@ -834,8 +748,8 @@ removes their full stops, so `J.-P.` equals `J-P`, but it is not equal to
   spaced the same way as between declarations. A name with nothing to space
   keeps the key it had.
 
-The emitted `name` and name parts keep what the entry wrote, and
-`normalize_name()` itself is unchanged.
+The emitted `name` and name parts keep what the entry wrote, and the spacing
+is applied outside `normalize_name()`, which does exactly the steps above.
 
 The match decides in this order:
 
@@ -954,8 +868,9 @@ it. What that buys, and what it does not:
   *How a name is matched*), with the lab members competing. An authorship
   that matches exactly one entry is grouped under the key of that entry's
   normalised name, `grouped_by: declared`; one that fits an entry and anyone
-  else is reported under `RESOLVE-AMBIGUOUS-NAME` and grouped by its own
-  name. A `name` or alias a member already declares is reported under
+  else is reported (`ID-GROUPING-AMBIGUOUS-DECLARED`, and
+  `RESOLVE-AMBIGUOUS-NAME` when it fits more than one member) and grouped by
+  its own name. A `name` or alias a member already declares is reported under
   `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and not used. The file never
   produces a `person_id`. The remaining risk is **reported** rather than
   silent:
@@ -1042,47 +957,15 @@ as "whichever person sslabdata matched on the day version 4 shipped".
 So a **resolver correction** — a change that makes the matcher better satisfy
 the documented matching policy, without changing the shape, the namespace or
 the meaning of the relationship — is a package-level behaviour change
-recorded as a **Version note** here, not a `schema_version` bump. A consumer
+recorded in [`CHANGELOG.md`](CHANGELOG.md), not a `schema_version` bump. A consumer
 that needs byte-identical compilation pins the **package** version; one that
 needs to read the document pins `schema_version`. The two are independent, and
 this is why.
-
-The precedent is already in this file. PR #61 changed what `--unresolved`
-prints when no `people_file` is configured, and PR #64 made duplicate citation
-keys an error where they had been invisible; both changed behaviour a user
-could observe, both are recorded above as Version notes, and neither
-incremented `schema_version`. The same reading is what lets #24 change how
-authors resolve without a fifth version.
 
 What that does **not** license: changing `person_id` to point at a
 collaborator, making it a list, allowing it to carry something other than a
 person's id, or reordering a list §3 promises. Those are shape, namespace,
 meaning and guarantees, and each of them is a bump.
-
-> **Version note (#24).** Through commit `eec03e6`, every author was
-> abbreviated to initials before matching (`match_form()`), so a full name
-> could resolve to whoever declared the abbreviation, and a near miss on
-> string similarity was linked with `method: fuzzy`. Since #24, matching
-> reads the structured full name first and the abbreviated form only where
-> the input itself is abbreviated (§5, *How a name is matched*); a name that
-> fits more than one person gets `resolution.status: ambiguous` and no
-> `person_id`, a near miss is reported under `RESOLVE-SUGGESTION` and never
-> linked, and `collaborators_file` can join the spellings of one external
-> co-author, as `grouped_by: declared`. `schema_version` stays 4: the shape,
-> namespace and meaning of `person_id` are unchanged, and `ambiguous` and
-> `declared` are new members of open strings. In the valid corpus six
-> `person_id` values move — `name-kim-alan` from `akim` to `alankim`,
-> `name-kim-initial` from `akim` to null, `id-full-name` from null to
-> `ffischer`, and three near misses that were linked by fuzzy matching and
-> now are not: `id-fuzzy` author 1 (`Davis, Dave M.`),
-> `name-equal-normalized` author 4 (`Davis{*}`) and `name-equal-escaped`
-> author 2 (`Davis\^{*}`), each from `ddavis` to null. That moves works from
-> `akim` to `alankim` and away from `ddavis`, removes the `Frank Fischer`
-> collaborator, and adds three: `A. Kim`, `Dave M. Davis`, and one grouping
-> the two starred Davis spellings, which normalise alike. In the demo no `person_id` moves; it now
-> declares `P. Patel` as an alias of `Priya Patel` in
-> `examples/demo/collaborators.yaml`, so `P. Patel` joins her grouping and the
-> `P. Patel` collaborator is gone. Exit codes are unchanged.
 
 **Published schemas are immutable and live at versioned paths.** A schema that
 has been published is never edited. Version `N`'s schema stays reachable, byte
@@ -1106,40 +989,16 @@ written. Each later version gets its own tag, at its own path, under the same
 rule.
 
 **The published addresses carry the old repository name.** The project was
-called `labdata` until #82 renamed it, and its repository with it, to
-`sslabdata`. The v3 and v4 schema files were published before the rename, so
-their `$id`s, and the titles and descriptions inside them, still say
-`labdata`, and they are left byte for byte as published rather than
-rewritten. v4's raw `$id` still resolves: GitHub redirects the old repository
+once called `labdata`, and its repository with it. The v3 and v4 schema files
+were published under that name, so their `$id`s, and the titles and
+descriptions inside them, say `labdata`, and they are left byte for byte as
+published rather than rewritten. v4's raw `$id` still resolves: GitHub redirects the old repository
 name to the new one. v3's `blob/main` `$id` still does not resolve, as above.
 v5 is the first schema published under the new name: its `$id`, title and
 descriptions say `sslabdata`.
 
-**Version history** of `sslabdata.models.SCHEMA_VERSION`:
-
-| `schema_version` | Change |
-|---|---|
-| 1 | The original document. |
-| 2 | Authors carry their structured name parts (#23). Breaking: the object is closed, so a v1 consumer rejects the new keys. |
-| 3 | Authors carry `equal_contribution` (#46). Breaking, for the same reason. |
-| 4 | One consolidated breaking change (#56): `publications` becomes `works`, the bibliography is structured, `links` and `identifiers` are open registries, `collaborators` is a declared grouping over unresolved authorships, every closed object declares every property it can carry, and `crossref` is rejected (#65). |
-| 5 | A project carries an optional `image`; `verification.checked_at` is removed; `work_count` and `authorship_count` are removed (#101). Breaking: each adds or removes a property of a closed object. |
-
-> **Version note (#101, `schema_version` 5).** Three changes, and nothing
-> else in the document moves:
->
-> 1. **A project carries `image`.** `projects.yaml` accepts it — a URL or a
->    site path, the same kind of value as a person's `photo` — and every
->    project emits it, `null` when absent (§4). It is plain text; deciding
->    which URLs are safe to render is the renderer's job.
-> 2. **`verification.checked_at` is removed.** Nothing produced it and it was
->    always `null`. A link's `verification` is `{status}`.
-> 3. **Counts that repeat the length of a list are removed:** `work_count` and
->    `authorship_count` from collaborators, and `work_count` from people. A
->    consumer reads `len(work_ids)` or `len(authorships)` instead.
->
-> A consumer that needs the old document pins `schema_version` 4 and the
-> schema at `schema/v4/output.schema.json`.
+**Version history.** What each `schema_version` changed is in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

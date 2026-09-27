@@ -242,7 +242,7 @@ HTML_TAG = re.compile(r"</?[A-Za-z][^<>]*>")
 # punctuation in one of these is text an author wrote, which SPEC.md section
 # 2 says sslabdata neither escapes nor strips -- the corpus carries `not
 # *emphasis*` in a title on purpose. Anywhere else it would be markup sslabdata
-# generated, which is what composing `venue` used to do and what #56 removed.
+# generated.
 INPUT_TEXT = {"title", "abstract", "note", "name", "given", "von", "family",
               "suffix", "literal", "name_variants", "description",
               "thesis_title", "current_position", "role", "status",
@@ -286,13 +286,13 @@ def test_the_demo_document_carries_no_markup(demo_exports):
     """Nothing sslabdata emits for the demo is Markdown or HTML.
 
     The demo's input is plain, so any markup in its output would be markup
-    sslabdata generated. Under `schema_version` 3 `venue` was exactly that:
-    `*Transactions on Robot Learning*, 4(2), 2025`.
+    sslabdata generated, as a composed `venue` such as
+    `*Transactions on Robot Learning*, 4(2), 2025` would be.
     """
     for data in demo_exports:
         assert markup_paths(data) == []
-    # An empty list has to mean "looked and found none": the venue string v3
-    # composed must be rejected by the same scan.
+    # An empty list has to mean "looked and found none": a composed venue
+    # string must be rejected by the same scan.
     composed = {"works": [{"venue": "*Transactions on Robot Learning*, 4(2), 2025"}]}
     assert markup_paths(composed) != []
     assert markup_paths({"lab": {"name": "<b>Lab</b>"}}) != []
