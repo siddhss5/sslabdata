@@ -414,6 +414,17 @@ config.collaborators_file.not_found:
   diagnostics:
     - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: collaborators_file, values: [nocollaborators.yaml]}
 
+# An empty path names no file, so each key is reported; leaving the key out is
+# how a configuration says there is no file.
+config.data_file.empty:
+  dir: config_data_file_empty
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: people_file}
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: projects_file}
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: collaborators_file}
+
 config.collaborators_file.wrong_type:
   dir: config_collaborators_file_type
   exit: 1
