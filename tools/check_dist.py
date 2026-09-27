@@ -38,7 +38,8 @@ from urllib.parse import urlsplit
 URL_LABELS = {"Homepage", "Repository", "Documentation", "Issues", "Changelog"}
 FENCE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[`~]*[ \t]*$", re.S | re.M)
 CODE_SPAN = re.compile(r"(`+).+?\1", re.S)
-DEFINITION = re.compile(r"^ {0,3}\[[^\]\n]+\]:[ \t]*<?([^\s>]+)", re.M)
+# A definition's destination may follow on the next line, and may be `<>`.
+DEFINITION = re.compile(r"^ {0,3}\[[^\]\n]+\]:[ \t]*\n?[ \t]*(?:<([^<>\n]*)>|([^\s<]\S*))", re.M)
 
 
 class _Attributes(HTMLParser):
@@ -47,7 +48,7 @@ class _Attributes(HTMLParser):
         self.targets = []
 
     def handle_starttag(self, tag, attrs):
-        self.targets += [v for k, v in attrs if k in ("href", "src") and v]
+        self.targets += [v for k, v in attrs if k in ("href", "src") and v is not None]
 
     handle_startendtag = handle_starttag
 
@@ -62,15 +63,15 @@ def inline_targets(text):
         inside = text[opening.end():i - 1].strip()
         if inside.startswith("<"):
             yield inside[1:].split(">")[0]
-        elif inside:  # what follows the first space is a title
-            yield inside.split()[0]
+        else:  # what follows the first space is a title; an empty one is a target
+            yield inside.split()[0] if inside else ""
 
 
 def link_targets(markdown):
     text = CODE_SPAN.sub("", FENCE.sub("", markdown))
     html = _Attributes()
     html.feed(text)
-    return sorted(set(inline_targets(text)) | set(DEFINITION.findall(text)) | set(html.targets))
+    return sorted(set(inline_targets(text)) | {a or b for a, b in DEFINITION.findall(text)} | set(html.targets))
 
 
 def is_absolute(target):
