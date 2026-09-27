@@ -85,7 +85,7 @@ Exit codes, as `sslabdata.cli.main()` returns them:
 | Code | Meaning |
 |---|---|
 | `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
-| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, a `bib_files[].name` that is absolute or leaves `bib_dir`, or a `lab.yaml` of the wrong shape; a file the configuration names is not there; a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
+| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, a `bib_files[].name` that is absolute or leaves `bib_dir`, a `lab.yaml` of the wrong shape, or a value under `lab` that has no one JSON form; a file the configuration names is not there; a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
 **Streams and message shapes.** Ordinary reporting goes to **standard
@@ -159,7 +159,9 @@ without depending on English wording. Codes obey three rules:
    empty and its separator kept: `CONFIG-NOT-A-MAPPING lab.yaml::: …` names a
    file and nothing in it, and `CONFIG-KEY-MISSING lab.yaml:bib_dir:: …` a
    top-level key with no field under it. For a configuration file, `<key>` is
-   the top-level key and `<field>` the key under it; for a people or projects
+   the top-level key and `<field>` the key under it, or, deeper in `lab`, the
+   keys down to the value joined by `.` with a list member's index in
+   brackets (`lab.yaml:lab:links.scores[1]`); for a people or projects
    file, `<key>` is the record's `id`.
 2. **Severity is not part of the code.** A code says *what was found*, never
    how badly the run took it. Severity belongs to the condition and the mode
@@ -167,7 +169,7 @@ without depending on English wording. Codes obey three rules:
 
    | Class | `--validate` | Every other mode | Codes |
    |---|---|---|---|
-   | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
+   | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
    | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
@@ -241,6 +243,7 @@ Codes in use:
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
 | `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file`, `projects_file` or `collaborators_file` that is not a string, `lab` that is not a mapping, a `lab` key the schema types (`name`, `description`, `institution`, `department`, `website`, `email`, `address` and `logo` are strings, `links` a mapping) whose value is another type or empty, or `bib_files` that is not a list. A `bib_files` entry is a mapping of a string `name` and a string `category` and nothing else: one that is not a mapping, whose `name` or `category` is not a string, or that holds another key is this code too, located at `lab.yaml:bib_files:<field>`. Fatal at load. |
+| `CONFIG-VALUE-NOT-JSON` | A value under `lab`, at any depth and `lab.links` included, that the document cannot carry the same way in both formats: NaN or an infinity, which JSON cannot write; a set (`!!set`), whose order is not stable between runs; binary (`!!binary`); any other type that is not text, a number, a boolean, null, a list or a mapping; or a mapping key that is not a string, which YAML and JSON would write differently. Located at `lab.yaml:lab:<path>`, or at the mapping holding a key that is not a string, with the value or key in the prose. A date or a timestamp is not this code: it is emitted as its ISO 8601 text (`2010-01-01`, `2024-05-01T09:30:00+00:00`), in both formats. Fatal at load, so `--validate` fails wherever `--output` could not write the document. Raised as a `sslabdata.ConfigurationError`. |
 | `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key sslabdata does not read (`sslabdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
 | `CONFIG-BIB-FILES-MISSING` | No `bib_files` are configured, absent or empty, so the document has no works. A warning: that can be meant, but it is never silently normal. |
 | `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file`, `projects_file` or `collaborators_file`. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
@@ -333,7 +336,9 @@ because they fail sooner and say more — `from_yaml()` names the file the user
 would edit. For a name that leaves `bib_dir` (`CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`)
 it is raised by `from_yaml()` and by `assemble()`. For a `lab.yaml` of the wrong shape (`CONFIG-NOT-A-MAPPING`,
 `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`) it is raised by `from_yaml()`
-alone. Its message is always one coded diagnostic line.
+alone. For a `lab` value with no one JSON form (`CONFIG-VALUE-NOT-JSON`) it is
+raised by `from_yaml()` and, for a `lab` set in Python, by `LabData.to_dict()`,
+which also turns a date there into its ISO 8601 text. Its message is always one coded diagnostic line.
 
 **`sslabdata.AssemblyError`** (defined in `sslabdata.assembler`) is a subclass
 of `ValueError`, raised by `assemble()` when any diagnostic is of class

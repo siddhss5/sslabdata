@@ -61,8 +61,8 @@ def export_to_yaml(data: LabData, output_path: str):
         output_path: Path to output YAML file
     """
     _write(output_path,
-           yaml.dump(data.to_dict(), default_flow_style=False,
-                     allow_unicode=True, sort_keys=False))
+           yaml.safe_dump(data.to_dict(), default_flow_style=False,
+                          allow_unicode=True, sort_keys=False))
 
 
 def export_to_json(data: LabData, output_path: str, indent: int = 2):
@@ -74,4 +74,5 @@ def export_to_json(data: LabData, output_path: str, indent: int = 2):
         indent: Indentation level for pretty printing
     """
     _write(output_path,
-           json.dumps(data.to_dict(), indent=indent, ensure_ascii=False))
+           json.dumps(data.to_dict(), indent=indent, ensure_ascii=False,
+                      allow_nan=False))

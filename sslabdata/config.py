@@ -8,9 +8,11 @@ Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 
+import math
 import os
 import yaml
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Dict, List, Optional
 from pathlib import Path, PureWindowsPath
 
@@ -55,6 +57,16 @@ _STRING_KEYS = ("pdf_base_url", "people_file", "projects_file",
 _LAB_TYPES = {**dict.fromkeys(("name", "description", "institution",
                                "department", "website", "email", "address",
                                "logo"), str), "links": dict}
+
+# `lab` is otherwise open, and it reaches both formats of the document, so
+# every value in it at any depth must have one JSON form that YAML writes
+# alike. A date or a timestamp becomes its ISO 8601 text, which keeps what the
+# author wrote. Anything else JSON cannot carry is refused rather than
+# guessed at: NaN and the infinities have no JSON form, a set's order changes
+# between runs, binary has no meaning as text, and a key that is not a string
+# is written as `2019` by YAML and `"2019"` by JSON. Fatal at load, because
+# `--output` could not write it and `--validate` must fail where that does.
+VALUE_NOT_JSON = "CONFIG-VALUE-NOT-JSON"
 
 
 class ConfigurationError(ValueError):
@@ -124,6 +136,40 @@ def reject_name_outside_bib_dir(name, bib_dir, file: Optional[str] = None) -> No
             f"'{name}' is not under bib_dir '{bib_dir}'; a bib_files name is "
             "a name under bib_dir, with no '..' component and no symlink "
             "leading out of it"))
+
+
+def json_lab(lab: dict, file: Optional[str] = None) -> dict:
+    """``lab`` as the document carries it, by the rule at `VALUE_NOT_JSON`.
+
+    Returns a copy with every date and timestamp as ISO 8601 text, or raises
+    at `<file>:lab:<path>`, where the path is the keys down to the value,
+    joined by `.`, with a list member's index in brackets.
+    """
+    def plain(value, path):
+        def refuse(what):
+            raise ConfigurationError(diagnostic(
+                VALUE_NOT_JSON, file, "lab", path or None,
+                f"{f'lab.{path}' if path else 'lab'} {what}; a "
+                "value under lab is text, a number, a boolean, a date, or a "
+                "list or mapping of them with string keys"))
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, float) and not math.isfinite(value):
+            refuse(f"is {value!r}, which JSON cannot write")
+        if value is None or isinstance(value, (str, bool, int, float)):
+            return value
+        if isinstance(value, list):
+            return [plain(v, f"{path}[{i}]") for i, v in enumerate(value)]
+        if isinstance(value, dict):
+            for key in value:
+                if not isinstance(key, str):
+                    refuse(f"has the key {key}, {_kind(key)}, which YAML and "
+                           "JSON would write differently")
+            return {k: plain(v, f"{path}.{k}" if path else k)
+                    for k, v in value.items()}
+        refuse(f"is {'binary' if isinstance(value, bytes) else _kind(value)}")
+
+    return plain(lab, "")
 
 
 @dataclass
@@ -214,6 +260,8 @@ class LabDataConfig:
                 reject(TYPE_INVALID, 'lab', key,
                        f"lab.{key} is {_kind(data['lab'][key])}; it must be "
                        f"{'a mapping' if expected is dict else 'a string'}")
+        lab = None if data.get('lab') is None else json_lab(data['lab'],
+                                                            str(path))
         for key in _STRING_KEYS:
             if data.get(key) is not None and not isinstance(data[key], str):
                 reject(TYPE_INVALID, key, None,
@@ -262,7 +310,7 @@ class LabDataConfig:
             pdf_base_url=data.get('pdf_base_url'),
             people_file=data.get('people_file'),
             projects_file=data.get('projects_file'),
-            lab=data.get('lab'),
+            lab=lab,
             path=str(path),
             collaborators_file=data.get('collaborators_file'),
             unknown_keys=[str(key) for key in data if key not in KNOWN_KEYS],

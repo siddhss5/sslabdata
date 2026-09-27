@@ -5,11 +5,15 @@ checked by test_invalid_corpus.py.
 """
 
 import json
+from datetime import date, datetime, timezone
 
+import jsonschema
 import pytest
 import yaml
 
-from .support import VALID, case, export, item, run_sslabdata, work, write_variant
+from .support import (
+    SCHEMA_PATH, VALID, case, export, item, run_sslabdata, work, write_variant,
+)
 
 
 # --- Config keys: present ----------------------------------------------------
@@ -111,6 +115,37 @@ def test_config_lab_missing(tmp_path):
     run, empty = export(VALID, tmp_path, write_variant(tmp_path, lab={}))
     assert run.code == 0 and run.crash is None, run.output
     assert empty["lab"] == {}
+
+
+# Covers config.lab.date
+def test_config_lab_dates_are_emitted_as_iso_text(tmp_path):
+    """A date or a timestamp under `lab`, at any depth, is its ISO 8601 text:
+    `--validate --strict` in each format passes, both exports succeed, parse
+    to the same document and validate against the schema. Read back as YAML,
+    a date the export left unquoted would be a date again, and the two
+    documents would differ.
+
+    To reproduce, add `founded: 2010-01-01` under `lab` in
+    tests/corpus/valid/lab.yaml and export it with `--format json`.
+    """
+    lab = {"name": "Corpus Lab", "founded": date(2010, 1, 1),
+           "links": {"cv": datetime(2024, 5, 1, 9, 30, tzinfo=timezone.utc)}}
+    variant = write_variant(tmp_path, lab=lab, bib_files=[
+        {"name": "encoding.bib", "category": "E"}])
+    documents = []
+    for fmt in ("yaml", "json"):
+        run = run_sslabdata(["--config", variant, "--validate", "--strict",
+                             "--format", fmt], VALID)
+        assert run.code == 0 and run.crash is None, run.output
+        run, data = export(VALID, tmp_path, variant, fmt)
+        assert run.code == 0 and run.crash is None, run.output
+        documents.append(data)
+    assert documents[0] == documents[1]
+    assert documents[0]["lab"] == {"name": "Corpus Lab", "founded": "2010-01-01",
+                                   "links": {"cv": "2024-05-01T09:30:00+00:00"}}
+    with open(SCHEMA_PATH, encoding="utf-8") as f:
+        jsonschema.validate(documents[1], json.load(f),
+                            cls=jsonschema.Draft202012Validator)
 
 
 # Covers config.pdf_base_url.missing
@@ -305,3 +340,4 @@ def test_cli_unresolved_none(tmp_path):
     assert not lines[0].startswith(" "), run.stdout
     for name in ("Adams", "Côté"):
         assert name not in run.stdout
+

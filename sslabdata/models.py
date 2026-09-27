@@ -15,7 +15,9 @@ from typing import Dict, List, Optional
 # `work.source.file` must never be absolute (SPEC.md section 5).
 # `sslabdata.config` owns the code and the exception type because the
 # condition is a configuration mistake; `Work.to_dict()` checks as well.
-from .config import reject_absolute_name
+# So with `lab`: `LabData.to_dict()` applies the rule `from_yaml()` does to
+# a `lab` built in Python.
+from .config import json_lab, reject_absolute_name
 
 
 # Version of the output format (see schema/v5/output.schema.json). Bump it when
@@ -399,7 +401,7 @@ class LabData:
                 'version': __version__,
                 'schema_version': SCHEMA_VERSION,
             },
-            'lab': dict(self.lab or {}),
+            'lab': json_lab(dict(self.lab or {})),
             'works': [w.to_dict() for w in self.works],
             'people': [p.to_dict() for p in self.people],
             'projects': [p.to_dict() for p in self.projects],

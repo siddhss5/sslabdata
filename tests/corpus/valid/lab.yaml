@@ -4,6 +4,7 @@
 
 # CASE config.lab.present
 # CASE config.lab.missing
+# CASE config.lab.date
 # CASE output.lab
 # CASE output.schema_version
 # CASE output.generator
