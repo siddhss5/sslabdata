@@ -10,15 +10,16 @@ Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 
-class Diagnostic(str):
-    """One coded diagnostic: the line itself, with its parts kept alongside.
+@dataclass(frozen=True)
+class Diagnostic:
+    """One coded diagnostic: its parts, and the line they make (``str()``).
 
-    A ``str``, so it goes wherever a diagnostic line is expected; the parts
-    are there for a caller that would otherwise have to split the line,
-    which a citation key containing a colon would defeat.
+    The parts are kept so that no caller has to split the line, which a
+    citation key containing a colon would defeat.
     """
 
     code: str
@@ -27,21 +28,25 @@ class Diagnostic(str):
     field: Optional[str]
     message: str
 
+    def __post_init__(self) -> None:
+        # An unregistered code is rejected here, not later in `severity()`.
+        # A line break in the message -- a library's multi-line wording, or a
+        # name written across two lines -- becomes a space, so a diagnostic is
+        # always one line and every line of it carries its code.
+        if self.code not in CLASSES:
+            raise ValueError(f"unregistered diagnostic code {self.code!r}")
+        object.__setattr__(self, "message",
+                           " ".join(self.message.splitlines()))
+
+    def __str__(self) -> str:
+        return (f"{self.code} {self.file or ''}:{self.key or ''}:"
+                f"{self.field or ''}: {self.message}")
+
 
 def diagnostic(code: str, file: Optional[str], key: Optional[str],
                field: Optional[str], message: str) -> Diagnostic:
-    """Build one coded diagnostic line; ``None`` parts are left empty.
-
-    A line break in the message -- a library's multi-line wording, or a name
-    written across two lines -- becomes a space, so a diagnostic is always one
-    line and every line of it carries its code.
-    """
-    message = " ".join(message.splitlines())
-    line = Diagnostic(
-        f"{code} {file or ''}:{key or ''}:{field or ''}: {message}")
-    line.code, line.file, line.key, line.field, line.message = (
-        code, file, key, field, message)
-    return line
+    """Build one coded diagnostic; ``None`` parts are left empty in its line."""
+    return Diagnostic(code, file, key, field, message)
 
 
 # The four classes a code can belong to (SPEC.md, *Diagnostic codes*).
@@ -125,19 +130,14 @@ NEVER_AN_ERROR = frozenset({
 ERROR, WARN = "error", "warning"
 
 
-def code_of(line: str) -> str:
-    """The code a diagnostic line carries: its attribute, or its first word."""
-    return getattr(line, "code", None) or line.split(" ", 1)[0]
-
-
-def severity(line: str, validating: bool, strict: bool) -> str:
+def severity(line: Diagnostic, validating: bool, strict: bool) -> str:
     """`ERROR` or `WARN` for one diagnostic in one run.
 
     Fatal codes are errors in every mode. A validation error is an error under
     ``--validate``. Under ``--strict`` every code is an error except those in
     `NEVER_AN_ERROR`.
     """
-    code = code_of(line)
+    code = line.code
     kind = CLASSES[code]
     if kind in (FATAL_AT_LOAD, FATAL):
         return ERROR
@@ -152,13 +152,11 @@ def in_report_order(lines: List[Diagnostic]) -> List[Diagnostic]:
     """Fatal codes first, then validation errors, then warnings, each class
     in the order it was found: the order every report lists them in."""
     order = (FATAL_AT_LOAD, FATAL, VALIDATION_ERROR, WARNING)
-    return sorted(lines, key=lambda line: order.index(CLASSES[code_of(line)]))
+    return sorted(lines, key=lambda line: order.index(CLASSES[line.code]))
 
 
-def record(line: str, level: str) -> Dict[str, Optional[str]]:
+def record(line: Diagnostic, level: str) -> Dict[str, Optional[str]]:
     """One diagnostic as the JSON record SPEC.md specifies."""
-    return {"code": code_of(line), "severity": level,
-            "file": getattr(line, "file", None) or None,
-            "key": getattr(line, "key", None) or None,
-            "field": getattr(line, "field", None) or None,
-            "message": getattr(line, "message", line)}
+    return {"code": line.code, "severity": level,
+            "file": line.file or None, "key": line.key or None,
+            "field": line.field or None, "message": line.message}

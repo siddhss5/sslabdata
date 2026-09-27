@@ -124,7 +124,7 @@ class AssemblyError(ValueError):
     """
 
     def __init__(self, fatal: List[Diagnostic], diagnostics: List[Diagnostic]):
-        super().__init__("\n".join(fatal))
+        super().__init__("\n".join(str(line) for line in fatal))
         self.diagnostics = diagnostics
 
 
@@ -333,7 +333,7 @@ def group_collaborators(works: List[Work], bib_dir: str,
     return [group.build() for group in ordered]
 
 
-def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[str]:
+def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[Diagnostic]:
     """The two ways a key over- or under-groups, reported against a work.
 
     Both are located at the first authorship the key grouped, which is where
@@ -362,7 +362,7 @@ def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[str]:
 
 
 def unresolved_name_diagnostics(works: List[Work], names: List[str],
-                                bib_dir: str) -> List[str]:
+                                bib_dir: str) -> List[Diagnostic]:
     """One `UNRESOLVED_NAME` diagnostic per name, in the order given.
 
     Each is located at the first authorship, in document order, that is

@@ -8,7 +8,7 @@ import pytest
 from sslabdata.models import Author, Contributor, Work, Person, Project, LabData
 from sslabdata.loaders import load_collaborators, load_people, load_projects
 from sslabdata.diagnostics import (
-    CLASSES, FATAL, VALIDATION_ERROR, WARNING, code_of, record,
+    CLASSES, FATAL, VALIDATION_ERROR, WARNING, record,
 )
 from sslabdata.resolver import (
     Candidates,
@@ -23,12 +23,13 @@ from sslabdata.resolver import (
 
 def places(lines):
     """The (code, location) of each diagnostic line. SPEC.md: prose is not stable."""
-    return [tuple(line.split(" ", 2)[:2]) for line in lines]
+    return [tuple(str(line).split(" ", 2)[:2]) for line in lines]
 
 
 def assert_diagnostic(line, code, where, *values):
     """A diagnostic's code and location, and the essential values in its message."""
     prefix = f"{code} {where} "
+    line = str(line)
     assert line.startswith(prefix), line
     message = line[len(prefix):]
     missing = [value for value in values if value not in message]
@@ -230,7 +231,7 @@ class TestMatchingPolicy:
             people, Author(name="Lin Lee", position=1, given="Lin", family="Lee"))
         assert work.authors[0].person_id is None
         assert work.authors[0].resolution_status == "ambiguous"
-        assert [w.split()[0] for w in warnings] == ["RESOLVE-AMBIGUOUS-NAME"]
+        assert [w.code for w in warnings] == ["RESOLVE-AMBIGUOUS-NAME"]
 
     def test_a_near_miss_is_suggested_and_not_linked(self):
         people = [Person(id="ddavis", name="Dave Davis", aliases=["D. Davis"])]
@@ -250,15 +251,15 @@ class TestMatchingPolicy:
         work, _, warnings = self.run(
             people, Author(name="Alan Kim", position=1, given="Alan", family="Kim"))
         assert work.authors[0].person_id is None
-        assert [w.split()[0] for w in warnings] == ["RESOLVE-SUGGESTION"]
-        assert "may be akim" in warnings[0]
+        assert [w.code for w in warnings] == ["RESOLVE-SUGGESTION"]
+        assert "may be akim" in warnings[0].message
 
     def test_an_initial_nobody_declared_is_suggested_and_not_linked(self):
         people = [Person(id="ffischer", name="Frank Fischer")]
         work, _, warnings = self.run(
             people, Author(name="F. Fischer", position=1, given="F.", family="Fischer"))
         assert work.authors[0].person_id is None
-        assert "may be ffischer" in warnings[0]
+        assert "may be ffischer" in warnings[0].message
 
     def test_an_external_name_is_reported_by_nothing(self):
         people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
@@ -327,7 +328,7 @@ class TestMatchingPolicy:
                         Person(id="zlee", name="Dina Lee")]):
             _, _, warnings = self.run(people, Author(**author))
             assert len(warnings) == 1
-            assert "may be alee, zlee;" in warnings[0]
+            assert "may be alee, zlee;" in warnings[0].message
 
     def test_editors_are_matched_and_reported_the_same_way(self):
         people = [Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
@@ -640,9 +641,9 @@ class TestDeclaredCollaboratorGrouping:
             [Author(name="P. Patel", position=1, given="P.", family="Patel")])
         assert works[0].authors[0].person_id is None
         assert [c.grouped_by for c in collaborators] == ["normalized_name"]
-        assert any(w.startswith("ID-GROUPING-AMBIGUOUS-DECLARED")
-                   and "person:ppatel" in w for w in warnings)
-        assert not any(w.startswith("RESOLVE-AMBIGUOUS-NAME") for w in warnings)
+        assert any(w.code == "ID-GROUPING-AMBIGUOUS-DECLARED"
+                   and "person:ppatel" in w.message for w in warnings)
+        assert not any(w.code == "RESOLVE-AMBIGUOUS-NAME" for w in warnings)
 
     def test_a_declared_name_that_is_a_member_is_left_to_the_member(self):
         from sslabdata.loaders import DeclaredCollaborator
@@ -671,8 +672,8 @@ class TestPeopleAndProjectsFiles:
         records = loader(str(path), found)
 
         def of(kind):
-            return [line.replace(str(path), "f.yaml") for line in found
-                    if CLASSES[code_of(line)] == kind]
+            return [str(line).replace(str(path), "f.yaml") for line in found
+                    if CLASSES[line.code] == kind]
         return records, of(FATAL), of(VALIDATION_ERROR), of(WARNING)
 
     def test_an_empty_file_is_no_records(self, tmp_path):
@@ -763,15 +764,15 @@ class TestSharedDeclarations:
                   Person(id="aadamson", name="A. Adams", aliases=[]),
                   Person(id="adup", name="A Adams", aliases=["a. adams"])]
         [line] = shared_declarations(people, "people.yaml")
-        assert line.startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:aadamson:name: ")
-        assert "aadams, aadamson, adup" in line
+        assert str(line).startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:aadamson:name: ")
+        assert "aadams, aadamson, adup" in line.message
 
     def test_run_together_and_spaced_initials_are_one_spelling(self):
         people = [Person(id="sivers", name="Stella Sky Ivers", aliases=["S. S. Ivers"]),
                   Person(id="sivory", name="Sam Sol Ivers", aliases=["S.S. Ivers"])]
         [line] = shared_declarations(people, "people.yaml")
-        assert line.startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:sivory:aliases: ")
-        assert "sivers, sivory" in line
+        assert str(line).startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:sivory:aliases: ")
+        assert "sivers, sivory" in line.message
 
     @pytest.mark.parametrize("first, second", [
         ("S.S. Ivers, Jr.", "S. S. Ivers, Jr."),   # before a suffix
@@ -781,7 +782,7 @@ class TestSharedDeclarations:
         people = [Person(id="p1", name="One", aliases=[first]),
                   Person(id="p2", name="Two", aliases=[second])]
         [line] = shared_declarations(people, "people.yaml")
-        assert "p1, p2" in line
+        assert "p1, p2" in line.message
 
     @pytest.mark.parametrize("first, second", [
         ("Ada S.S.", "Ada S. S."),      # a family name is not split
@@ -800,7 +801,7 @@ class TestSharedDeclarations:
         people = [Person(id="p1", name="One", aliases=["A, B, C, D"]),
                   Person(id="p2", name="Two", aliases=["a, b, c, d"])]
         [line] = shared_declarations(people, "people.yaml")
-        assert "p1, p2" in line
+        assert "p1, p2" in line.message
 
     def test_a_declaration_bibtex_cannot_split_is_compared_as_normalised(self):
         """A word nested more than 100 braces deep makes pybtex raise, so the
@@ -810,7 +811,7 @@ class TestSharedDeclarations:
                   Person(id="p2", name="Two", aliases=[f"s.s. {deep} ivers"]),
                   Person(id="p3", name="Three", aliases=[f"S. S. {deep} Ivers"])]
         [line] = shared_declarations(people, "people.yaml")
-        assert "declared by p1, p2;" in line
+        assert "declared by p1, p2;" in line.message
 
     def test_a_person_repeating_their_own_spelling_is_not_reported(self):
         people = [Person(id="aadams", name="Alice Adams",

@@ -2,7 +2,9 @@
 
 import re
 
-from sslabdata.diagnostics import CLASSES, NEVER_AN_ERROR
+import pytest
+
+from sslabdata.diagnostics import CLASSES, NEVER_AN_ERROR, diagnostic
 
 from ..conformance.support import REPO_ROOT
 from ..test_strict_json import (
@@ -21,13 +23,15 @@ def test_the_code_classes_are_the_ones_spec_states():
 
 
 def test_every_code_the_source_names_is_classified():
-    """A code the source emits but `CLASSES` lacks raises `KeyError` inside
-    `severity()` on the run that first reports it, which only a fixture that
-    reaches that code would otherwise reveal."""
+    """A code the source emits but `CLASSES` lacks is rejected when the
+    diagnostic is built, on the run that first reports it, which only a
+    fixture that reaches that code would otherwise reveal."""
     named = set()
     for path in (REPO_ROOT / "sslabdata").rglob("*.py"):
         named |= set(re.findall(rf'"({CODE})"', path.read_text(encoding="utf-8")))
     assert named and named - set(CLASSES) == set()
+    with pytest.raises(ValueError, match="NO-SUCH-CODE"):
+        diagnostic("NO-SUCH-CODE", "w.bib", "e", "title", "never reported")
 
 
 def test_a_field_whose_latex_cannot_be_read_is_located(tmp_path, monkeypatch):
