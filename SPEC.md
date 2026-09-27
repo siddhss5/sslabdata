@@ -67,8 +67,8 @@ Flags, as `sslabdata.cli.main()` defines them:
 |---|---|
 | `--config PATH` | Required. The `lab.yaml` to compile. |
 | `--format {yaml,json}` | Default `yaml`. It has **two meanings**. With `--output` alone it is the **document's** format, and diagnostics stay on standard error as text. With `--validate` or `--unresolved`, `json` prints the **diagnostics** as one JSON array on standard output instead of the text report (*Diagnostics as JSON* below), and `yaml` is the text report. |
-| `--output PATH` | Write the document to `PATH`. The document is written in full to a temporary file beside `PATH` and then moved over it, so a failed write leaves any file already there as it was and creates none. |
-| `--validate` | Report counts and problems, then exit without writing. |
+| `--output PATH` | Write the document to `PATH`. The document is written in full to a temporary file beside `PATH` and then moved over it, so a failed write leaves any file already there as it was and creates none. A destination the system will not let it write — a directory, a path under a file, a directory without write permission — is reported as `OUTPUT-WRITE-FAILED` and exits `1`. |
+| `--validate` | Report counts and problems, then exit without writing. It also builds the document in memory, in `--format`, with the code `--output` writes it with (`sslabdata.exporters.serialize()`), and a document that code refuses is reported under the refusing code, located at the `--config` file when the refusal names none, and fails the run. So `--validate` exits `0` only where `--output` in the same format would succeed, apart from a failure of the write itself (`OUTPUT-WRITE-FAILED`), which only writing can find. |
 | `--unresolved` | List author names that matched no person, then exit. A name left ambiguous is one of them. |
 | `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error: a redefined `@string` macro, and anything about an author who matched no lab member. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
 
@@ -85,7 +85,7 @@ Exit codes, as `sslabdata.cli.main()` returns them:
 | Code | Meaning |
 |---|---|
 | `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
-| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, a `bib_files[].name` that is absolute or leaves `bib_dir`, or a `lab.yaml` of the wrong shape; a file the configuration names is not there; a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
+| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, a `bib_files[].name` that is absolute or leaves `bib_dir`, a `lab.yaml` of the wrong shape, or a value under `lab` that has no one JSON form; a file the configuration names is not there; a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; `--output` could not be written; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
 **Streams and message shapes.** Ordinary reporting goes to **standard
@@ -100,7 +100,7 @@ message is kept to one line. As text there are three shapes:
 
 | Shape | Stream | Source |
 |---|---|---|
-| `<CODE> <file>:<key>:<field>: …` | see right | A diagnostic raised **during assembly**, described under *Diagnostic codes* below. Under `--validate` it is on standard **output**, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not. In the other modes it is on standard **error**: prefixed `Warning: ` when it is a warning, unprefixed when it fails the run. |
+| `<CODE> <file>:<key>:<field>: …` | see right | A diagnostic raised **during assembly**, or `OUTPUT-WRITE-FAILED` when the document is written, described under *Diagnostic codes* below. Under `--validate` it is on standard **output**, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not. In the other modes it is on standard **error**: prefixed `Warning: ` when it is a warning, unprefixed when it fails the run. |
 | `Error: <CODE> …` and `Error loading configuration: <CODE> …` | standard error | Configuration failures, from `sslabdata.cli.main()`: every fatal-at-load code. A configuration sslabdata cannot find, cannot read or will not compile from, in **every** mode including `--validate`, because nothing is assembled and there is no report to gather it into. `Error: ` precedes `CONFIG-NOT-FOUND`; `Error loading configuration: ` precedes the others, for example `Error loading configuration: CONFIG-BIB-FILE-ABSOLUTE lab.yaml:bib_files:name: …`. |
 | `usage: …` / `…: error: …` | standard error | Argument errors, in the argument parser's own format. They are not diagnostics and carry no code. |
 
@@ -159,7 +159,9 @@ without depending on English wording. Codes obey three rules:
    empty and its separator kept: `CONFIG-NOT-A-MAPPING lab.yaml::: …` names a
    file and nothing in it, and `CONFIG-KEY-MISSING lab.yaml:bib_dir:: …` a
    top-level key with no field under it. For a configuration file, `<key>` is
-   the top-level key and `<field>` the key under it; for a people or projects
+   the top-level key and `<field>` the key under it, or, deeper in `lab`, the
+   keys down to the value joined by `.` with a list member's index in
+   brackets (`lab.yaml:lab:links.scores[1]`); for a people or projects
    file, `<key>` is the record's `id`.
 2. **Severity is not part of the code.** A code says *what was found*, never
    how badly the run took it. Severity belongs to the condition and the mode
@@ -167,8 +169,8 @@ without depending on English wording. Codes obey three rules:
 
    | Class | `--validate` | Every other mode | Codes |
    |---|---|---|---|
-   | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
-   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING` |
+   | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
+   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `OUTPUT-WRITE-FAILED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
    | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
@@ -241,12 +243,14 @@ Codes in use:
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
 | `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file`, `projects_file` or `collaborators_file` that is not a string, `lab` that is not a mapping, a `lab` key the schema types (`name`, `description`, `institution`, `department`, `website`, `email`, `address` and `logo` are strings, `links` a mapping) whose value is another type or empty, or `bib_files` that is not a list. A `bib_files` entry is a mapping of a string `name` and a string `category` and nothing else: one that is not a mapping, whose `name` or `category` is not a string, or that holds another key is this code too, located at `lab.yaml:bib_files:<field>`. Fatal at load. |
+| `CONFIG-VALUE-NOT-JSON` | A value under `lab`, at any depth and `lab.links` included, that the document cannot carry the same way in both formats: NaN or an infinity, which JSON cannot write; a set (`!!set`), whose order is not stable between runs; binary (`!!binary`); any other type that is not text, a number, a boolean, null, a list or a mapping; or a mapping key that is not a string, which YAML and JSON would write differently. Located at `lab.yaml:lab:<path>`, or at the mapping holding a key that is not a string, with the value or key in the prose. A date or a timestamp is not this code: it is emitted as its ISO 8601 text (`2010-01-01`, `2024-05-01T09:30:00+00:00`), in both formats. Fatal at load, so `--validate` fails wherever `--output` could not write the document. Raised as a `sslabdata.ConfigurationError`. |
 | `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key sslabdata does not read (`sslabdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
 | `CONFIG-BIB-FILES-MISSING` | No `bib_files` are configured, absent or empty, so the document has no works. A warning: that can be meant, but it is never silently normal. |
 | `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file`, `projects_file` or `collaborators_file`. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
 | `BIB-PARSER-MESSAGE` | The BibTeX parser library raised a message that is neither a syntax error nor an undefined macro — a field repeated within one entry, or a name list it cannot split. The prose is the **library's own wording**, kept as it phrased it. Located at the file, and at the entry key when the library raised it while reading one; the field is left empty. The entry is kept as the library read it. A warning. |
 | `LATEX-CONVERSION-FAILED` | A text field or a name part whose LaTeX the converter could not read at all. Its text is kept as written, with the braces taken off, so it may still hold LaTeX (§2, *Two degraded cases*). Located at the entry and field. A warning. |
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
+| `OUTPUT-WRITE-FAILED` | `--output` names a destination the operating system will not let sslabdata write: a directory, a path under a file, a directory without write permission, a full disk. Located at the `--output` path alone; the prose is the operating system's reason, naming the path it refused when that is not the destination's own directory. Unprefixed on standard error, with no `Wrote …` line. The write is atomic, so a file already at the path is as it was and no temporary file is left behind. Only `--output` writes, so no other mode reports it. Fatal. |
 | `CONFIG-NOT-FOUND` | The `--config` file does not exist. Located at that path alone; `Error: CONFIG-NOT-FOUND …` on standard error. Fatal at load. |
 | `CONFIG-UNREADABLE` | The `--config` file exists but cannot be read — not valid YAML, not UTF-8, or a file the operating system will not open — or another input file, such as a `people_file`, exists but the operating system will not open it. Located at the `--config` path alone; the prose is the reading library's own wording, on one line. Fatal at load. |
 | `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute (§5). Raised as a `sslabdata.ConfigurationError`, which the Python API paragraphs below say more about. |
@@ -333,7 +337,9 @@ because they fail sooner and say more — `from_yaml()` names the file the user
 would edit. For a name that leaves `bib_dir` (`CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`)
 it is raised by `from_yaml()` and by `assemble()`. For a `lab.yaml` of the wrong shape (`CONFIG-NOT-A-MAPPING`,
 `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`) it is raised by `from_yaml()`
-alone. Its message is always one coded diagnostic line.
+alone. For a `lab` value with no one JSON form (`CONFIG-VALUE-NOT-JSON`) it is
+raised by `from_yaml()` and, for a `lab` set in Python, by `LabData.to_dict()`,
+which also turns a date there into its ISO 8601 text. Its message is always one coded diagnostic line.
 
 **`sslabdata.AssemblyError`** (defined in `sslabdata.assembler`) is a subclass
 of `ValueError`, raised by `assemble()` when any diagnostic is of class

@@ -475,6 +475,46 @@ config.lab.value_wrong_type:
   diagnostics:
     - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: lab, field: name}
 
+# A value under `lab` that JSON cannot carry, or whose order or meaning is not
+# stable, is refused at load, so `--validate` fails wherever `--output` would.
+# The field is the path under `lab`; a list member is named by its index.
+config.lab.value_nan:
+  dir: config_lab_value_nan
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-VALUE-NOT-JSON, severity: error, file: lab.yaml, key: lab, field: ratio, values: [nan]}
+
+config.lab.value_infinity:
+  dir: config_lab_value_infinity
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-VALUE-NOT-JSON, severity: error, file: lab.yaml, key: lab, field: "links.scores[1]", values: [-inf]}
+
+config.lab.value_set:
+  dir: config_lab_value_set
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-VALUE-NOT-JSON, severity: error, file: lab.yaml, key: lab, field: tags, values: [set]}
+
+config.lab.value_binary:
+  dir: config_lab_value_binary
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-VALUE-NOT-JSON, severity: error, file: lab.yaml, key: lab, field: seal, values: [binary]}
+
+# JSON would write the key as "2019" and YAML as 2019; it is located at the
+# mapping that holds it, and the message names it.
+config.lab.key_type:
+  dir: config_lab_key_type
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-VALUE-NOT-JSON, severity: error, file: lab.yaml, key: lab, field: awards, values: ["2019"]}
+
 # Three keys, one of them a number and one a date: each is named as text.
 config.unknown_key:
   dir: config_unknown_key

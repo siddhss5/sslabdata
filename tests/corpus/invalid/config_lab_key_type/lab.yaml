@@ -1,0 +1,8 @@
+# CASE config.lab.key_type
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files: []
+lab:
+  name: Corpus Lab
+  awards:
+    2019: Best Paper

@@ -1,0 +1,7 @@
+# CASE config.lab.value_nan
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files: []
+lab:
+  name: Corpus Lab
+  ratio: .nan

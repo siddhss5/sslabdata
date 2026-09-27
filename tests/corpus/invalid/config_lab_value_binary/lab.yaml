@@ -1,0 +1,7 @@
+# CASE config.lab.value_binary
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files: []
+lab:
+  name: Corpus Lab
+  seal: !!binary aGk=

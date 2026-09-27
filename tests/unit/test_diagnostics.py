@@ -1,4 +1,4 @@
-"""The code classes, and the three adapter codes only a fault can reach."""
+"""The code classes, and the codes and paths only a fault can reach."""
 
 import re
 
@@ -6,7 +6,7 @@ import pytest
 
 from sslabdata.diagnostics import CLASSES, NEVER_AN_ERROR, diagnostic
 
-from ..conformance.support import REPO_ROOT
+from ..conformance.support import REPO_ROOT, run_sslabdata
 from ..test_strict_json import (
     CODE, json_run, spec_classes, spec_never_an_error, spec_registry, write_lab,
 )
@@ -64,3 +64,38 @@ def test_an_entry_that_cannot_be_written_back_is_located(tmp_path, monkeypatch):
     assert (record["code"], record["file"], record["key"], record["field"]) == (
         "BIB-WRITE-BACK-FAILED", "./w.bib", "e", "bibtex")
     assert run.code == 0
+
+
+# Covers cli.validate.agrees_with_output
+@pytest.mark.parametrize("fmt", ["yaml", "json"])
+def test_validate_fails_on_what_serializing_refuses(tmp_path, monkeypatch, fmt):
+    """`--validate` fails on what serializing the document refuses, not only
+    on what loading caught. Loading refuses a NaN under `lab` before
+    serializing is reached, so one is put into the assembled document:
+    `--validate` in `fmt` reports it coded, located at the configuration,
+    and exits 1; `--output` in `fmt` reports the same and writes nothing."""
+    import sslabdata.cli as cli
+
+    def assemble_with_nan(config, assemble_result=cli.assemble_result):
+        result = assemble_result(config)
+        result.data.lab["ratio"] = float("nan")
+        return result
+    monkeypatch.setattr(cli, "assemble_result", assemble_with_nan)
+    write_lab(tmp_path, "@article{e, title = {T}, journal = {J}, year = 2024}\n")
+    where = "CONFIG-VALUE-NOT-JSON lab.yaml:lab:ratio: "
+
+    if fmt == "json":
+        run, [record] = json_run(tmp_path, "--validate")
+        assert (record["code"], record["severity"], record["file"], record["key"],
+                record["field"]) == ("CONFIG-VALUE-NOT-JSON", "error", "lab.yaml",
+                                     "lab", "ratio")
+    else:
+        run = run_sslabdata(["--config", "lab.yaml", "--validate"], tmp_path)
+        assert run.crash is None and where in run.stdout, run.output
+    assert run.code == 1
+
+    run = run_sslabdata(["--config", "lab.yaml", "--format", fmt, "--output",
+                         "out"], tmp_path)
+    assert run.crash is None and run.code == 1, run.output
+    assert run.stderr.startswith(where), run.stderr
+    assert not (tmp_path / "out").exists()

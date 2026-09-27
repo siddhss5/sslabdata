@@ -34,7 +34,7 @@ from sslabdata import (
 )
 
 from .support import (
-    EXPECTED, INVALID, REPO_ROOT, AllOf, Contains, Excludes, assert_field,
+    EXPECTED, INVALID, REPO_ROOT, VALID, AllOf, Contains, Excludes, assert_field,
     export, item, run_sslabdata, working_dir, write_atomically,
 )
 
@@ -223,6 +223,24 @@ def test_outcome(observed, case_id):
     # The Python API: the same fatality, as an exception.
     assert entry["api"] == {"load": "ConfigurationError", "assembly": "AssemblyError",
                             None: "LabData"}[fatal], entry["api"]
+
+
+# Covers cli.validate.agrees_with_output
+@pytest.mark.parametrize("fmt", ["yaml", "json"])
+def test_validate_passes_only_what_output_writes(tmp_path, fmt):
+    """`--validate` serializes the document in `--format` through the
+    exporters' own code, so over every fixture and the valid corpus it exits
+    0 only where `--output` in that format writes a document. The outcomes
+    above run `--output` in JSON alone; this runs YAML too."""
+    for folder in [VALID, *(INVALID / spec["dir"] for spec in DIAGNOSTICS.values())]:
+        out = tmp_path / f"{folder.name}.{fmt}"
+        validate = run_sslabdata(["--config", "lab.yaml", "--validate",
+                                  "--format", fmt], folder)
+        output = run_sslabdata(["--config", "lab.yaml", "--format", fmt,
+                                "--output", out], folder)
+        assert validate.crash is None and output.crash is None, folder.name
+        if validate.code == 0:
+            assert output.code == 0 and out.exists(), (folder.name, output.output)
 
 
 def test_the_python_api_prints_diagnostics_only_when_asked_to(capsys):
