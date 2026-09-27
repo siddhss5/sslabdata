@@ -212,6 +212,23 @@ latex.definition_commands:
       expect: {title: zqx Tidy Robots, venue.name: https://x.org/x Letters, note: site (https://x.org/y) and y z,
                abstract: "Accented \\'\\urlhttps://x.org/z link"}
 
+# A command the parser library knows the arguments of, and sslabdata has no
+# rule for, keeps them as text, as a command it knows nothing about does.
+latex.unknown_command_arguments:
+  dir: unknown_command_arguments
+  exit: 0
+  diagnostics:
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: title, values: ["\\keywords"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: title, values: ["\\verb"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: journal, values: ["\\subexercise"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: note, values: ["\\xrightarrow"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: note, values: ["\\fictionalmacro"]}
+  kept: [unknown-command-arguments]
+  emits:
+    - work: unknown-command-arguments
+      expect: {title: Tidy Robots with zqx, venue.name: Journal of Fictional Robots,
+               note: "Moving [fast]there and [a]b too"}
+
 # One record for the command, however many fields use it, with the count and
 # the first field in document order.
 latex.unknown_macro_repeated:

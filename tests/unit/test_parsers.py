@@ -391,9 +391,9 @@ class TestLatexFallback:
 
     def test_the_entry_is_still_published(self, tmp_path):
         """End to end: the entry is read, with the raw text of the bad field."""
-        found, works = located(tmp_path, entry("kept", title=r"Speed: \verb"))
+        found, works = located(tmp_path, entry("kept", title=r"Speed: \href"))
         assert list(works) == ["kept"]
-        assert works["kept"].title == r"Speed: \verb"
+        assert works["kept"].title == r"Speed: \href"
         assert works["kept"].year == 2024
         assert [a.name for a in works["kept"].authors] == ["Alice Adams"]
         [line] = found[LATEX_CONVERSION_FAILED]
