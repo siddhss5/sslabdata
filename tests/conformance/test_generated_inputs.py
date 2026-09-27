@@ -780,7 +780,11 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
                      f"{e.key}.{name}: {source!r}"[:400])
         if name in TEXT_FIELDS and places:
             source = value_text(f)
-            for url in re.findall(r"\\(?:url|href)\s*\{([^{}]*)\}", source):
+            # Math is left as TeX with a bare `%` or `&` escaped (SPEC.md), so
+            # a URL is checked only in a value with no bare `$`.
+            urls = ([] if re.search(r"(?<!\\)\$", source) else
+                    re.findall(r"\\(?:url|href)\s*\{([^{}]*)\}", source))
+            for url in urls:
                 if not any(url in (v or "") for v in places) \
                         and not excused(name, LOSS_EXPLAINED):
                     fail("5 a URL in \\url or \\href is changed",
