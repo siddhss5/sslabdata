@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import List
 from pathlib import Path
 
-from .config import _kind
+from .config import _kind, dotted, read_yaml, repeated_message
 from .diagnostics import Diagnostic, diagnostic
 from .models import Person, Project
 
@@ -38,6 +38,10 @@ PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
 PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
 PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
 RECORD_KEY_UNKNOWN = "RECORD-KEY-UNKNOWN"
+# A key given twice in one mapping. YAML would keep the last value, so the
+# record is not loaded and the run is fatal, as for a missing field: which
+# value was meant is not sslabdata's to guess.
+RECORD_KEY_REPEATED = "RECORD-KEY-REPEATED"
 RECORD_TYPE_INVALID = "RECORD-TYPE-INVALID"
 
 # The keys each file's records are read for. Any other key is reported and
@@ -91,10 +95,11 @@ def _records(path: str, codes, required, known, optional,
     configuration key instead) and reads as no records, as does an empty one.
     A file that is not valid YAML or not a list, a record that is not a
     mapping and a record missing a required field are reported to
-    ``diagnostics`` and left out. A kept record's unknown keys are reported
-    at the record's first required field -- its `id`, or a collaborator's
-    `name` -- and the record is kept without them, as it is with an optional
-    field of the wrong type, which is set to ``None``.
+    ``diagnostics`` and left out, and so is a record with a key given twice
+    in one of its mappings (`RECORD_KEY_REPEATED`). A kept record's unknown
+    keys are reported at the record's first required field -- its `id`, or a
+    collaborator's `name` -- and the record is kept without them, as it is
+    with an optional field of the wrong type, which is set to ``None``.
     """
     yaml_invalid, not_a_list, field_missing = codes
     fail = diagnostics.append
@@ -103,11 +108,24 @@ def _records(path: str, codes, required, known, optional,
 
     try:
         with open(path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
+            data, repeated = read_yaml(f)
     except (yaml.YAMLError, UnicodeDecodeError) as error:
         fail(diagnostic(yaml_invalid, path, None, None,
                         " ".join(str(error).split())))
         return []
+
+    # Each repeat inside a record is reported with that record, below; one
+    # anywhere else is reported here, at the file and the path to the key.
+    in_record = {}
+    for repeat in repeated:
+        index = repeat.path[0] if repeat.path else None
+        if (isinstance(data, list) and isinstance(index, int)
+                and isinstance(data[index], dict)):
+            in_record.setdefault(index, []).append(repeat)
+        else:
+            fail(diagnostic(RECORD_KEY_REPEATED, path, None,
+                            dotted((*repeat.path, repeat.key)),
+                            repeated_message(repeat)))
 
     if data is None:
         return []
@@ -123,6 +141,20 @@ def _records(path: str, codes, required, known, optional,
             fail(diagnostic(not_a_list, path, None, None,
                             f"entry {number} is a {type(entry).__name__}, "
                             "not a record"))
+            continue
+        if number - 1 in in_record:
+            # The record is named by its first required field, unless that
+            # is the key given twice.
+            repeats = in_record[number - 1]
+            key = entry.get(required[0])
+            if (not isinstance(key, str) or
+                    any(r.path == (number - 1,) and r.key == required[0]
+                        for r in repeats)):
+                key = None
+            for repeat in repeats:
+                fail(diagnostic(RECORD_KEY_REPEATED, path, key,
+                                dotted((*repeat.path[1:], repeat.key)),
+                                repeated_message(repeat)))
             continue
         missing = [name for name in required
                    if not isinstance(entry.get(name), str)

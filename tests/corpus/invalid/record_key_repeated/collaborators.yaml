@@ -1,0 +1,5 @@
+# CASE records.key_repeated
+# Aliases given twice.
+- name: "Priya Patel"
+  aliases: ["P. Patel"]
+  aliases: ["Priya P."]

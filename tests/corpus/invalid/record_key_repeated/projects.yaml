@@ -1,0 +1,10 @@
+# CASE records.key_repeated
+# A status given twice.
+- id: "homebot"
+  title: "Household Manipulation"
+  status: "active"
+  status: "completed"
+# An id given twice: the record is named by neither.
+- id: "gardenbot"
+  id: "yardbot"
+  title: "Robot-Assisted Gardening"
