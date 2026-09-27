@@ -8,8 +8,7 @@ mapping that records every key looked up that way, and compares what was
 looked up with the list.
 """
 
-import yaml
-
+from sslabdata import config, loaders
 from sslabdata.config import KNOWN_KEYS, LabDataConfig
 from sslabdata.loaders import (
     COLLABORATOR_KEYS, PERSON_KEYS, PROJECT_KEYS, load_collaborators,
@@ -36,7 +35,7 @@ class Recording(dict):
 def read_by(load, record, monkeypatch, tmp_path):
     """The keys ``load`` reads from ``record``, the one record in its file."""
     record = Recording(record)
-    monkeypatch.setattr(yaml, "safe_load", lambda _: [record])
+    monkeypatch.setattr(loaders, "read_yaml", lambda _: ([record], []))
     path = tmp_path / "records.yaml"
     path.write_text("", encoding="utf-8")
     load(str(path), [])
@@ -71,7 +70,7 @@ def test_lab_yaml_keys_are_the_keys_from_yaml_reads(monkeypatch, tmp_path):
     """`site` is known without being read: renderers read it, sslabdata
     passes it by."""
     data = Recording({"bib_dir": "bib"})
-    monkeypatch.setattr(yaml, "safe_load", lambda _: data)
+    monkeypatch.setattr(config, "read_yaml", lambda _: (data, []))
     path = tmp_path / "lab.yaml"
     path.write_text("", encoding="utf-8")
     LabDataConfig.from_yaml(str(path))

@@ -210,6 +210,19 @@ projects.invalid_status:
     - {code: PROJECTS-STATUS-INVALID, severity: warning, file: projects.yaml, key: sharedarm, field: status, values: [sometimes]}
   kept: [ok-entry]
 
+# A key given twice in a record of each file: an error at the file, the record
+# and the key, naming both lines, and the record is not loaded. The merge key
+# in people.yaml is not a repeated key and is not reported (records.merge_key).
+records.key_repeated:
+  dir: record_key_repeated
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: RECORD-KEY-REPEATED, severity: error, file: people.yaml, key: ann, field: name, values: [line 5, line 6]}
+    - {code: RECORD-KEY-REPEATED, severity: error, file: projects.yaml, key: homebot, field: status, values: [line 5, line 6]}
+    - {code: RECORD-KEY-REPEATED, severity: error, file: projects.yaml, field: id, values: [line 8, line 9]}
+    - {code: RECORD-KEY-REPEATED, severity: error, file: collaborators.yaml, key: Priya Patel, field: aliases, values: [line 4, line 5]}
+
 # One key in each file: a warning at the file, the record and the key, and no
 # key reaches the document.
 records.unknown_key:
@@ -524,6 +537,15 @@ config.unknown_key:
     - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: "7"}
     - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: "2025-01-01"}
   kept: [ok-entry]
+
+# A key given twice in one mapping of lab.yaml, located at the key the
+# repeat is under and naming both lines.
+config.key_repeated:
+  dir: config_key_repeated
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-KEY-REPEATED, severity: error, file: lab.yaml, key: lab, field: name, values: [line 5, line 6]}
 
 config.not_a_mapping:
   dir: config_not_a_mapping

@@ -1,0 +1,10 @@
+# CASE config.key_repeated
+# Fictional invalid input for tests/COVERAGE.md.
+# `name` is given twice under `lab`; YAML alone would keep the second.
+lab:
+  name: "Corpus Lab"
+  name: "Corpus Laboratory"
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"

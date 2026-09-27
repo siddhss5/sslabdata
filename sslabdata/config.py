@@ -13,7 +13,7 @@ import os
 import yaml
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 from pathlib import Path, PureWindowsPath
 
 from .diagnostics import diagnostic
@@ -67,6 +67,102 @@ _LAB_TYPES = {**dict.fromkeys(("name", "description", "institution",
 # is written as `2019` by YAML and `"2019"` by JSON. Fatal at load, because
 # `--output` could not write it and `--validate` must fail where that does.
 VALUE_NOT_JSON = "CONFIG-VALUE-NOT-JSON"
+
+# A key given twice in one mapping of `lab.yaml`. PyYAML keeps the last value
+# and says nothing, so the first would be lost without a trace, and which of
+# the two the user meant is not sslabdata's to guess. Fatal at load, like
+# every other `lab.yaml` of the wrong shape.
+KEY_REPEATED = "CONFIG-KEY-REPEATED"
+
+MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+class RepeatedKey(NamedTuple):
+    """A key given again in a mapping it is already in.
+
+    ``path`` leads from the document's root to that mapping: a mapping key
+    as text, a list index as an integer. ``line`` is where the key is given
+    again and ``first_line`` where it was first given, both counted from 1.
+    """
+    path: Tuple[Union[str, int], ...]
+    key: str
+    line: int
+    first_line: int
+
+
+class YAMLLoader(yaml.SafeLoader):
+    """PyYAML's safe loader, which also records every repeated mapping key.
+
+    Every YAML file sslabdata reads is read with it, through `read_yaml()`.
+    Keys are compared as the loader constructs them, so `1` and `0x1`, which
+    one dict would hold as one key, are a repeat too. A merge key (`<<`) is
+    not: the keys it merges in are overridden by the mapping's own, which is
+    what a merge is for, and PyYAML merges them as it always has.
+    """
+
+    def __init__(self, stream):
+        super().__init__(stream)
+        self.repeated: List[RepeatedKey] = []
+
+    def construct_document(self, node):
+        seen = set()
+
+        def walk(node, path):
+            # An alias is the node it names, so each node is walked once,
+            # where it first appears, and a recursive alias ends the walk.
+            if id(node) in seen:
+                return
+            seen.add(id(node))
+            if isinstance(node, yaml.SequenceNode):
+                for index, child in enumerate(node.value):
+                    walk(child, (*path, index))
+            elif isinstance(node, yaml.MappingNode):
+                first = {}
+                for key_node, value_node in node.value:
+                    if key_node.tag == MERGE_TAG:
+                        walk(value_node, (*path, "<<"))
+                        continue
+                    # A key that is not a scalar cannot be a dict key;
+                    # constructing the mapping reports it.
+                    if not isinstance(key_node, yaml.ScalarNode):
+                        continue
+                    key = self.construct_object(key_node)
+                    line = key_node.start_mark.line + 1
+                    if key in first:
+                        self.repeated.append(RepeatedKey(
+                            path, str(key), line, first[key]))
+                    else:
+                        first[key] = line
+                    walk(value_node, (*path, str(key)))
+
+        walk(node, ())
+        return super().construct_document(node)
+
+
+def read_yaml(stream) -> Tuple[object, List[RepeatedKey]]:
+    """One YAML document, and every key repeated in a mapping of it."""
+    loader = YAMLLoader(stream)
+    try:
+        return loader.get_single_data(), loader.repeated
+    finally:
+        loader.dispose()
+
+
+def dotted(path: Sequence[Union[str, int]]) -> str:
+    """A path as a diagnostic's field names it: keys joined by `.`, with a
+    list member's index in brackets (`links.scores[1]`)."""
+    text = ""
+    for step in path:
+        text += (f"[{step}]" if isinstance(step, int)
+                 else f".{step}" if text else step)
+    return text
+
+
+def repeated_message(repeat: RepeatedKey) -> str:
+    """What a repeated key's diagnostic says, in every file."""
+    return (f"'{repeat.key}' is given at line {repeat.first_line} and again "
+            f"at line {repeat.line} of one mapping; YAML would silently keep "
+            "the last value")
 
 
 class ConfigurationError(ValueError):
@@ -236,11 +332,21 @@ class LabDataConfig:
     def from_yaml(cls, path: str) -> 'LabDataConfig':
         """Load configuration from a YAML file."""
         with open(path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
+            data, repeated = read_yaml(f)
 
         def reject(code, key, field_name, message):
             raise ConfigurationError(
                 diagnostic(code, str(path), key, field_name, message))
+
+        # Located as any key of this file is: the top-level key, then the
+        # path below it. The first repeat is reported, as the first of any
+        # other fault is.
+        for repeat in repeated:
+            steps = (*repeat.path, repeat.key)
+            top = steps[0] if isinstance(steps[0], str) else None
+            reject(KEY_REPEATED, top,
+                   dotted(steps[1 if top else 0:]) or None,
+                   repeated_message(repeat))
 
         if not isinstance(data, dict):
             reject(NOT_A_MAPPING, None, None,
