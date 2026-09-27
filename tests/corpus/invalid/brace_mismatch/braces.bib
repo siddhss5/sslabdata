@@ -1,0 +1,27 @@
+% CASE structure.brace_mismatch
+% Braces BibTeX matches differently from how they were meant, with no syntax
+% error. One opening brace too many reads the next field into a value; one
+% closing brace too many ends the entry, and the fields after it are lost.
+
+@misc{brace-merged,
+  title        = {Merged Fields},
+  organization = {{{Fictional Robotics Society}},
+  abstract     = {{A} tidy abstract}},
+  year         = {2024}
+}
+
+@misc{brace-dropped,
+  title = {Dropped Fields}},
+  note  = {A note that is lost},
+  year  = {2024}
+}
+
+@misc{brace-trailing,
+  howpublished = {Online}} and more,
+  year         = {2024}
+}
+
+@misc{brace-after,
+  title = {Read As Written},
+  year  = {2024}
+}
