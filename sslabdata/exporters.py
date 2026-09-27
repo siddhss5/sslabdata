@@ -53,6 +53,24 @@ def _write(output_path: str, text: str) -> None:
         raise
 
 
+def serialize(data: LabData, fmt: str, indent: int = 2) -> str:
+    """The document as text in ``fmt``, ``yaml`` or ``json``, written nowhere.
+
+    Both exporters write this text, and ``--validate`` builds it too, so a
+    document ``--validate`` passes is one ``--output`` can serialize.
+    `LabData.to_dict()` refuses what the document cannot carry, raising
+    `ConfigurationError`. The dumpers are a backstop behind it: `safe_dump`
+    writes no Python-specific tag, and `allow_nan=False` refuses NaN rather
+    than write JSON that is not JSON.
+    """
+    tree = data.to_dict()
+    if fmt == 'json':
+        return json.dumps(tree, indent=indent, ensure_ascii=False,
+                          allow_nan=False)
+    return yaml.safe_dump(tree, default_flow_style=False, allow_unicode=True,
+                          sort_keys=False)
+
+
 def export_to_yaml(data: LabData, output_path: str):
     """Export LabData to a YAML file.
 
@@ -60,9 +78,7 @@ def export_to_yaml(data: LabData, output_path: str):
         data: Assembled LabData instance
         output_path: Path to output YAML file
     """
-    _write(output_path,
-           yaml.safe_dump(data.to_dict(), default_flow_style=False,
-                          allow_unicode=True, sort_keys=False))
+    _write(output_path, serialize(data, 'yaml'))
 
 
 def export_to_json(data: LabData, output_path: str, indent: int = 2):
@@ -73,6 +89,4 @@ def export_to_json(data: LabData, output_path: str, indent: int = 2):
         output_path: Path to output JSON file
         indent: Indentation level for pretty printing
     """
-    _write(output_path,
-           json.dumps(data.to_dict(), indent=indent, ensure_ascii=False,
-                      allow_nan=False))
+    _write(output_path, serialize(data, 'json', indent))

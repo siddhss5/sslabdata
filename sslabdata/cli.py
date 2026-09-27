@@ -10,14 +10,17 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import yaml
 
 from .config import ConfigurationError, LabDataConfig
 from .assembler import assemble_result, unresolved_name_diagnostics
-from .diagnostics import ERROR, diagnostic, record, severity
-from .exporters import export_to_yaml, export_to_json
+from .diagnostics import (
+    ERROR, Diagnostic, diagnostic, in_report_order, record, severity,
+)
+from .exporters import export_to_yaml, export_to_json, serialize
 
 # A configuration sslabdata cannot open or cannot read at all. Both are fatal
 # at load; the second keeps the reading library's words as its prose.
@@ -120,6 +123,15 @@ Examples:
     data = result.data
     found = result.diagnostics
 
+    # --validate builds the document in memory, in --format, with the code
+    # --output writes it with, so it cannot pass a document --output would
+    # refuse. What it cannot find is a failure of the write itself.
+    if args.validate:
+        try:
+            serialize(data, args.format)
+        except ConfigurationError as e:
+            found = in_report_order([*found, located(e, args.config)])
+
     def level(line):
         return severity(line, validating=args.validate, strict=args.strict)
     errors = [line for line in found if level(line) == ERROR]
@@ -192,6 +204,10 @@ Examples:
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
     try:
         export_func(data, args.output)
+    except ConfigurationError as e:
+        # What serializing refuses, reported as --validate reports it.
+        print(located(e, args.config), file=sys.stderr)
+        sys.exit(1)
     except OSError as e:
         reason = e.strerror or str(e)
         if e.filename and (Path(os.fsdecode(e.filename)).parent
@@ -206,6 +222,14 @@ Examples:
     print(f"  {len(data.works)} works, "
           f"{len(data.people)} people, "
           f"{len(data.projects)} projects")
+
+
+def located(error: ConfigurationError, config: str) -> Diagnostic:
+    """The diagnostic a document refused while it was serialized carries,
+    located at ``config`` when it names no file: `LabData.to_dict()` cannot
+    know which file its values came from."""
+    line = error.args[0]
+    return line if line.file else replace(line, file=config)
 
 
 def stop(line, prefix: str, as_json: bool) -> None:

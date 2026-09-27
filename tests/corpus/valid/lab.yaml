@@ -62,6 +62,7 @@ projects_file: "projects.yaml"
 # CASE cli.format.invalid
 # CASE cli.mode.required
 # CASE cli.validate
+# CASE cli.validate.agrees_with_output
 # CASE cli.unresolved
 # CASE cli.unresolved_none
 # CASE cli.help
