@@ -2,7 +2,7 @@
 YAML data loaders for people and projects.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 

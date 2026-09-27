@@ -4,7 +4,7 @@ Configuration for sslabdata.
 Single-layer configuration loaded from a YAML file (lab.yaml).
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 

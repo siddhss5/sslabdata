@@ -7,7 +7,7 @@ one person is left unresolved and reported, and a near miss is reported as a
 suggestion rather than linked. Resolves project tags and computes back-links.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 

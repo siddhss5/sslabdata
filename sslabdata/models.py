@@ -5,7 +5,7 @@ Defines the core entity types: Work, Author, Person, Project, Collaborator,
 and the assembled LabData output.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
-Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
+Author: Siddhartha Srinivasa
 MIT License - see LICENSE file for details.
 """
 
