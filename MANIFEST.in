@@ -1,3 +1,4 @@
 include SPEC.md
 graft schema
 prune tests
+global-exclude __pycache__ *.py[cod]

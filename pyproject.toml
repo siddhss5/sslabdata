@@ -53,7 +53,8 @@ build-backend = "setuptools.build_meta"
 # The current output schema is public wheel data, installed at
 # sslabdata/schema/v5/output.schema.json. The package directory is mapped onto
 # the repository's schema/ directory so the frozen file has one copy and one
-# path; earlier versions stay in the sdist only.
+# path; earlier versions stay in the sdist only. schema/__init__.py makes the
+# mapped directory a regular package, which editable installs need to resolve.
 [tool.setuptools]
 include-package-data = false
 packages = ["sslabdata", "sslabdata.parsers", "sslabdata.schema"]
