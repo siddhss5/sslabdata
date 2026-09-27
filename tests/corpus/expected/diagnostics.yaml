@@ -162,6 +162,22 @@ structure.not_utf8:
   diagnostics:
     - {code: BIB-ENCODING-INVALID, severity: error, file: ./latin1.bib, values: ["0xfc", line 6]}
 
+# A resolver with nothing after it names no DOI: no identifier, no link.
+links.doi_resolver_only:
+  dir: doi_resolver_only
+  exit: 0
+  diagnostics:
+    - {code: BIB-DOI-INVALID, severity: warning, file: ./doi.bib, key: doi-resolver-only, field: doi, values: ["https://doi.org/"]}
+    - {code: BIB-DOI-INVALID, severity: warning, file: ./doi.bib, key: doi-dx-resolver-only, field: doi, values: ["http://dx.doi.org/"]}
+  kept: [doi-resolver-only, doi-dx-resolver-only, doi-present]
+  emits:
+    - work: doi-resolver-only
+      expect: {identifiers: {}, links: {}}
+    - work: doi-dx-resolver-only
+      expect: {identifiers: {}, links: {}}
+    - work: doi-present
+      expect: {identifiers.doi: [10.5555/corpus.0003], links.doi.0.url: "https://doi.org/10.5555/corpus.0003"}
+
 # --- Projects, people and identity -------------------------------------------
 
 projects.undefined:

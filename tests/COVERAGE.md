@@ -257,6 +257,7 @@ the source text are not markup and must survive unchanged.
 |---|---|---|---|---|---|
 | `links.doi_bare` | `doi = {10.5555/corpus.0001}` | A link of kind `doi` at the DOI resolver URL | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.doi_url` | `doi = {https://doi.org/10.5555/corpus.0002}` | The same URL, not doubled up | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.doi_resolver_only` | `doi = {https://doi.org/}` and `doi = {http://dx.doi.org/}`, a resolver with no DOI after it | Warning `BIB-DOI-INVALID` naming the file, key, `doi` and the value; no `identifiers.doi` and no link of kind `doi`, rather than an empty DOI the schema rejects. A DOI after its resolver beside them is read | `tests/corpus/invalid/doi_resolver_only/doi.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `links.arxiv_prefixed` | `eprint` with `archivePrefix = {arXiv}` | A link of kind `arxiv` at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.arxiv_unprefixed` | `eprint` with no `archivePrefix` | A link of kind `arxiv` at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.arxiv_other_repository` | `eprint` with `archivePrefix = {HAL}` | The identifier is filed under that repository's scheme, and no arXiv link is built for an identifier that is not an arXiv one | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
