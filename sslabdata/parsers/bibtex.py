@@ -21,8 +21,9 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 import pybtex.errors
-from pybtex.database import Entry, Person
+from pybtex.database import BibliographyData, Entry, Person
 from pybtex.exceptions import PybtexError
+from pybtex.database.output.bibtex import Writer as BibTeXWriter
 from pybtex.database.input.bibtex import (
     LowLevelParser, Parser as PybtexParser, SkipEntry, UndefinedMacro,
 )
@@ -62,6 +63,7 @@ YEAR_MISSING = "BIB-YEAR-MISSING"
 # A year that is present but is not a number is treated as no year, and says
 # so, rather than stopping the run: the entry is still a work.
 YEAR_INVALID = "BIB-YEAR-INVALID"
+YEAR_DIGITS = re.compile(r"[0-9]+")
 
 # A `doi` that is a resolver URL with nothing after it. It names no DOI, so
 # the work gets no DOI identifier and no link rather than an empty one.
@@ -253,8 +255,9 @@ class _Parser(PybtexParser):
     """pybtex's BibTeX parser, reading ``@comment`` groups as comments.
 
     ``Parser.parse_string`` names ``LowLevelParser`` directly, so swapping the
-    tokenizer means restating that loop. It is the one place sslabdata touches a
-    pybtex internal, which is why ``pybtex~=0.26`` is pinned.
+    tokenizer means restating that loop. It and `_VerbatimWriter` are the two
+    places sslabdata touches a pybtex internal, which is why ``pybtex~=0.26``
+    is pinned.
     """
 
     def __init__(self, *args, duplicate_keys=None, **kwargs):
@@ -667,17 +670,33 @@ def entry_fields(bib_id: str, entry: Entry, unknown_in) -> Dict[str, str]:
     return read
 
 
+class _VerbatimWriter(BibTeXWriter):
+    """pybtex's BibTeX writer, writing each value exactly as it was read.
+
+    The library's writer encodes every value as LaTeX, which escapes `%`, `&`,
+    `_` and `#` whether or not they already were: `20\\%` came back as
+    `20\\\\%`, a line break and a comment. A value read from a `.bib` file is
+    BibTeX already, so it is written as it stands. The braces are still
+    checked, so a value that cannot be written back is still reported.
+    """
+
+    def _encode(self, text):
+        return text
+
+
 def format_bibtex(bib_id: str, entry: Entry, source: str,
                   report) -> Optional[str]:
     """The entry written back out as BibTeX, for readers to copy.
 
     This is the entry as it was read, before LaTeX conversion, so fields
-    sslabdata does not emit as properties are preserved rather than rewritten.
-    It is a re-serialization of the entry's data and explicitly not a source
-    of properties: nothing in sslabdata reads a value back out of it.
+    sslabdata does not emit as properties are preserved rather than rewritten,
+    each value byte for byte. It is a re-serialization of the entry's data and
+    explicitly not a source of properties: nothing in sslabdata reads a value
+    back out of it.
     """
     try:
-        return entry.to_string("bibtex").strip()
+        return _VerbatimWriter().to_string(
+            BibliographyData(entries={bib_id: entry})).strip()
     except Exception:  # noqa: BLE001 - a copyable string is not worth an entry
         report(diagnostic(
             WRITE_BACK_FAILED, source, bib_id, "bibtex",
@@ -909,20 +928,22 @@ def entry_year(entry: dict, source: str, report) -> Optional[int]:
 
     A work with no year sorts last, and its year is None rather than 0, so a
     consumer can tell "no year" from "the year zero". A year that is not a
-    number is reported and read as no year.
+    number is reported and read as no year. Only an unsigned run of ASCII
+    digits is a number here: `int()` would also read `-5`, `+2020`, `2_020`
+    and full-width `２０２０`.
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
         report(diagnostic(YEAR_MISSING, source, entry.get("ID"), "year",
                           "entry has no year"))
         return None
-    try:
+    if YEAR_DIGITS.fullmatch(raw):
         return int(raw)
-    except ValueError:
-        report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
-                          f"'{raw}' is not a number; the work is emitted "
-                          "with year: null and sorts last"))
-        return None
+    report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
+                      f"'{raw}' is not a year, which is written in the "
+                      "digits 0-9 alone; the work is emitted with year: null "
+                      "and sorts last"))
+    return None
 
 
 # The container field checked for an entry type, and the entry types sslabdata

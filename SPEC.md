@@ -218,7 +218,7 @@ Codes in use:
 | `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict`. |
 | `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
-| `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
+| `BIB-YEAR-INVALID` | An entry's `year` is present but is not an unsigned run of the ASCII digits `0`–`9` (`sslabdata.parsers.bibtex.YEAR_DIGITS`), such as `in press`, or `-5`, `+2020`, `2_020` and full-width `２０２０`, which Python's `int()` would read as numbers. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
 | `BIB-DOI-INVALID` | An entry's `doi` is a DOI resolver URL with nothing after it, such as `https://doi.org/` (`sslabdata.parsers.bibtex.DOI_RESOLVERS`), so it names no DOI. Located at `<file>:<key>:doi`, naming the value. The work gets no DOI identifier and no link of kind `doi`, rather than an empty one; the entry is kept. A `doi` that is empty or blank is read as absent, and is not reported. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
 | `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not, while a well-formed `@string{…}` on a `%` line does: the parser reads it, and it changes the macro's value. Whether it should be read is #78. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
@@ -401,7 +401,29 @@ BibTeX are converted from LaTeX to Unicode by
 and `\textbf{Best Paper}` arrives as `Best Paper`. Beside the converter's own
 table, a few common text macros have a rule (`sslabdata.parsers.latex._TEXT_MACROS`):
 `\TeX`, `\LaTeX`, `\LaTeXe` and `\BibTeX` become their names, `\emdash` and
-`\endash` their dashes, and `\slash` a `/`. An unescaped `&` or `%` is a
+`\endash` their dashes, and `\slash` a `/`. Where the converter's own table
+would write syntax rather than text, sslabdata replaces the rule
+(`sslabdata.parsers.latex._PLAIN_TEXT_RULES`):
+
+| Command | The converter's own rule | What sslabdata emits |
+|---|---|---|
+| `\url{u}` | `<u>` | `u`, exactly as written: it is set aside before conversion, as an `\href` URL is, so `~`, `%`, `_`, `#` and `&` in it are kept |
+| `\footnote{n}` | `[n]` | ` (n)`: one space, then the footnote in parentheses |
+| `\item` | a new line, `  * ` | a new line, `• ` |
+| `\item[l]` | a new line, `  l` | a new line, `l` |
+| `\cite`, `\citep`, `\citet` | `<cit.>` | nothing |
+| `\ref`, `\autoref`, `\cref`, `\eqref` | `<ref>`; `\eqref` gives `(<ref>)` | nothing |
+| `\Cref` | `<Ref>` | nothing |
+| `\includegraphics` | `< g r a p h i c s >` on its own line | nothing |
+| `\maketitle` | a `[NO \title GIVEN]` block underlined with `=` | nothing |
+| `\textfrac{a}{b}` | `%s/%s` followed by `ab` | `a/b` |
+
+A command that becomes nothing, a footnote and an item also take the spaces
+before them, so `planners~\cite{k}.` arrives as `planners.`: sslabdata has no
+bibliography, numbering or figure to resolve them against. A rule that writes
+one literal character — `\_`, `\#`, `\{`, `\}`, `\textbackslash`,
+`\textasciitilde`, `\textasciigrave`, `\vert` — keeps it, because the author
+asked for that character. An unescaped `&` or `%` is a
 literal character, as in BibTeX, not an alignment tab or the start of a
 comment: `50% faster` arrives as `50% faster`, a `%` inside `\url{…}` stays in
 the URL, and in math it is escaped to `\&` or `\%`. Exactly the fields in
@@ -467,7 +489,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | `pdf` | Becomes the work's one link of kind `pdf`, with `origin: input`, in place of the one `pdf_base_url` would give (`build_links()`). Empty or whitespace-only is read as absent. |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
 | `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `person.work_ids`, from a project's people and from `collaborators`. |
-| `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none. It drives the works order (§3). |
+| `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none, or with `BIB-YEAR-INVALID` when it is not written in the digits `0`–`9` alone. It drives the works order (§3). |
 | `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
@@ -823,9 +845,17 @@ with its kind and its origin, and it would be a cross-record constraint JSON
 Schema cannot express and sslabdata would have to police by hand.
 
 **`work.bibtex` is re-serialized, not verbatim.** It is produced by
-`format_bibtex()`, which calls pybtex's `Entry.to_string("bibtex")` on the
-*parsed* entry. What survives is the set of fields and their values. What does
-**not** survive is how they were written: field order, brace-versus-quote
+`format_bibtex()`, which writes the *parsed* entry out with pybtex's BibTeX
+writer. What survives is the set of fields and their values, and **every
+field value is the value the entry was read with, byte for byte** — as BibTeX
+reads a value, each run of whitespace, line breaks included, is one space.
+Nothing is escaped on the way out, so `20\%`, `\&`, `\_`, `\#`, a bare `%`
+or `&`, math and nested braces all come back as written, and the `bibtex`
+record, read again, gives each field the value the source gave it
+(`tests/COVERAGE.md` row `output.work.bibtex_round_trip`). Names are the exception to "as written":
+each is written back from the parts BibTeX split it into, as
+`von Last, Jr, First`, so it reads back as the same parts. What does **not**
+survive is how the entry was written: field order, brace-versus-quote
 delimiters, whitespace and indentation are all the serializer's, and
 `@string` macros are gone — a field written `journal = j` comes back as
 `journal = "Expanded Journal"`. Verified directly.
