@@ -172,7 +172,7 @@ without depending on English wording. Codes obey three rules:
    | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `OUTPUT-WRITE-FAILED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
@@ -218,7 +218,8 @@ Codes in use:
 | `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict`. |
 | `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
-| `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
+| `BIB-YEAR-INVALID` | An entry's `year` is present but is not an unsigned run of the ASCII digits `0`–`9` (`sslabdata.parsers.bibtex.YEAR_DIGITS`), such as `in press`, or `-5`, `+2020`, `2_020` and full-width `２０２０`, which Python's `int()` would read as numbers. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
+| `BIB-DOI-INVALID` | An entry's `doi` is a DOI resolver URL with nothing after it, such as `https://doi.org/` (`sslabdata.parsers.bibtex.DOI_RESOLVERS`), so it names no DOI. Located at `<file>:<key>:doi`, naming the value. The work gets no DOI identifier and no link of kind `doi`, rather than an empty one; the entry is kept. A `doi` that is empty or blank is read as absent, and is not reported. A warning. |
 | `BIB-OTHERS-NOT-LAST` | An `author` or `editor` list has `and others` somewhere other than at its end, the one place BibTeX reads it as "et al.". It names nobody there either, so it is dropped as a terminal one is, and the names around it are kept in their order, with `position` counting only them. Located at `<file>:<key>:author` or `:editor`, once per list however many times it occurs. A terminal `and others` is not reported. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
 | `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not, while a well-formed `@string{…}` on a `%` line does: the parser reads it, and it changes the macro's value. Whether it should be read is #78. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
@@ -401,13 +402,36 @@ BibTeX are converted from LaTeX to Unicode by
 and `\textbf{Best Paper}` arrives as `Best Paper`. Beside the converter's own
 table, a few common text macros have a rule (`sslabdata.parsers.latex._TEXT_MACROS`):
 `\TeX`, `\LaTeX`, `\LaTeXe` and `\BibTeX` become their names, `\emdash` and
-`\endash` their dashes, and `\slash` a `/`. An unescaped `&` or `%` is a
+`\endash` their dashes, and `\slash` a `/`. Where the converter's own table
+would write syntax rather than text, sslabdata replaces the rule
+(`sslabdata.parsers.latex._PLAIN_TEXT_RULES`):
+
+| Command | The converter's own rule | What sslabdata emits |
+|---|---|---|
+| `\url{u}` | `<u>` | `u`, exactly as written: it is set aside before conversion, as an `\href` URL is, so `~`, `%`, `_`, `#` and `&` in it are kept |
+| `\footnote{n}` | `[n]` | ` (n)`: one space, then the footnote in parentheses |
+| `\item` | a new line, `  * ` | a new line, `• ` |
+| `\item[l]` | a new line, `  l` | a new line, `l` |
+| `\cite`, `\citep`, `\citet` | `<cit.>` | nothing |
+| `\ref`, `\autoref`, `\cref`, `\eqref` | `<ref>`; `\eqref` gives `(<ref>)` | nothing |
+| `\Cref` | `<Ref>` | nothing |
+| `\includegraphics` | `< g r a p h i c s >` on its own line | nothing |
+| `\maketitle` | a `[NO \title GIVEN]` block underlined with `=` | nothing |
+| `\textfrac{a}{b}` | `%s/%s` followed by `ab` | `a/b` |
+
+A command that becomes nothing, a footnote and an item also take the spaces
+before them, so `planners~\cite{k}.` arrives as `planners.`: sslabdata has no
+bibliography, numbering or figure to resolve them against. A rule that writes
+one literal character — `\_`, `\#`, `\{`, `\}`, `\textbackslash`,
+`\textasciitilde`, `\textasciigrave`, `\vert` — keeps it, because the author
+asked for that character. An unescaped `&` or `%` is a
 literal character, as in BibTeX, not an alignment tab or the start of a
 comment: `50% faster` arrives as `50% faster`, a `%` inside `\url{…}` stays in
 the URL, and in math it is escaped to `\&` or `\%`. Exactly the fields in
 `sslabdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
 `note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
-`publisher`, `address`, `organization` — applied in `entry_fields()`. Name
+`publisher`, `address`, `organization`, `archivePrefix` and `eprinttype` —
+applied in `entry_fields()`. Name
 parts are converted the same way, in `person_name_parts()`, for authors and
 editors alike.
 
@@ -416,7 +440,8 @@ Being converted is not the same as being emitted. Of these fields, `title`,
 `organization` are emitted under their own names; `journal`, `booktitle`,
 `school` and `institution` are consumed by `build_venue()` and reach the
 document as `venue.name`, which is the one place sslabdata normalises across
-entry types.
+entry types; `archivePrefix` and `eprinttype` name a preprint's repository,
+its scheme and its `venue.name`.
 
 **2. Emitted without conversion — the rule is a requirement on the input.**
 These strings do reach the document, exactly as written, and sslabdata neither
@@ -457,9 +482,9 @@ rule does not apply to the input itself — only to whatever it produces.
 
 | Input | What becomes of it |
 |---|---|
-| `doi` | Becomes `identifiers.doi`, with a resolver prefix taken off if it was written as a URL, and a link of kind `doi` built from it (`bare_doi()`, `build_identifiers()`, `build_links()`). |
-| `eprint` | Becomes an identifier under the scheme `archivePrefix` names, and a link of kind `arxiv` when that scheme is arXiv (`build_identifiers()`, `build_links()`). |
-| `archivePrefix` (or `archiveprefix`) | Becomes the **scheme** of the `eprint` identifier, **lower-cased**, and the `venue.name` of a preprint, as written (`_archive_prefix()`). It has no property of its own, because naming the repository is what a scheme does. An entry that names no prefix is read as an arXiv one, which is the only case the default covers; an entry that names `HAL` is filed under `hal` and gets no arXiv link. |
+| `doi` | Becomes `identifiers.doi`, with a resolver prefix taken off if it was written as a URL, and a link of kind `doi` built from it (`bare_doi()`, `build_identifiers()`, `build_links()`). A resolver with nothing after it names no DOI: it yields neither, and is reported as `BIB-DOI-INVALID`. |
+| `eprint` | Becomes an identifier under the scheme `archivePrefix` or `eprinttype` names, and a link of kind `arxiv` when that scheme is arXiv (`build_identifiers()`, `build_links()`). |
+| `archivePrefix` (or `archiveprefix`), and `eprinttype` | Becomes the **scheme** of the `eprint` identifier, **lower-cased**, and the `venue.name` of a preprint, converted from LaTeX (§2) and otherwise as written (`_archive_prefix()`), so `archivePrefix = {{arXiv}}` is read as `arXiv`. biblatex's `eprinttype` is an alias of `archivePrefix`; an entry that writes both is read from `archivePrefix`. It has no property of its own, because naming the repository is what a scheme does. An entry that names neither is read as an arXiv one, which is the only case the default covers; an entry that names `HAL` or `eprinttype = {pubmed}` is filed under `hal` or `pubmed` and gets no arXiv link. |
 | `isbn`, `issn` | Become `identifiers.isbn` and `identifiers.issn` (`build_identifiers()`). |
 | `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
 | `url` | Becomes a link of kind `video` when its host is youtube.com, youtu.be or vimeo.com or a subdomain of one, and of kind `url` otherwise, with `origin: input` (`is_video_url()`, `build_links()`). |
@@ -467,7 +492,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | `pdf` | Becomes the work's one link of kind `pdf`, with `origin: input`, in place of the one `pdf_base_url` would give (`build_links()`). Empty or whitespace-only is read as absent. |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
 | `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `person.work_ids`, from a project's people and from `collaborators`. |
-| `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none. It drives the works order (§3). |
+| `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none, or with `BIB-YEAR-INVALID` when it is not written in the digits `0`–`9` alone. It drives the works order (§3). |
 | `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
@@ -673,7 +698,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `work.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`sslabdata.config.BibFile`, read by `parse_all_works()`). |
 | `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`sslabdata.parsers.bibtex.build_venue()`). See below. |
 | `work.volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Input — the BibTeX fields of those names, under BibTeX's names and with BibTeX's meanings (`FLAT_FIELDS`, read in `entry_to_work()`). Those in `TEXT_FIELDS` are converted from LaTeX (§2); the rest are emitted as written. |
-| `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
+| `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix` or `eprinttype`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` or `eprinttype` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
 | `work.links` | **Derived** — a map from kind to link records, built from the entry's `url`, `video` and `pdf`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
 | `work.project_ids` | Input — the `project` field, split on commas (`parse_project_ids()`). |
 | `work.bibtex` | **Derived** — the entry re-serialized as BibTeX, or `null` when that failed (`format_bibtex()`). See below. |
@@ -792,7 +817,7 @@ well: `journal` for a journal, `conference` for `@inproceedings`,
 `@book`, `other` for any other entry type carrying a `booktitle`, and
 `institution` for a `school` or an `institution`. An entry with none of the
 four but with an `eprint` gets `{kind: "repository", name: <archivePrefix>}`,
-defaulting to `arXiv`, because the repository is what the preprint's
+the repository `archivePrefix` or `eprinttype` names, defaulting to `arXiv`, because the repository is what the preprint's
 container is. Anything else gets `null`: sslabdata does not invent a container
 the entry did not name. `kind` is an **open string**, deliberately not a JSON
 Schema enum, so a new work type (#31) needs no version bump.
@@ -823,9 +848,17 @@ with its kind and its origin, and it would be a cross-record constraint JSON
 Schema cannot express and sslabdata would have to police by hand.
 
 **`work.bibtex` is re-serialized, not verbatim.** It is produced by
-`format_bibtex()`, which calls pybtex's `Entry.to_string("bibtex")` on the
-*parsed* entry. What survives is the set of fields and their values. What does
-**not** survive is how they were written: field order, brace-versus-quote
+`format_bibtex()`, which writes the *parsed* entry out with pybtex's BibTeX
+writer. What survives is the set of fields and their values, and **every
+field value is the value the entry was read with, byte for byte** — as BibTeX
+reads a value, each run of whitespace, line breaks included, is one space.
+Nothing is escaped on the way out, so `20\%`, `\&`, `\_`, `\#`, a bare `%`
+or `&`, math and nested braces all come back as written, and the `bibtex`
+record, read again, gives each field the value the source gave it
+(`tests/COVERAGE.md` row `output.work.bibtex_round_trip`). Names are the exception to "as written":
+each is written back from the parts BibTeX split it into, as
+`von Last, Jr, First`, so it reads back as the same parts. What does **not**
+survive is how the entry was written: field order, brace-versus-quote
 delimiters, whitespace and indentation are all the serializer's, and
 `@string` macros are gone — a field written `journal = j` comes back as
 `journal = "Expanded Journal"`. Verified directly.

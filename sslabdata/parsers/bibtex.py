@@ -21,8 +21,9 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 import pybtex.errors
-from pybtex.database import Entry, Person
+from pybtex.database import BibliographyData, Entry, Person
 from pybtex.exceptions import PybtexError
+from pybtex.database.output.bibtex import Writer as BibTeXWriter
 from pybtex.database.input.bibtex import (
     LowLevelParser, Parser as PybtexParser, SkipEntry, UndefinedMacro,
 )
@@ -34,10 +35,13 @@ from ..models import Author, Contributor, Link, Venue, Work
 
 
 # Field values that hold prose and are converted from LaTeX to plain text.
-# Everything else (url, doi, eprint, project, ...) is data, and is kept raw.
+# The repository fields are among them because they name a venue, and braces
+# around `{arXiv}` are grouping, not part of the name. Everything else (url,
+# doi, eprint, project, ...) is data, and is kept raw.
 TEXT_FIELDS = frozenset({
     "title", "abstract", "note", "journal", "booktitle", "school",
     "institution", "type", "series", "publisher", "address", "organization",
+    "archiveprefix", "eprinttype",
 })
 
 # A name list ending in "and others" means "et al."; it is not an author.
@@ -67,6 +71,11 @@ YEAR_MISSING = "BIB-YEAR-MISSING"
 # A year that is present but is not a number is treated as no year, and says
 # so, rather than stopping the run: the entry is still a work.
 YEAR_INVALID = "BIB-YEAR-INVALID"
+YEAR_DIGITS = re.compile(r"[0-9]+")
+
+# A `doi` that is a resolver URL with nothing after it. It names no DOI, so
+# the work gets no DOI identifier and no link rather than an empty one.
+DOI_INVALID = "BIB-DOI-INVALID"
 
 # A value naming an `@string` macro that nothing defines. The parser library
 # reads it as empty, as BibTeX does; the entry is kept.
@@ -254,8 +263,9 @@ class _Parser(PybtexParser):
     """pybtex's BibTeX parser, reading ``@comment`` groups as comments.
 
     ``Parser.parse_string`` names ``LowLevelParser`` directly, so swapping the
-    tokenizer means restating that loop. It is the one place sslabdata touches a
-    pybtex internal, which is why ``pybtex~=0.26`` is pinned.
+    tokenizer means restating that loop. It and `_VerbatimWriter` are the two
+    places sslabdata touches a pybtex internal, which is why ``pybtex~=0.26``
+    is pinned.
     """
 
     def __init__(self, *args, duplicate_keys=None, **kwargs):
@@ -679,17 +689,33 @@ def entry_fields(bib_id: str, entry: Entry, unknown_in) -> Dict[str, str]:
     return read
 
 
+class _VerbatimWriter(BibTeXWriter):
+    """pybtex's BibTeX writer, writing each value exactly as it was read.
+
+    The library's writer encodes every value as LaTeX, which escapes `%`, `&`,
+    `_` and `#` whether or not they already were: `20\\%` came back as
+    `20\\\\%`, a line break and a comment. A value read from a `.bib` file is
+    BibTeX already, so it is written as it stands. The braces are still
+    checked, so a value that cannot be written back is still reported.
+    """
+
+    def _encode(self, text):
+        return text
+
+
 def format_bibtex(bib_id: str, entry: Entry, source: str,
                   report) -> Optional[str]:
     """The entry written back out as BibTeX, for readers to copy.
 
     This is the entry as it was read, before LaTeX conversion, so fields
-    sslabdata does not emit as properties are preserved rather than rewritten.
-    It is a re-serialization of the entry's data and explicitly not a source
-    of properties: nothing in sslabdata reads a value back out of it.
+    sslabdata does not emit as properties are preserved rather than rewritten,
+    each value byte for byte. It is a re-serialization of the entry's data and
+    explicitly not a source of properties: nothing in sslabdata reads a value
+    back out of it.
     """
     try:
-        return entry.to_string("bibtex").strip()
+        return _VerbatimWriter().to_string(
+            BibliographyData(entries={bib_id: entry})).strip()
     except Exception:  # noqa: BLE001 - a copyable string is not worth an entry
         report(diagnostic(
             WRITE_BACK_FAILED, source, bib_id, "bibtex",
@@ -716,7 +742,7 @@ BOOKTITLE_KINDS = {"inproceedings": "conference", "conference": "conference",
 OTHER_KIND = "other"
 
 # A preprint's venue is the repository it sits in, which is what
-# `archivePrefix` names. arXiv is the default, because a bare `eprint` is
+# `archivePrefix` or `eprinttype` names. arXiv is the default, because a bare `eprint` is
 # read as an arXiv identifier (`build_identifiers`) and linked as one.
 ARXIV = "arXiv"
 REPOSITORY_KIND = "repository"
@@ -778,9 +804,16 @@ def build_venue(entry: dict) -> Optional[Venue]:
 
 
 def _archive_prefix(entry: dict) -> str:
-    """The repository an `eprint` belongs to, as the entry names it."""
-    prefix = entry.get("archivePrefix", entry.get("archiveprefix", ""))
-    return prefix.strip() or ARXIV
+    """The repository an `eprint` belongs to, as the entry names it.
+
+    biblatex names it in `eprinttype`, of which `archivePrefix` is an alias;
+    an entry carrying both is read from `archivePrefix`.
+    """
+    for field_name in ("archiveprefix", "eprinttype"):
+        prefix = (entry.get(field_name) or "").strip()
+        if prefix:
+            return prefix
+    return ARXIV
 
 
 def bare_doi(doi: str) -> str:
@@ -792,19 +825,29 @@ def bare_doi(doi: str) -> str:
     return doi
 
 
-def build_identifiers(entry: dict) -> Dict[str, List[str]]:
+def build_identifiers(entry: dict, source: str, report) -> Dict[str, List[str]]:
     """The entry's identifiers, as a map from scheme to a list of identifiers.
 
     The list shape is there because ISBN and ISSN genuinely repeat — a print
     and an electronic one are two values of one identifier — even though a
-    BibTeX field holds one value, so v4 emits at most one per scheme.
+    BibTeX field holds one value, so v4 emits at most one per scheme. A `doi`
+    that is a resolver and nothing after it names no DOI, and is reported
+    rather than emitted empty.
     """
     identifiers: Dict[str, List[str]] = {}
     for scheme, field_name in IDENTIFIER_FIELDS.items():
         value = (entry.get(field_name) or "").strip()
         if not value:
             continue
-        identifiers[scheme] = [bare_doi(value) if scheme == "doi" else value]
+        if scheme == "doi":
+            if not bare_doi(value):
+                report(diagnostic(
+                    DOI_INVALID, source, entry.get("ID"), field_name,
+                    f"'{value}' is a DOI resolver with no DOI after it; the "
+                    "work gets no DOI identifier and no DOI link"))
+                continue
+            value = bare_doi(value)
+        identifiers[scheme] = [value]
 
     eprint = (entry.get("eprint") or "").strip()
     if eprint:
@@ -911,20 +954,22 @@ def entry_year(entry: dict, source: str, report) -> Optional[int]:
 
     A work with no year sorts last, and its year is None rather than 0, so a
     consumer can tell "no year" from "the year zero". A year that is not a
-    number is reported and read as no year.
+    number is reported and read as no year. Only an unsigned run of ASCII
+    digits is a number here: `int()` would also read `-5`, `+2020`, `2_020`
+    and full-width `２０２０`.
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
         report(diagnostic(YEAR_MISSING, source, entry.get("ID"), "year",
                           "entry has no year"))
         return None
-    try:
+    if YEAR_DIGITS.fullmatch(raw):
         return int(raw)
-    except ValueError:
-        report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
-                          f"'{raw}' is not a number; the work is emitted "
-                          "with year: null and sorts last"))
-        return None
+    report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
+                      f"'{raw}' is not a year, which is written in the "
+                      "digits 0-9 alone; the work is emitted with year: null "
+                      "and sorts last"))
+    return None
 
 
 # The container field checked for an entry type, and the entry types sslabdata
@@ -975,7 +1020,7 @@ def entry_to_work(
     unknown_in = _unknown_command_reporter(report, source, bib_id,
                                            unknown_commands_seen)
     fields = entry_fields(bib_id, entry, unknown_in)
-    identifiers = build_identifiers(fields)
+    identifiers = build_identifiers(fields, source, report)
     check_entry_type(fields, source, report)
     check_others(entry, bib_id, source, report)
 

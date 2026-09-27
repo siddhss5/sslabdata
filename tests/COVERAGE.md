@@ -60,9 +60,7 @@ entry of the same ID.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
 #20 (verifying a remote link), #27 (explicit link and award fields), #28
-(`keywords` project tags). #18 is still open for
-renderers — escaping, attribute-safe escaping and the checks on rendered
-output — but every LaTeX-to-text row below passes.
+(`keywords` project tags).
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -97,6 +95,7 @@ the second definition is the one that reaches the output.
 | `structure.duplicate_key_across` | The same citation key in two files | Stable `BIB-DUPLICATE-KEY` error names both files, keys and `citation_key` field | `tests/corpus/invalid/duplicate_key_across_files/first.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `structure.missing_year` | An entry with no `year` | Stable `BIB-YEAR-MISSING` warning names the file, key and `year`; the work is emitted with `year: null` and sorts last | `tests/corpus/invalid/missing_year/noyear.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `structure.year_not_number` | `year = {in press}` | Warning naming the file, key and field; the entry and its neighbours are kept | `tests/corpus/invalid/year_not_number/badyear.bib` | `test_invalid_corpus.py::test_outcome` | pass |
+| `structure.year_not_digits` | `year = {-5}`, `{+2020}`, `{2_020}` and full-width `{２０２０}`, each of which `int()` reads as a number | The same `BIB-YEAR-INVALID` warning, naming the file, key, field and value, and `year: null`: a year is an unsigned run of ASCII digits, and the schema's `minimum: 0` is never broken; the plain year beside them is read | `tests/corpus/invalid/year_not_digits/digits.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `structure.missing_journal` | An `@article` with no `journal` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_journal/nojournal.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `structure.missing_booktitle` | An `@inproceedings` with no `booktitle` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_booktitle/nobooktitle.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 
@@ -139,6 +138,8 @@ preserved in the copyable `bibtex` output field.
 | `fields.type` | `type` | The `type` property: a report's own label, distinct from `entry_type` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.eprint` | `eprint` | An identifier under the scheme `archivePrefix` names | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.archiveprefix` | `archivePrefix = {arXiv}`, and `archivePrefix = {HAL}` on another entry | Becomes the identifier's scheme, lower-cased, and the venue's name for a preprint, so it needs no property of its own. The entry naming another repository is what pins it: a compiler that assumed arXiv would satisfy the arXiv row and lose the field | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.eprinttype` | `eprinttype = {hal}` and `eprinttype = {pubmed}`, biblatex's name for the field, with no `archivePrefix` | Read as `archivePrefix` is: the identifier is filed under `hal` or `pubmed`, the venue is that repository, and no arXiv link is built | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.archiveprefix_latex` | `archivePrefix = {{arXiv}}` | Converted from LaTeX before it is read, so it behaves as `{arXiv}` does: scheme `arxiv`, venue `arXiv` and an arXiv link | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.doi` | `doi`, bare or written as a resolver URL | `identifiers.doi`, with the resolver prefix off | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.url` | `url` | A link of kind `video` for a known video host, otherwise `url`, with `origin: input` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.project` | `project = {homebot}` | Becomes `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
@@ -248,6 +249,12 @@ the source text are not markup and must survive unchanged.
 | `latex.unicode_raw` | Raw CJK and emoji | Passed through unchanged | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.abstract` | An abstract with accents, math and `\emph` | Same rules as a title: plain text with math left as TeX | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.note_href` | `note = {Code at \href{url}{our site}}` | The link and its text both survive; the entry is never dropped | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.url` | `note = {Code at \url{https://cs.example.edu/~ann/robot_code?v=2&q=1#frag}.}` | The URL exactly as written, `~`, `_`, `&` and `#` included, not the autolink `<…>` and with no no-break space for `~` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.footnote` | `Tidy Robots\footnote{Funded by …}` | `Tidy Robots (Funded by …)`: the footnote in parentheses, not `[…]` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.cite_ref` | `planners~\cite{k1,k2}` and `shows~\ref{app}` | Both left out with the space before them, not `<cit.>` or `<ref>` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.list_item` | `\item fast` and `\item[(b)] tidy` in `itemize` | A line `• fast` and a line `(b) tidy`, not a Markdown `* ` bullet | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.layout_dropped` | `\includegraphics{fig.png}` and `\maketitle{}` | Both left out, not `< g r a p h i c s >` or a `[NO \title GIVEN]` block | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.textfrac` | `A \textfrac{3}{2}-Approximation` | `A 3/2-Approximation`, not `%s/%s32` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.text_macros` | `\TeX{}`, `\LaTeX\ `, `\BibTeX`, `\emdash`, `\endash`, `\slash` | `TeX`, `LaTeX`, `BibTeX`, `—`, `–`, `/`, with no `LATEX-COMMAND-UNKNOWN` warning | `tests/corpus/invalid/common_text_macros/macros.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro_repeated` | One unknown macro in three fields of two entries | One warning line for the macro, with the count of fields and the first of them as the location | `tests/corpus/invalid/unknown_macro_repeated/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
@@ -258,6 +265,7 @@ the source text are not markup and must survive unchanged.
 |---|---|---|---|---|---|
 | `links.doi_bare` | `doi = {10.5555/corpus.0001}` | A link of kind `doi` at the DOI resolver URL | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.doi_url` | `doi = {https://doi.org/10.5555/corpus.0002}` | The same URL, not doubled up | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.doi_resolver_only` | `doi = {https://doi.org/}` and `doi = {http://dx.doi.org/}`, a resolver with no DOI after it | Warning `BIB-DOI-INVALID` naming the file, key, `doi` and the value; no `identifiers.doi` and no link of kind `doi`, rather than an empty DOI the schema rejects. A DOI after its resolver beside them is read | `tests/corpus/invalid/doi_resolver_only/doi.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `links.arxiv_prefixed` | `eprint` with `archivePrefix = {arXiv}` | A link of kind `arxiv` at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.arxiv_unprefixed` | `eprint` with no `archivePrefix` | A link of kind `arxiv` at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.arxiv_other_repository` | `eprint` with `archivePrefix = {HAL}` | The identifier is filed under that repository's scheme, and no arXiv link is built for an identifier that is not an arXiv one | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
@@ -415,6 +423,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.link.verification` | Any link | `verification` is `{status}` and nothing else: a build never fetches and records no time | `tests/corpus/valid/links.bib` | `test_output_format.py::test_a_link_verification_is_only_its_status` | pass |
 | `output.work.project_ids` | `project` or namespaced `keywords` | `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.bibtex` | The whole entry | `bibtex`, the copyable source, including fields sslabdata emits no property for; null when it could not be written back out | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.bibtex_round_trip` | `\%`, `\&`, `\_`, `\#`, a bare `%` and `&`, math, nested braces and a brace-protected name holding `\&`; and every entry of the valid corpus and the demo | Every field the entry writes as one braced or quoted value is in `bibtex` byte for byte, with whitespace read as BibTeX reads it: nothing already escaped is escaped again, and nothing bare is escaped. The name comes back as written too | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_bibtex_round_trips_every_field` | pass |
 | `output.work.derived` | Any run | `derived`, an open bag reserved for sslabdata, `{}` today | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.id` | `id` in `people.yaml` | `id` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.name` | `name` | `name` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
@@ -451,7 +460,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.collaborator.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.no_duplicate_counts` | A person's works, and a collaborator's works and occurrences | No `work_count` or `authorship_count` anywhere: each would be the length of the `work_ids` or `authorships` emitted beside it | `tests/corpus/valid/names.bib` | `test_output_format.py::test_no_count_repeats_the_length_of_a_list` | pass |
 | `output.collaborators.order` | Several collaborators, including three that share a year and a work count whose name order and key order disagree, two of them sharing a readable name | Sorted by last year descending with null last, then the number of `work_ids` descending, then name ascending, then key ascending. `key` is appended after `name`, not a replacement for it | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_collaborators_order` | pass |
-| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
+| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text, and no string in the corpus or the demo holds `<http`, an autolink or a Markdown link the input did not write | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
 | `output.derived_is_empty` | The corpus and the demo | Every `derived` bag is `{}`, so the region cannot quietly fill | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_every_derived_bag_is_empty` | pass |
 | `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields and an authorship carrying two contributor references or none | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
 | `output.versioned_schema` | The published schemas | v5 lives at its own path, and v3 and v4 stay reachable byte for byte, still saying 3 and 4 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |

@@ -6,12 +6,14 @@ mark describe the intended behavior, which the issue in the reason delivers.
 """
 
 import json
+import re
 
 import pytest
+import yaml
 
 from .support import (
-    VALID, AllOf, Contains, Excludes, assert_field, case, export, item,
-    run_sslabdata, work, write_variant,
+    REPO_ROOT, VALID, AllOf, Contains, Excludes, assert_field, case, export,
+    item, run_sslabdata, work, write_variant,
 )
 
 
@@ -360,7 +362,7 @@ LATEX = [
     case("latex.percent_bare", "tex-percent-bare", "abstract",
          "Accuracy rose 12% over prior work, a 100%% gain in $O(n)$ time, to 99%"),
     case("latex.percent_bare", "tex-percent-bare", "note",
-         Contains("https://example.org/a%20b_c")),
+         "See https://example.org/a%20b_c"),
     case("latex.underscore", "tex-underscore", "title", "The robot_arm Package"),
     case("latex.endash", "tex-endash", "title", "Pages 1–10"),
     case("latex.emdash", "tex-emdash", "title", "Robots—and People"),
@@ -377,6 +379,17 @@ LATEX = [
          "Café robots run in $O(n)$ time and are very tidy."),
     case("latex.note_href", "tex-note-href", "note",
          Contains("https://example.org/code", "our site")),
+    case("latex.url", "tex-url", "note",
+         "Code at https://cs.example.edu/~ann/robot_code?v=2&q=1#frag"),
+    case("latex.footnote", "tex-footnote", "title",
+         "Tidy Robots (Funded by the Fictional Foundation.)"),
+    case("latex.cite_ref", "tex-cite-ref", "abstract",
+         "Faster than prior planners, as the appendix shows."),
+    case("latex.list_item", "tex-list-item", "abstract",
+         "Two results:\n• fast\n(b) tidy"),
+    case("latex.layout_dropped", "tex-layout", "note",
+         "A figure and a title block are left out"),
+    case("latex.textfrac", "tex-textfrac", "title", "A 3/2-Approximation"),
 ]
 
 
@@ -560,6 +573,23 @@ STRUCTURE = [
     case("fields.archiveprefix", "link-eprint-hal", "identifiers.arxiv", None),
     case("fields.archiveprefix", "link-eprint-hal", "venue",
          {"kind": "repository", "name": "HAL"}),
+    case("fields.eprinttype", "link-eprinttype-hal", "identifiers",
+         {"hal": ["hal-01234567"]}),
+    case("fields.eprinttype", "link-eprinttype-hal", "venue",
+         {"kind": "repository", "name": "hal"}),
+    case("fields.eprinttype", "link-eprinttype-hal", "links.arxiv", None),
+    case("fields.eprinttype", "link-eprinttype-pubmed", "identifiers",
+         {"pubmed": ["12345678"]}),
+    case("fields.eprinttype", "link-eprinttype-pubmed", "venue",
+         {"kind": "repository", "name": "pubmed"}),
+    case("fields.eprinttype", "link-eprinttype-pubmed", "links.arxiv", None),
+    # Braces are LaTeX grouping, not part of the repository's name.
+    case("fields.archiveprefix_latex", "link-arxiv-braced", "identifiers",
+         {"arxiv": ["2401.00003"]}),
+    case("fields.archiveprefix_latex", "link-arxiv-braced", "venue",
+         {"kind": "repository", "name": "arXiv"}),
+    case("fields.archiveprefix_latex", "link-arxiv-braced", "links.arxiv.0.url",
+         "https://arxiv.org/abs/2401.00003"),
     case("fields.doi", "link-doi-bare", "identifiers.doi", ["10.5555/corpus.0001"]),
     # A DOI written as a resolver URL is recorded as the identifier it is.
     case("fields.doi", "link-doi-url", "identifiers.doi", ["10.5555/corpus.0002"]),
@@ -795,6 +825,65 @@ OUTPUT_FIELDS = [
 def test_output_fields(valid_output, case_id, section, key, value, path, expected):
     obj = item(valid_output, section, key, value) if section else valid_output
     assert_field(obj, path, expected, where=f"{section} {value}: ")
+
+
+ENTRY = re.compile(r"^@(\w+)\s*\{\s*([^,\s]+)\s*,$(.*?)^\}", re.M | re.S)
+FIELD = re.compile(r"^\s*(\w+)\s*=\s*(.*?)\s*,?\s*$", re.M)
+
+
+def literal(value):
+    """The text of one braced or quoted BibTeX value, or None when ``value`` is
+    anything else: a macro, a number, or a concatenation of several parts."""
+    if len(value) < 2 or (value[0], value[-1]) not in (("{", "}"), ('"', '"')):
+        return None
+    depth = 0
+    for char in value[1:-1]:
+        depth += {"{": 1, "}": -1}.get(char, 0)
+        if depth < 0 or (char == '"' and value[0] == '"' and depth == 0):
+            return None
+    return value[1:-1] if depth == 0 else None
+
+
+def literal_fields(text):
+    """{citation key: {field: value}} for every field that ``text`` writes as
+    one braced or quoted value on one line, with each run of whitespace read
+    as one space, as BibTeX reads it. Names are left out: they are written
+    back from their parts, so only their parts, not their spelling, survive."""
+    entries = {}
+    for _, key, body in ENTRY.findall(text):
+        entries[key] = {name.lower(): " ".join(value.split())
+                        for name, raw in FIELD.findall(body)
+                        if name.lower() not in ("author", "editor")
+                        for value in [literal(raw)] if value is not None}
+    return entries
+
+
+# Covers output.work.bibtex_round_trip
+@pytest.mark.parametrize("cwd, config", [(VALID, "lab.yaml"),
+                                         (REPO_ROOT, "examples/demo/lab.yaml")])
+def test_bibtex_round_trips_every_field(tmp_path, cwd, config):
+    """Each work's `bibtex` holds every field its entry wrote as one literal
+    value, byte for byte, for the valid corpus and the demo: nothing escaped
+    is escaped again, and nothing bare is escaped."""
+    run, data = export(cwd, tmp_path, config)
+    assert run.code == 0 and run.crash is None, run.output
+    settings = yaml.safe_load((cwd / config).read_text(encoding="utf-8"))
+    source = {}
+    for bib_file in settings["bib_files"]:
+        path = cwd / settings["bib_dir"] / bib_file["name"]
+        source.update(literal_fields(path.read_text(encoding="utf-8-sig")))
+    compared = 0
+    for found in data["works"]:
+        (emitted,) = literal_fields(found["bibtex"] + "\n").values()
+        written = source[found["bib_id"]]
+        assert {name: emitted.get(name) for name in written} == written, \
+            found["bib_id"]
+        compared += len(written)
+    assert compared > len(data["works"])
+    if cwd == VALID:
+        # A brace-protected name is one part, so it too comes back as written.
+        assert 'author = "Adams, Alice and {R\\&D Robotics}"' in work(
+            data, "struct-escapes")["bibtex"]
 
 
 # Covers output.collaborators.order
