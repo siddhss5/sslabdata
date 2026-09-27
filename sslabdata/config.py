@@ -132,11 +132,9 @@ class BibFile:
 
     ``name`` is a name under ``bib_dir``, not a path of its own: it is
     emitted as ``work.source.file`` and must never be absolute. The
-    constructor checks it, so the mistake is caught where it is made -- but
-    this class is a plain, mutable dataclass, which is public API, so a name
-    can be set after it was checked. The check that *holds* is the one
-    `sslabdata.models.Work.to_dict()` makes, at the boundary every emitted
-    document passes through.
+    constructor checks it where the mistake is made, but a plain, mutable
+    dataclass can be changed afterwards, so `sslabdata.models.Work.to_dict()`
+    checks again (SPEC.md, *`sslabdata.ConfigurationError`*).
     """
     name: str
     category: str

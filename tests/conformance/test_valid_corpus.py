@@ -261,8 +261,8 @@ def test_every_readable_name_agrees_with_its_parts(valid_output):
     A row-by-row check of the parts would still pass if the parts were filled
     in beside a name built some other way. This rebuilds the whole name from
     the parts and compares it, for authorships and editors alike, and then
-    asserts that no full given name came out as an initial -- which is what
-    the name used to be and what a consumer must not be handed here.
+    asserts that no full given name came out as an initial, which a consumer
+    must not be handed.
     """
     checked = 0
     for work_ in valid_output["works"]:
@@ -496,7 +496,7 @@ STRUCTURE = [
     case("structure.value_numeric", "struct-numeric", "year", 2019),
     case("structure.value_numeric", "struct-numeric", "volume", "7"),
     case("structure.value_numeric", "struct-numeric", "number", "2"),
-    # An ordinary @proceedings entry, of the kind a crossref used to point
+    # An ordinary @proceedings entry, of the kind a crossref would point
     # at. Rejecting crossref must not change how one of these is read.
     case("structure.proceedings", "struct-parent", "year", 2018),
     case("structure.proceedings", "struct-parent", "entry_type", "proceedings"),
@@ -796,10 +796,10 @@ def test_output_fields(valid_output, case_id, section, key, value, path, expecte
 def test_collaborators_order(valid_output):
     """Most recent first, then most works, then name, then key.
 
-    `name` is the tie-break it has always been. `key` follows it rather than
+    `name` is the tie-break. `key` follows it rather than
     replacing it, because two keys can carry the same readable name -- a
     parsed and a brace-protected spelling of one string are two keys -- so
-    the name alone is no longer total.
+    the name alone is not total.
     """
     rows = [(c["last_year"] is None, -(c["last_year"] or 0), -len(c["work_ids"]),
              c["name"], c["key"]) for c in valid_output["collaborators"]]

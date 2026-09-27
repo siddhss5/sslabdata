@@ -64,7 +64,7 @@ PROJECT_TYPES = dict.fromkeys(("description", "website", "image"), STRING)
 COLLABORATOR_TYPES = {"aliases": ALIASES}
 
 # A person's `status` is one of these. A `role` is any non-empty string, so
-# that any lab's roles fit (SPEC.md, *The people and projects files*).
+# that any lab's roles fit (SPEC.md section 5).
 PERSON_STATUSES = ("current", "alumni")
 PROJECT_STATUSES = ("active", "completed")
 

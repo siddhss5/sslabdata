@@ -101,9 +101,8 @@ def test_collaborator_alias_that_is_a_member_is_reported(tmp_path, valid_output)
 def test_config_lab_missing(tmp_path):
     """The header is always emitted, so `lab: {}` is what no header looks like.
 
-    Under `schema_version` 3 the key was omitted, and a consumer could not
-    tell "no header" from "an empty header". Now it can: the key is there and
-    the header is empty.
+    A consumer can tell "no header" from "an empty header": the key is there
+    and the header is empty.
     """
     run, data = export(VALID, tmp_path, write_variant(tmp_path, lab=None))
     assert run.code == 0 and run.crash is None, run.output
@@ -178,10 +177,9 @@ def valid_pdf_base(tmp_path):
 def test_remote_pdf_url_not_verified(tmp_path):
     """A remote pdf_base_url gives a link nobody has checked.
 
-    The link is kept and labelled either way -- that is #56's structural fix
-    for #20 -- but `unchecked` is still not an answer about whether the file
-    is there. #20 is what makes a remote base say `verified` or `missing`,
-    as a local one already does.
+    The link is kept and labelled either way, but `unchecked` is not an
+    answer about whether the file is there. #20 makes a remote base say
+    `verified` or `missing`, as a local one already does.
     """
     variant = write_variant(tmp_path, pdf_base_url="https://example.org/pdfs")
     run, data = export(VALID, tmp_path, variant)

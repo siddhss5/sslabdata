@@ -1,4 +1,4 @@
-"""`--strict`, diagnostics as JSON, and every message carrying a code (#26).
+"""`--strict`, diagnostics as JSON, and every message carrying a code.
 
 The classes and the JSON shape are the ones SPEC.md states; these tests read
 SPEC.md for both, so the document and the code cannot drift apart.
@@ -198,8 +198,8 @@ def test_strict_passes_when_only_outside_co_authors_are_unresolved(tmp_path):
 
 
 def test_a_suggestion_alone_leaves_strict_at_exit_0(tmp_path):
-    """Decision 10: an author who matched no lab member is never an error
-    under --strict, even when the name is close to a member's."""
+    """An author who matched no lab member is never an error under --strict,
+    even when the name is close to a member's."""
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Davis, Dave M.}}\n",
@@ -211,9 +211,9 @@ def test_a_suggestion_alone_leaves_strict_at_exit_0(tmp_path):
 
 
 def test_an_initials_only_grouping_alone_leaves_strict_at_exit_0(tmp_path):
-    """An ambiguous initials-only grouping is a warning even under `--strict`
-    (decision 10); promoting it would fail runs over a lab's ordinary
-    outside co-authors. The corpus never runs with `--strict`."""
+    """An ambiguous initials-only grouping is a warning even under `--strict`:
+    it is about outside co-authors, and promoting it would fail runs over a
+    lab's ordinary ones. The corpus never runs with `--strict`."""
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Quinn, Q. and Quinn, Quentin}}\n", people=MEMBERS)
@@ -222,7 +222,7 @@ def test_an_initials_only_grouping_alone_leaves_strict_at_exit_0(tmp_path):
     assert exits == {0}
 
 
-# The boundary of ID-GROUPING-AMBIGUOUS-DECLARED (#26 decisions 6 and 10).
+# The boundary of ID-GROUPING-AMBIGUOUS-DECLARED.
 
 def test_a_name_fitting_two_collaborator_entries_is_a_grouping_warning(tmp_path):
     """A name two collaborator entries both declare is one grouping warning,
@@ -277,8 +277,9 @@ def test_a_name_fitting_an_entry_and_one_member_is_two_warnings(tmp_path):
 
     The resolver reports its initials fitting the member as
     RESOLVE-SUGGESTION, and grouping reports the entry and the member as
-    ID-GROUPING-AMBIGUOUS-DECLARED. Both are warnings under decision 10, so
-    --strict passes; RESOLVE-AMBIGUOUS-NAME is not reported.
+    ID-GROUPING-AMBIGUOUS-DECLARED. Both are about a name that matched no
+    lab member, so both stay warnings and --strict passes;
+    RESOLVE-AMBIGUOUS-NAME is not reported.
     """
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
@@ -300,7 +301,7 @@ def test_a_name_fitting_an_entry_and_one_member_is_two_warnings(tmp_path):
 
 def test_a_name_fitting_an_entry_and_two_members_fails_strict(tmp_path):
     """One entry and two members: the members' ambiguity is
-    RESOLVE-AMBIGUOUS-NAME (decision 6), an error under --strict, and the
+    RESOLVE-AMBIGUOUS-NAME, an error under --strict, and the
     grouping warning names the entry as well. No RESOLVE-SUGGESTION: a name
     the resolver finds ambiguous is not also offered as a suggestion."""
     write_lab(tmp_path,

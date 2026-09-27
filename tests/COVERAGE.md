@@ -62,8 +62,7 @@ Cases that fail today are not fixed here (that is the linked issue's job):
 #20 (verifying a remote link), #27 (explicit link and award fields), #28
 (`keywords` project tags). #18 is still open for
 renderers — escaping, attribute-safe escaping and the checks on rendered
-output — but every LaTeX-to-text row below passes, and the one place
-sslabdata generated Markdown of its own, the composed `venue`, is gone.
+output — but every LaTeX-to-text row below passes.
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -455,12 +454,10 @@ The probes in `examples/consumers/` read the emitted document and nothing
 else, and run against the demo in CI. The rows here are the identity
 scenarios asserted over the node and edge sets `graph.py` builds.
 
-The identity rows are filed against **two** issues, because two issues
-promise them. #56 settled a grouping keyed on the normalised full name and
-says the policy itself is #24's; under that key `priya patel`, `p patel` and
-`pradeep patel` are three keys, so #56 delivered the separation but by
-construction does not join two spellings of one person. Joining them needs
-the collaborator aliases of #24, which is why one row here is still `xfail`.
+A grouping keyed on the normalised full name keeps `priya patel`, `p patel`
+and `pradeep patel` as three keys, and by construction does not join two
+spellings of one person. `collaborators_file` joins them when a human
+declares the alias.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|

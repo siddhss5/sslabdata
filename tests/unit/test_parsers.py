@@ -98,8 +98,8 @@ class TestPdfLink:
     """A remote `pdf_base_url` is labelled `unchecked`, because a build never fetches.
 
     Read as a local path, every remote PDF would be labelled `missing`. The
-    conformance case for this (#20) is an expected failure, so only this test
-    pins today's behaviour; it changes with #20."""
+    conformance case for verifying a remote link (#20) is an expected
+    failure, so only this test pins the `unchecked` label."""
 
     def test_a_remote_base_is_never_fetched(self):
         link = pdf_link("k", "https://example.org/pdfs")
@@ -159,7 +159,7 @@ class TestParseAllWorks:
 
 
 class TestCrossref:
-    """An entry carrying a crossref is rejected rather than resolved (#65).
+    """An entry carrying a crossref is rejected rather than resolved.
 
     Resolving it silently would emit a child with no author of its own. The
     corpus proves the fatal outcome of three fixtures; only this class sees the
@@ -369,11 +369,11 @@ class TestCommentHandling:
         assert not (read & absent), label
 
     def test_a_quoted_value_does_not_end_a_paren_entry(self, tmp_path):
-        """Regression: a ) inside "..." used to end @article(...) early.
+        """A ) inside "..." does not end an @article(...) entry.
 
-        sslabdata read the file itself to find @comment groups, so it could be
-        wrong about where a value ended; the entry then lost every field and
-        the entry after it disappeared. pybtex tokenizes the file now.
+        Were entry boundaries found by scanning the file rather than by the
+        parser, the entry would lose every field and the entry after it would
+        disappear.
         """
         source = ('@article(host,title="Host ) @comment(unclosed",'
                   ' author="Adams, Alice", journal="J", year=2024)\n' + entry("real"))
@@ -472,11 +472,11 @@ class TestLocatedParserDiagnostics:
         assert list(works) == ["e"]
 
     def test_a_well_formed_command_on_a_percent_line_is_read(self, tmp_path):
-        """Records the behaviour on main, not an endorsement of it (#78).
+        """A well-formed entry on a `%` line is an entry.
 
         The parser library has no `%` comment outside an entry, as classic
-        BibTeX has none, so a well-formed entry on a `%` line is an entry.
-        Only a syntax error on such a line goes unreported.
+        BibTeX has none. Only a syntax error on such a line goes unreported;
+        an entry lost to a `%` prefix would vanish without a diagnostic.
         """
         source = ("% @article{hidden, title = {H}, journal = {J}, year = 2024}\n"
                   + entry("visible"))
