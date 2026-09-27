@@ -360,7 +360,7 @@ LATEX = [
     case("latex.percent_bare", "tex-percent-bare", "abstract",
          "Accuracy rose 12% over prior work, a 100%% gain in $O(n)$ time, to 99%"),
     case("latex.percent_bare", "tex-percent-bare", "note",
-         Contains("https://example.org/a%20b_c")),
+         "See https://example.org/a%20b_c"),
     case("latex.underscore", "tex-underscore", "title", "The robot_arm Package"),
     case("latex.endash", "tex-endash", "title", "Pages 1–10"),
     case("latex.emdash", "tex-emdash", "title", "Robots—and People"),
@@ -377,6 +377,17 @@ LATEX = [
          "Café robots run in $O(n)$ time and are very tidy."),
     case("latex.note_href", "tex-note-href", "note",
          Contains("https://example.org/code", "our site")),
+    case("latex.url", "tex-url", "note",
+         "Code at https://cs.example.edu/~ann/robot_code?v=2&q=1#frag"),
+    case("latex.footnote", "tex-footnote", "title",
+         "Tidy Robots (Funded by the Fictional Foundation.)"),
+    case("latex.cite_ref", "tex-cite-ref", "abstract",
+         "Faster than prior planners, as the appendix shows."),
+    case("latex.list_item", "tex-list-item", "abstract",
+         "Two results:\n• fast\n(b) tidy"),
+    case("latex.layout_dropped", "tex-layout", "note",
+         "A figure and a title block are left out"),
+    case("latex.textfrac", "tex-textfrac", "title", "A 3/2-Approximation"),
 ]
 
 
