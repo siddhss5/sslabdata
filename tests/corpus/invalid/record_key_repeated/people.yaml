@@ -1,0 +1,17 @@
+# CASE records.key_repeated
+# CASE records.merge_key
+# Ann's name is given twice; YAML alone would keep the second.
+- id: "ann"
+  name: "Ann Able"
+  name: "Ann B. Able"
+  role: "student"
+# A merge key is not a repeated key: cat takes bob's role and status, and
+# her own id and name override the merged ones.
+- &bob
+  id: "bob"
+  name: "Bob Brown"
+  role: "student"
+  status: "alumni"
+- <<: *bob
+  id: "cat"
+  name: "Cat Cole"

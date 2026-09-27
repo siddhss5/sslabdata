@@ -237,6 +237,8 @@ def test_the_published_id_is_the_string_consumers_resolve(validator):
 # and `BIT*` are real paper titles and `Davis*` is a real corpus name.
 MARKDOWN_EMPHASIS = re.compile(r"\*[^*\s][^*]*\*")
 HTML_TAG = re.compile(r"</?[A-Za-z][^<>]*>")
+# A link as Markdown writes one: an autolink `<scheme:...>`, or `[text](url)`.
+LINK = re.compile(r"<[A-Za-z][A-Za-z0-9+.-]*:[^<>\s]*>|\[[^\]]*\]\([^)]*\)|<http")
 
 # The properties whose value the input supplies verbatim. Markdown
 # punctuation in one of these is text an author wrote, which SPEC.md section
@@ -249,7 +251,7 @@ INPUT_TEXT = {"title", "abstract", "note", "name", "given", "von", "family",
               "category", "key", "url"}
 
 
-def markup_paths(data):
+def markup_paths(data, patterns=(MARKDOWN_EMPHASIS, HTML_TAG)):
     """Every path outside the re-serialized export whose string carries markup.
 
     The export is skipped because it is the entry re-typeset and still holds
@@ -268,7 +270,7 @@ def markup_paths(data):
             for index, inner in enumerate(value):
                 walk(inner, path + "/" + str(index))
         elif isinstance(value, str):
-            if MARKDOWN_EMPHASIS.search(value) or HTML_TAG.search(value):
+            if any(pattern.search(value) for pattern in patterns):
                 found.append("%s = %r" % (path, value))
 
     walk(data, "")
@@ -312,6 +314,24 @@ def test_markup_in_the_corpus_is_only_text_the_input_wrote(valid_output):
     offenders = [path for path in found
                  if leaf_property(path.split(" = ")[0]) not in INPUT_TEXT]
     assert offenders == []
+
+
+# Covers output.no_markup
+def test_no_display_string_carries_a_link_in_markup(valid_output, demo_exports):
+    """A link in the input reaches the document as plain text.
+
+    `\\url{u}` used to arrive as the autolink `<u>` in a `note`, a property
+    whose other punctuation is input text, so the scans above let it through.
+    The one Markdown link allowed is the one the corpus writes into a title
+    on purpose.
+    """
+    written = "Not [a link](x), not `code`, not # heading, not *emphasis*"
+    for data in [valid_output] + list(demo_exports):
+        found = [path for path in markup_paths(data, (LINK,))
+                 if not path.endswith(" = %r" % written)]
+        assert found == []
+    assert markup_paths({"note": "See <https://a.org/x>"}, (LINK,)) != []
+    assert markup_paths({"note": "See [site](https://a.org)"}, (LINK,)) != []
 
 
 # Covers output.derived_is_empty

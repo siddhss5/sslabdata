@@ -1,0 +1,12 @@
+# CASE config.path.is_directory
+# Fictional invalid input for tests/COVERAGE.md.
+# `shelf` exists, but it is a directory where each key names a file.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+  - name: "shelf"
+    category: "Papers"
+people_file: "shelf"
+projects_file: "shelf"
+collaborators_file: "shelf"

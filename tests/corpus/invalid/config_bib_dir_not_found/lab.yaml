@@ -1,0 +1,10 @@
+# CASE config.bib_dir.not_found
+# Fictional invalid input for tests/COVERAGE.md.
+# `bib_dir` names a directory that is not there: reported once, at bib_dir,
+# rather than once for every file under it.
+bib_dir: "nowhere"
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+  - name: "also.bib"
+    category: "Papers"

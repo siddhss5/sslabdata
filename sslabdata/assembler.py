@@ -90,6 +90,34 @@ LAB_NAME_MISSING = "CONFIG-LAB-NAME-MISSING"
 # missing its works, people, projects or declared groupings.
 FILE_NOT_FOUND = "CONFIG-FILE-NOT-FOUND"
 
+# A path the configuration names that is there but is the wrong kind: a
+# directory, or anything else that is not a regular file, where a file is
+# named, or a `bib_dir` that is not a directory. Its own code, because "not
+# found" would send the user looking for a typo in a path that exists. Fatal,
+# as a missing file is.
+PATH_WRONG_KIND = "CONFIG-PATH-WRONG-KIND"
+
+
+def path_problem(path: str, directory: bool = False
+                 ) -> Optional[Tuple[str, str]]:
+    """What is wrong with a configured path, as ``(code, message)``, or
+    ``None`` when it is a regular file (a directory, with ``directory``).
+
+    Symlinks are followed, so a dangling one is missing.
+    """
+    target = Path(path)
+    if not target.exists():
+        return FILE_NOT_FOUND, f"'{path}' does not exist"
+    if directory:
+        if target.is_dir():
+            return None
+        return PATH_WRONG_KIND, f"'{path}' is not a directory"
+    if target.is_file():
+        return None
+    return PATH_WRONG_KIND, (f"'{path}' is a directory, not a file"
+                             if target.is_dir() else
+                             f"'{path}' is not a regular file")
+
 # A key `lab.yaml` holds that sslabdata does not read, such as a misspelt
 # `people_fil`. A warning: nothing is lost that was ever read.
 KEY_UNKNOWN = "CONFIG-KEY-UNKNOWN"
@@ -439,19 +467,31 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
             BIB_FILES_MISSING, source, 'bib_files', None,
             "no bib_files are configured, so the document has no works"))
 
-    # Every file the configuration names, checked before any is read, so a
-    # missing one is reported against the key that names it.
-    def present(path: Optional[str], key: str, field_name=None) -> bool:
-        if not path or Path(path).is_file():
+    # Every path the configuration names, checked before any is read, so a
+    # missing one, or one of the wrong kind, is reported against the key that
+    # names it. Only a key left out means no file: an empty path is more
+    # likely a mistake than that, and it names no file.
+    def present(path: Optional[str], key: str, field_name=None,
+                directory: bool = False) -> bool:
+        if path is None:
             return True
-        found.append(diagnostic(
-            FILE_NOT_FOUND, source, key, field_name,
-            f"'{path}' does not exist"))
+        problem = path_problem(path, directory) if path else (
+            FILE_NOT_FOUND,
+            f"the path is empty; name a file, or leave {key} out for none")
+        if problem is None:
+            return True
+        found.append(diagnostic(problem[0], source, key, field_name,
+                                problem[1]))
         return False
 
+    # `bib_dir` is checked only when a file is read from it, and then once:
+    # when it is not a directory, no file under it is looked for. The files
+    # are opened as `<bib_dir>/<name>`, so an empty one is the root.
+    bib_dir_found = not config.bib_files or present(
+        config.bib_dir or "/", 'bib_dir', directory=True)
     bib_files = [{'name': bf.name, 'category': bf.category}
-                 for bf in config.bib_files
-                 if present(f"{config.bib_dir}/{bf.name}", 'bib_files', 'name')]
+                 for bf in config.bib_files if bib_dir_found and
+                 present(f"{config.bib_dir}/{bf.name}", 'bib_files', 'name')]
     people_found = present(config.people_file, 'people_file')
     projects_found = present(config.projects_file, 'projects_file')
     collaborators_found = present(config.collaborators_file,
