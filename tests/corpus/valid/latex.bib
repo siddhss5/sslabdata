@@ -179,3 +179,57 @@
   year    = {2021},
   note    = {Code at \href{https://example.org/code}{our site}}
 }
+
+% Commands the converter's table renders as syntax rather than text. Each
+% comes out as plain text, or not at all (SPEC.md section 2).
+% CASE latex.url
+@article{tex-url,
+  title   = {A Note with a Bare URL},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021},
+  note    = {Code at \url{https://cs.example.edu/~ann/robot_code?v=2&q=1#frag}.}
+}
+
+% CASE latex.footnote
+@article{tex-footnote,
+  title   = {Tidy Robots\footnote{Funded by the Fictional Foundation.}},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.cite_ref
+@article{tex-cite-ref,
+  title    = {Citations and Cross-References},
+  author   = {Adams, Alice},
+  journal  = {Journal of Fictional Robots},
+  year     = {2021},
+  abstract = {Faster than prior planners~\cite{k1,k2}, as the appendix shows~\ref{app}.}
+}
+
+% CASE latex.list_item
+@article{tex-list-item,
+  title    = {A List in an Abstract},
+  author   = {Adams, Alice},
+  journal  = {Journal of Fictional Robots},
+  year     = {2021},
+  abstract = {Two results:\begin{itemize}\item fast\item[(b)] tidy\end{itemize}}
+}
+
+% CASE latex.layout_dropped
+@article{tex-layout,
+  title   = {Figures and Title Blocks},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021},
+  note    = {A figure\includegraphics{fig.png} and a title block\maketitle{} are left out.}
+}
+
+% CASE latex.textfrac
+@article{tex-textfrac,
+  title   = {A \textfrac{3}{2}-Approximation},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}

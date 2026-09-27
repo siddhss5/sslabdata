@@ -127,7 +127,7 @@ nothing else:
 | `year` | `year`, and the sort order of the works list. `null`, with a diagnostic, when the entry has none |
 | `journal` / `booktitle` / `school` / `institution` | `venue`, as `{kind, name}` — the one place sslabdata normalises across entry types. `null` when the entry names no container |
 | `volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Properties of the work, under BibTeX's own names and with BibTeX's own meanings |
-| `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them. An `eprint`'s scheme is the repository `archivePrefix` named, lower-cased, so that field needs no property of its own — and an `eprint` in a repository other than arXiv gets no arXiv link |
+| `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` (or `eprinttype`) | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them. An `eprint`'s scheme is the repository `archivePrefix` or `eprinttype` named, lower-cased, so that field needs no property of its own — and an `eprint` in a repository other than arXiv gets no arXiv link |
 | `abstract` | `abstract` |
 | `note` | `note` |
 | `url` | A link of kind `video` when its host is YouTube or Vimeo (or a subdomain of either), otherwise of kind `url` |

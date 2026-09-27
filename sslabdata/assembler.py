@@ -469,12 +469,15 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
 
     # Every path the configuration names, checked before any is read, so a
     # missing one, or one of the wrong kind, is reported against the key that
-    # names it.
+    # names it. Only a key left out means no file: an empty path is more
+    # likely a mistake than that, and it names no file.
     def present(path: Optional[str], key: str, field_name=None,
                 directory: bool = False) -> bool:
-        if not path:
+        if path is None:
             return True
-        problem = path_problem(path, directory)
+        problem = path_problem(path, directory) if path else (
+            FILE_NOT_FOUND,
+            f"the path is empty; name a file, or leave {key} out for none")
         if problem is None:
             return True
         found.append(diagnostic(problem[0], source, key, field_name,

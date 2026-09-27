@@ -92,6 +92,29 @@ structure.year_not_number:
     - {code: BIB-YEAR-INVALID, severity: warning, file: ./badyear.bib, key: bad-year, field: year, values: [in press]}
   kept: [bad-year, ok-entry]
 
+# A year is an unsigned run of ASCII digits; int() would read each of these
+# four as a number.
+structure.year_not_digits:
+  dir: year_not_digits
+  exit: 0
+  diagnostics:
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-negative, field: year, values: ["-5"]}
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-plus, field: year, values: ["+2020"]}
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-underscore, field: year, values: ["2_020"]}
+    - {code: BIB-YEAR-INVALID, severity: warning, file: ./digits.bib, key: year-fullwidth, field: year, values: [２０２０]}
+  kept: [year-digits, year-negative, year-plus, year-underscore, year-fullwidth]
+  emits:
+    - work: year-negative
+      expect: {year: null}
+    - work: year-plus
+      expect: {year: null}
+    - work: year-underscore
+      expect: {year: null}
+    - work: year-fullwidth
+      expect: {year: null}
+    - work: year-digits
+      expect: {year: 2020}
+
 structure.missing_journal:
   dir: missing_journal
   exit: 0
@@ -162,7 +185,43 @@ structure.not_utf8:
   diagnostics:
     - {code: BIB-ENCODING-INVALID, severity: error, file: ./latin1.bib, values: ["0xfc", line 6]}
 
+# A resolver with nothing after it names no DOI: no identifier, no link.
+links.doi_resolver_only:
+  dir: doi_resolver_only
+  exit: 0
+  diagnostics:
+    - {code: BIB-DOI-INVALID, severity: warning, file: ./doi.bib, key: doi-resolver-only, field: doi, values: ["https://doi.org/"]}
+    - {code: BIB-DOI-INVALID, severity: warning, file: ./doi.bib, key: doi-dx-resolver-only, field: doi, values: ["http://dx.doi.org/"]}
+  kept: [doi-resolver-only, doi-dx-resolver-only, doi-present]
+  emits:
+    - work: doi-resolver-only
+      expect: {identifiers: {}, links: {}}
+    - work: doi-dx-resolver-only
+      expect: {identifiers: {}, links: {}}
+    - work: doi-present
+      expect: {identifiers.doi: [10.5555/corpus.0003], links.doi.0.url: "https://doi.org/10.5555/corpus.0003"}
+
 # --- Projects, people and identity -------------------------------------------
+
+# "and others" before the end of a name list is reported and dropped; at the
+# end it is "et al.", as ever, and says nothing.
+names.others_mid_list:
+  dir: others_mid_list
+  exit: 0
+  diagnostics:
+    - {code: BIB-OTHERS-NOT-LAST, severity: warning, file: ./others.bib, key: others-mid-author, field: author}
+    - {code: BIB-OTHERS-NOT-LAST, severity: warning, file: ./others.bib, key: others-mid-editor, field: editor}
+  unresolved_only:
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./others.bib, key: others-mid-author, field: author, values: [Bob Brown]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./others.bib, key: others-mid-author, field: author, values: [Cy Cee]}
+  kept: [others-mid-author, others-mid-editor, others-last]
+  emits:
+    - work: others-mid-author
+      expect: {authors.*.name: [Alice Adams, Bob Brown, Cy Cee], authors.*.position: [1, 2, 3]}
+    - work: others-mid-editor
+      expect: {editors.*.name: [Bob Brown], editors.*.position: [1]}
+    - work: others-last
+      expect: {authors.*.name: [Alice Adams, Bob Brown]}
 
 projects.undefined:
   dir: undefined_project
@@ -209,6 +268,19 @@ projects.invalid_status:
   diagnostics:
     - {code: PROJECTS-STATUS-INVALID, severity: warning, file: projects.yaml, key: sharedarm, field: status, values: [sometimes]}
   kept: [ok-entry]
+
+# A key given twice in a record of each file: an error at the file, the record
+# and the key, naming both lines, and the record is not loaded. The merge key
+# in people.yaml is not a repeated key and is not reported (records.merge_key).
+records.key_repeated:
+  dir: record_key_repeated
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: RECORD-KEY-REPEATED, severity: error, file: people.yaml, key: ann, field: name, values: [line 5, line 6]}
+    - {code: RECORD-KEY-REPEATED, severity: error, file: projects.yaml, key: homebot, field: status, values: [line 5, line 6]}
+    - {code: RECORD-KEY-REPEATED, severity: error, file: projects.yaml, field: id, values: [line 8, line 9]}
+    - {code: RECORD-KEY-REPEATED, severity: error, file: collaborators.yaml, key: Priya Patel, field: aliases, values: [line 4, line 5]}
 
 # One key in each file: a warning at the file, the record and the key, and no
 # key reaches the document.
@@ -341,6 +413,17 @@ config.collaborators_file.not_found:
   fatal: assembly
   diagnostics:
     - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: collaborators_file, values: [nocollaborators.yaml]}
+
+# An empty path names no file, so each key is reported; leaving the key out is
+# how a configuration says there is no file.
+config.data_file.empty:
+  dir: config_data_file_empty
+  exit: 1
+  fatal: assembly
+  diagnostics:
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: people_file}
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: projects_file}
+    - {code: CONFIG-FILE-NOT-FOUND, severity: error, file: lab.yaml, key: collaborators_file}
 
 config.collaborators_file.wrong_type:
   dir: config_collaborators_file_type
@@ -553,6 +636,15 @@ config.unknown_key:
     - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: "7"}
     - {code: CONFIG-KEY-UNKNOWN, severity: warning, file: lab.yaml, key: "2025-01-01"}
   kept: [ok-entry]
+
+# A key given twice in one mapping of lab.yaml, located at the key the
+# repeat is under and naming both lines.
+config.key_repeated:
+  dir: config_key_repeated
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-KEY-REPEATED, severity: error, file: lab.yaml, key: lab, field: name, values: [line 5, line 6]}
 
 config.not_a_mapping:
   dir: config_not_a_mapping

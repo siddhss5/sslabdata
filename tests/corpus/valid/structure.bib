@@ -151,3 +151,12 @@
   author = {Adams, Alice},
   year   = {2020}
 }
+
+% CASE output.work.bibtex_round_trip
+% Every character the BibTeX writer might escape, already escaped and not.
+@misc{struct-escapes,
+  title  = {A 20\% Gain for Pick \& Place in robot\_arm Set \#2},
+  author = {Adams, Alice and {R\&D Robotics}},
+  note   = {50% faster, a&b, $O(n \log n)$ with {nested {braces}}},
+  year   = {2020}
+}
