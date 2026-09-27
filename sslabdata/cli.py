@@ -8,7 +8,9 @@ MIT License - see LICENSE file for details.
 
 import argparse
 import json
+import os
 import sys
+from pathlib import Path
 
 import yaml
 
@@ -26,6 +28,10 @@ CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
 # the program: a file that cannot be opened, is not UTF-8 or is not YAML. Any
 # other exception is a defect and is left to propagate.
 CONFIG_READ_ERRORS = (OSError, UnicodeDecodeError, yaml.YAMLError)
+
+# The document could not be written to --output. Fatal: the run exits 1, and
+# the file already there, if any, is as it was.
+OUTPUT_WRITE_FAILED = "OUTPUT-WRITE-FAILED"
 
 
 def main(argv=None):
@@ -177,8 +183,24 @@ Examples:
                 print(f"  {name}")
         return
 
+    # A destination the system will not let sslabdata write -- a directory,
+    # a path under a file, a directory without write permission -- is an
+    # input failure, not a defect. The write is atomic, so nothing has
+    # changed. The error names the temporary file when the write itself
+    # failed; its name is random and means nothing to the user, so it is
+    # given only when it is not beside --output (a parent that is a file).
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
-    export_func(data, args.output)
+    try:
+        export_func(data, args.output)
+    except OSError as e:
+        reason = e.strerror or str(e)
+        if e.filename and (Path(os.fsdecode(e.filename)).parent
+                           != Path(args.output).parent):
+            reason += f": '{os.fsdecode(e.filename)}'"
+        print(diagnostic(OUTPUT_WRITE_FAILED, args.output, None, None,
+                         f"the document could not be written: {reason}"),
+              file=sys.stderr)
+        sys.exit(1)
 
     print(f"Wrote {args.output}")
     print(f"  {len(data.works)} works, "

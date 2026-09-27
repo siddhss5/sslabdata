@@ -5,6 +5,7 @@ checked by test_invalid_corpus.py.
 """
 
 import json
+import os
 from datetime import date, datetime, timezone
 
 import jsonschema
@@ -341,3 +342,59 @@ def test_cli_unresolved_none(tmp_path):
     for name in ("Adams", "Côté"):
         assert name not in run.stdout
 
+
+
+def snapshot(root):
+    """Every path under `root` with its bytes, or None for a directory."""
+    return {p.relative_to(root): None if p.is_dir() else p.read_bytes()
+            for p in sorted(root.rglob("*"))}
+
+
+OLD = b"the document from the last good run\n"
+
+WRITE_FAILURES = [
+    case("cli.output.write_failed", "directory"),
+    case("cli.output.write_failed", "parent_is_a_file"),
+    case("cli.output.write_failed", "permission_denied"),
+]
+
+
+# Covers cli.output.write_failed
+@pytest.mark.parametrize("case_id, failure", WRITE_FAILURES)
+def test_a_failed_write_is_coded_and_changes_nothing(tmp_path, case_id, failure):
+    """`--output` naming a directory, a path under a file, or a file in a
+    directory that cannot be written to: `OUTPUT-WRITE-FAILED` located at the
+    destination on standard error, exit 1, no traceback and no `Wrote` line.
+    The tree is compared byte for byte before and after, so the old document
+    is kept and no temporary file is left behind.
+
+    To reproduce, run `sslabdata --config lab.yaml --output .` in
+    tests/corpus/valid.
+    """
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / "lab.yml").write_bytes(OLD)
+    if failure == "directory":
+        destination = tree / "lab.yml.d"
+        destination.mkdir()
+    elif failure == "parent_is_a_file":
+        destination = tree / "lab.yml" / "lab.yml"
+    else:
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("root can write to a read-only directory")
+        destination = tree / "lab.yml"
+        tree.chmod(0o555)
+        if os.access(tree, os.W_OK):
+            tree.chmod(0o755)
+            pytest.skip("permission bits do not stop this account writing")
+    before = snapshot(tree)
+    try:
+        run = run_sslabdata(["--config", "lab.yaml", "--output", destination], VALID)
+    finally:
+        tree.chmod(0o755)
+    assert run.crash is None and run.code == 1, run.output
+    coded = [line for line in run.stderr.splitlines() if "OUTPUT-WRITE-FAILED" in line]
+    assert len(coded) == 1, run.stderr
+    assert coded[0].startswith(f"OUTPUT-WRITE-FAILED {destination}::: "), coded
+    assert "Wrote" not in run.stdout, run.stdout
+    assert snapshot(tree) == before
