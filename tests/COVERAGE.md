@@ -258,6 +258,7 @@ the source text are not markup and must survive unchanged.
 | `latex.text_macros` | `\TeX{}`, `\LaTeX\ `, `\BibTeX`, `\emdash`, `\endash`, `\slash` | `TeX`, `LaTeX`, `BibTeX`, `—`, `–`, `/`, with no `LATEX-COMMAND-UNKNOWN` warning | `tests/corpus/invalid/common_text_macros/macros.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro_repeated` | One unknown macro in three fields of two entries | One warning line for the macro, with the count of fields and the first of them as the location | `tests/corpus/invalid/unknown_macro_repeated/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
+| `text.control_characters` | U+0002, U+0001 and U+007F raw in a title, and `"\x01"` and `"\a"` escapes in a person's `name` and in `lab.description` | Warning `TEXT-CONTROL-CHARACTER` at each value, naming the characters; they are removed and nothing else is: the title reads `Alpha Beta 0 Gamma Delta` with no `LATEX-CONVERSION-FAILED`, and the name resolves the author | `tests/corpus/invalid/control_characters/control.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 
 ## Links
 

@@ -36,6 +36,10 @@ _TEXT_MACROS = {
 
 # Marks a command that leaves nothing, or a parenthesis, where it stood: the
 # spaces before it go too, so `planners~\cite{k}.` reads `planners.`.
+# This marker and `_PLACEHOLDER` below are control characters, which cannot
+# collide with the input: every control character is removed from a field
+# value where it is read, before it is converted (`CONTROL_CHARACTER` in
+# sslabdata/config.py).
 _JOIN = '\x02'
 _JOIN_RE = re.compile(f'[ \t\xa0]*{_JOIN}')
 

@@ -462,6 +462,7 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
         found.append(diagnostic(
             KEY_UNKNOWN, source, key, None,
             f"'{key}' is not a key sslabdata reads, and is ignored"))
+    found.extend(config.control_characters)
     if not config.bib_files:
         found.append(diagnostic(
             BIB_FILES_MISSING, source, 'bib_files', None,

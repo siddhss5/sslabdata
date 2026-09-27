@@ -155,6 +155,26 @@ latex.unknown_macro:
     - work: unknown-macro
       expect: {title: {contains: [Strange], excludes: ["\\"]}}
 
+# A control character is removed where it is read and reported there, once
+# per value, in a .bib field, a people record and lab.yaml alike. The title
+# loses nothing else: U+0002 and U+0001 are the LaTeX conversion's own
+# markers, and are gone before it runs. JSON writes a control character as
+# \u00XX, which is what `not_emitted` looks for; DEL it writes as itself.
+text.control_characters:
+  dir: control_characters
+  exit: 0
+  diagnostics:
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: ./control.bib, key: control-chars, field: title, values: [U+0001, U+0002, U+007F]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: name, values: [U+0001]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: lab.yaml, key: lab, field: description, values: [U+0007]}
+  kept: [control-chars]
+  emits:
+    - work: control-chars
+      expect: {title: Alpha Beta 0 Gamma Delta, authors.*.person_id: [aadams]}
+    - person: aadams
+      expect: {name: Alice Adams}
+  not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\x7f"]
+
 # One record for the command, however many fields use it, with the count and
 # the first field in document order.
 latex.unknown_macro_repeated:

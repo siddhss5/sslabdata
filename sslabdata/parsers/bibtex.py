@@ -30,6 +30,7 @@ from pybtex.database.input.bibtex import (
 from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces, unknown_commands
+from ..config import CONTROL_CHARACTER, control_message, without_control_characters
 from ..diagnostics import Diagnostic, diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
@@ -280,6 +281,9 @@ class _Parser(PybtexParser):
         # The entry key each captured library message was raised while
         # reading, by the message's identity.
         self.message_keys: Dict[int, str] = {}
+        # (entry key, field name, characters) for every field value its
+        # control characters were removed from.
+        self.control_characters: List[Tuple[str, str, List[str]]] = []
 
     def handle_error(self, error):
         """Keep a syntax error with where it happened; relay anything else."""
@@ -300,11 +304,25 @@ class _Parser(PybtexParser):
         """
         if key is not None and key in self.data.entries:
             self.duplicate_keys.append(key)
+        # The ingress for field text: control characters are removed here,
+        # before pybtex splits a name list or normalises whitespace, and
+        # before any LaTeX is read (`CONTROL_CHARACTER`).
+        fields = [(name, self._without_controls(key, name, parts))
+                  for name, parts in fields]
         captured = pybtex.errors.captured_errors
         before = len(captured) if captured is not None else 0
         super().process_entry(entry_type, key, fields)
         for error in (captured or [])[before:]:
             self.message_keys[id(error)] = key
+
+    def _without_controls(self, key, name: str, parts: List[str]) -> List[str]:
+        """One field's value parts with control characters removed, and the
+        field recorded when there were any."""
+        cleaned = [without_control_characters(part) for part in parts]
+        found = list(dict.fromkeys(c for _, chars in cleaned for c in chars))
+        if found:
+            self.control_characters.append((key, name.lower(), found))
+        return [part for part, _ in cleaned]
 
     def parse_string(self, text: str):
         self.unnamed_entry_counter = 1
@@ -401,6 +419,9 @@ def parse_bibtex_file(
 
     redefinitions.extend((path, name, line) for name, line
                          in _redefined_macros(text, parser.string_definitions))
+    for key, field_name, found in parser.control_characters:
+        diagnostics.append(diagnostic(CONTROL_CHARACTER, path, key, field_name,
+                                      control_message(found)))
     for error, key, field_name, start in parser.syntax_errors:
         if key is None and _on_comment_line(text, start):
             continue
