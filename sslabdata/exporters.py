@@ -19,14 +19,10 @@ from .models import LabData
 
 
 def _write(output_path: str, text: str) -> None:
-    """Write a serialized document, after it has been serialized.
+    """Write ``text`` atomically over ``output_path`` (SPEC.md §1).
 
-    The document is built in full before anything is created, so a document
-    sslabdata refuses to emit -- one whose `source.file` is absolute, say --
-    leaves no file behind. It is then written in full to a temporary sibling
-    and moved over the destination in one step, so a failure at any point
-    leaves an existing file as it was, creates none where there was none, and
-    leaves no temporary file behind.
+    Takes text, not a `LabData`, so a document sslabdata refuses to serialize
+    is refused before any file is created.
     """
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -56,12 +52,10 @@ def _write(output_path: str, text: str) -> None:
 def serialize(data: LabData, fmt: str, indent: int = 2) -> str:
     """The document as text in ``fmt``, ``yaml`` or ``json``, written nowhere.
 
-    Both exporters write this text, and ``--validate`` builds it too, so a
-    document ``--validate`` passes is one ``--output`` can serialize.
-    `LabData.to_dict()` refuses what the document cannot carry, raising
-    `ConfigurationError`. The dumpers are a backstop behind it: `safe_dump`
-    writes no Python-specific tag, and `allow_nan=False` refuses NaN rather
-    than write JSON that is not JSON.
+    Both exporters and ``--validate`` build the text here, so a document
+    ``--validate`` passes is one ``--output`` can serialize. `LabData.to_dict()`
+    refuses what the document cannot carry; `safe_dump` and `allow_nan=False`
+    are a backstop behind it.
     """
     tree = data.to_dict()
     if fmt == 'json':

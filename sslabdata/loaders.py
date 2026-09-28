@@ -19,13 +19,8 @@ from .diagnostics import Diagnostic, diagnostic
 from .models import Person, Project
 
 
-# What can be wrong with a people, projects or collaborators file, one code
-# per condition and file; an unknown key is one code for all three, as the
-# check is the same in each. A file that is not valid YAML or not a list of
-# records, and a record missing a field it cannot be emitted without, fail
-# every mode; a repeated id fails `--validate`, as a repeated citation key
-# does; the rest are warnings. A required field that is not a string is as
-# unusable as a missing one, and is reported under the same code.
+# One code per condition and file; the RECORD-* codes cover all three files
+# (SPEC.md "Diagnostic codes").
 PEOPLE_YAML_INVALID = "PEOPLE-YAML-INVALID"
 PEOPLE_NOT_A_LIST = "PEOPLE-NOT-A-LIST"
 PEOPLE_FIELD_MISSING = "PEOPLE-FIELD-MISSING"
@@ -41,9 +36,6 @@ PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
 PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
 PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
 RECORD_KEY_UNKNOWN = "RECORD-KEY-UNKNOWN"
-# A key given twice in one mapping. YAML would keep the last value, so the
-# record is not loaded and the run is fatal, as for a missing field: which
-# value was meant is not sslabdata's to guess.
 RECORD_KEY_REPEATED = "RECORD-KEY-REPEATED"
 RECORD_TYPE_INVALID = "RECORD-TYPE-INVALID"
 
@@ -55,11 +47,9 @@ PERSON_KEYS = ("id", "name", "aliases", "role", "status", "photo", "website",
 PROJECT_KEYS = ("id", "title", "description", "website", "image", "status")
 COLLABORATOR_KEYS = ("name", "aliases")
 
-# The YAML type each optional field of a record accepts, beyond `role` and
-# `status`, which have codes of their own. The required fields (`id`, `name`,
-# `title`) are strings. A value of any other type is reported and read as
-# empty, so it is emitted as null (or, for aliases, declares none) and never
-# reaches the document as the wrong type.
+# The type each optional field accepts; `role` and `status` have codes of
+# their own. A value of another type is read as empty, so it never reaches the
+# document as the wrong type.
 STRING, INTEGER, ALIASES = ("a string", "an integer",
                             "a list of non-empty strings")
 PERSON_TYPES = {**dict.fromkeys(("photo", "website", "email", "co_advisor",
@@ -70,8 +60,8 @@ PERSON_TYPES = {**dict.fromkeys(("photo", "website", "email", "co_advisor",
 PROJECT_TYPES = dict.fromkeys(("description", "website", "image"), STRING)
 COLLABORATOR_TYPES = {"aliases": ALIASES}
 
-# A person's `status` is one of these. A `role` is any non-empty string, so
-# that any lab's roles fit (SPEC.md section 5).
+# There is no list of roles: any non-empty string is one, so that any lab's
+# roles fit (SPEC.md §5).
 PERSON_STATUSES = ("current", "alumni")
 PROJECT_STATUSES = ("active", "completed")
 
@@ -92,17 +82,10 @@ def _records(path: str, codes, required, known, optional,
 
     ``codes`` are the file's YAML-invalid, not-a-list and field-missing
     codes, ``required`` the fields a record cannot be emitted without --
-    each a non-empty string -- ``known`` the keys the file's records are read
-    for and ``optional`` the type each optional field accepts.
-    A missing file is not this function's to report (the assembler names the
-    configuration key instead) and reads as no records, as does an empty one.
-    A file that is not valid YAML or not a list, a record that is not a
-    mapping and a record missing a required field are reported to
-    ``diagnostics`` and left out, and so is a record with a key given twice
-    in one of its mappings (`RECORD_KEY_REPEATED`). A kept record's unknown
-    keys are reported at the record's first required field -- its `id`, or a
-    collaborator's `name` -- and the record is kept without them, as it is
-    with an optional field of the wrong type, which is set to ``None``.
+    each a non-empty string, the first naming the record -- ``known`` the
+    keys the file's records are read for and ``optional`` the type each
+    optional field accepts. A missing file reads as no records: the assembler
+    reports it, naming the configuration key.
     """
     yaml_invalid, not_a_list, field_missing = codes
     fail = diagnostics.append
@@ -217,18 +200,8 @@ def _repeated_ids(records: List[dict], path: str, code: str, report) -> None:
 
 
 def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
-    """Load people from a YAML file.
-
-    Expected format (list of dicts):
-        - id: "aadams"
-          name: "Alice Adams"
-          aliases: ["A. Adams", "A. J. Adams"]
-          role: "pi"
-          status: "current"
-          ...
-
-    ``diagnostics`` receives what is wrong with the file.
-    """
+    """Load people from a YAML file (format: README.md); ``diagnostics``
+    receives what is wrong with it."""
     warn = diagnostics.append
     people = []
     records = _records(path, (PEOPLE_YAML_INVALID, PEOPLE_NOT_A_LIST,
@@ -272,18 +245,8 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
 
 
 def load_projects(path: str, diagnostics: List[Diagnostic]) -> List[Project]:
-    """Load projects from a YAML file.
-
-    Expected format (list of dicts):
-        - id: "gardenbot"
-          title: "Robot-Assisted Gardening"
-          description: "Autonomous gardening systems"
-          website: "https://gardenbot.example.org"
-          status: "active"
-
-    The file is checked as `load_people()` checks its own; a project needs
-    an id and a title.
-    """
+    """Load projects from a YAML file, checked as `load_people()` checks
+    its own."""
     warn = diagnostics.append
     records = _records(path, (PROJECTS_YAML_INVALID, PROJECTS_NOT_A_LIST,
                               PROJECTS_FIELD_MISSING), ('id', 'title'), PROJECT_KEYS,
@@ -324,15 +287,8 @@ class DeclaredCollaborator:
 
 def load_collaborators(path: str, diagnostics: List[Diagnostic]
                        ) -> List[DeclaredCollaborator]:
-    """Load declared external co-authors from a YAML file.
-
-    Expected format (list of dicts):
-        - name: "Priya Patel"
-          aliases: ["P. Patel"]
-
-    The file is checked as `load_people()` checks its own; a collaborator
-    needs a name.
-    """
+    """Load declared external co-authors from a YAML file, checked as
+    `load_people()` checks its own."""
     records = _records(path, (COLLABORATORS_YAML_INVALID,
                               COLLABORATORS_NOT_A_LIST,
                               COLLABORATORS_FIELD_MISSING), ('name',),

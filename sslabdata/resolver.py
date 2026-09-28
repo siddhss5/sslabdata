@@ -1,10 +1,6 @@
 """
-Entity resolution: link works to people and projects.
-
-Matches contributor names in works to people in people.yaml on the
-structured full name, then on declared aliases. A name that fits more than
-one person is left unresolved and reported, and a near miss is reported as a
-suggestion rather than linked. Resolves project tags and computes back-links.
+Entity resolution: link works to people and projects, and compute
+back-links. Names are matched as SPEC.md "How a name is matched" says.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
 Author: Siddhartha Srinivasa
@@ -29,27 +25,15 @@ FUZZY_THRESHOLD = 0.85
 # After normalization (no periods): "a kim", "h zhang", etc.
 _ABBREVIATED_NAME_RE = re.compile(r'^[a-z] [a-z]+$')
 
-# How a contributor's `resolution.status` reads, and how it resolved.
-# `ambiguous` is a name that fits more than one person. Both are open strings,
-# so a new status or method is not a breaking change.
+# `resolution.status` and `resolution.method` values, both open strings
+# (SPEC.md §5).
 RESOLVED, UNRESOLVED, AMBIGUOUS = "resolved", "unresolved", "ambiguous"
 BY_NAME = "exact"
 
-# Two things the resolver declines to decide, reported rather than guessed.
-# Both are warnings. `AMBIGUOUS_NAME` means a name fits more than one lab
-# member, and `--strict` makes it an error; `SUGGESTION` is about an author
-# who matched no lab member, which is never an error under `--strict`.
+# The codes this module reports (SPEC.md "Diagnostic codes").
 AMBIGUOUS_NAME = "RESOLVE-AMBIGUOUS-NAME"
 SUGGESTION = "RESOLVE-SUGGESTION"
-
-# One spelling declared, as a name or an alias, by more than one person in
-# `people_file`. A name written that way fits all of them and resolves to
-# none, which is why the declaration itself is reported, and not only each
-# authorship it leaves ambiguous. A warning, as those are.
 ALIAS_AMBIGUOUS = "PEOPLE-ALIAS-AMBIGUOUS"
-
-# A work tagged with a project id that `projects_file` does not define. It
-# fails `--validate`: the id is a typo in data sslabdata owns (SPEC.md section 1).
 PROJECT_UNKNOWN = "RESOLVE-PROJECT-UNKNOWN"
 
 # One part of a given name that is an initial rather than a name: a letter,
@@ -60,14 +44,9 @@ PROJECT_UNKNOWN = "RESOLVE-PROJECT-UNKNOWN"
 # key too few rather than one too many.
 _INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
 
-# Initials written without a space between them: two or more letters, each
-# but the last followed by a period, the last period optional -- `S.S.`,
-# `S.S`, `T.A.K.`. In a given name they are read as one initial per letter,
-# so `S.S.` matches as `S. S.` does. A part with no period inside it (`SS`,
-# `Al.`) is a name, and a hyphenated one (`J.-P.`) is left as written. Never
-# applied to a family name, a particle, a suffix or a brace-protected name.
-# Tested once combining marks are off, so `Š.S.` is read alike whether the
-# accent is precomposed or decomposed.
+# Initials written without a space between them, `S.S.` or `T.A.K.`, read as
+# one initial per letter in a given name only. Tested once combining marks
+# are off. SPEC.md "How a name is matched" has the rule.
 _RUN_TOGETHER = re.compile(r"^[^\W\d_](?:\.[^\W\d_])+\.?$", re.UNICODE)
 
 
@@ -97,8 +76,8 @@ def _spaced_initials(text: str) -> str:
 def normalize_name(name: str) -> str:
     """Normalize a name for matching.
 
-    Lowercases, strips accents, removes periods and extra whitespace,
-    and standardizes initial formats.
+    Exactly the steps SPEC.md "How a name is matched" lists, so a change
+    here is a change to the contract.
     """
     name = name.lower().strip()
     name = ''.join(
@@ -112,17 +91,12 @@ def normalize_name(name: str) -> str:
 
 
 def declared_form(name: str) -> str:
-    """How a declared name or alias compares with another declaration.
+    """How a declared name or alias compares with another declaration
+    (SPEC.md "How a name is matched").
 
-    `normalize_name()`, with run-together initials spaced in the given name
-    only: `S.S. Ivers` and `S. S. Ivers` are one form. A declaration is
-    written `Given von Family, Suffix`, as `full_form()` joins a name, so
-    only the text before the first comma is read with BibTeX's name parsing,
-    and its given name is the words it reads as first and middle names, by
-    position: the leading words. Particles, the family name and anything
-    after the comma are never spaced. Where there is nothing to space, or
-    the parse does not line up with the words, it is `normalize_name()`
-    exactly.
+    A declaration is read as `full_form()` joins a name, `Given von Family,
+    Suffix`. Where the parse does not line up with the words, it is
+    `normalize_name()` exactly.
     """
     before = name.split(",", 1)[0]
     words = before.split()
@@ -208,9 +182,7 @@ def shared_declarations(people: List[Person], source: str) -> List[Diagnostic]:
     """One `ALIAS_AMBIGUOUS` warning per spelling more than one person declares.
 
     Compared through `declared_form()`, so `S.S. Ivers` and `S. S. Ivers`
-    are one spelling. Located at the
-    second person to declare the spelling, under the field that declares it
-    there, and naming every person who does.
+    are one spelling.
     """
     declared: Dict[str, List[Tuple[str, str, str]]] = {}
     for person in people:
@@ -380,15 +352,7 @@ class Match:
 def match(contributor: Contributor, candidates: Candidates) -> Match:
     """Match one name, on its full form first.
 
-    1. The full name, or a declared alias written in full, equal to exactly
-       one entity's: resolved. Equal to two: ambiguous.
-    2. Only when the name is itself abbreviated -- some part of the given
-       name an initial -- its abbreviated form against the declared names and
-       aliases. It resolves only when exactly one entity declares it *and*
-       no other entity's name could be it too: `A. Kim` is ambiguous when
-       one Kim declares the alias and another Kim is `Alan`.
-    3. Otherwise nothing is linked, and every entity the name could be is a
-       suggestion.
+    The order of the rules is SPEC.md "How a name is matched".
     """
     written = _written_key(contributor)
     abbreviated = has_initial(contributor.given)
@@ -463,16 +427,11 @@ def resolve_authors(
     diagnostics: Optional[List[Diagnostic]] = None,
     bib_dir: str = ".",
 ) -> List[str]:
-    """Resolve contributor names in works to person IDs.
+    """Resolve contributor names in works to person IDs, by `match()`.
 
-    Strategy, in `match()`: the structured full name, then -- only for a
-    name that is itself abbreviated -- a declared alias. A name that fits
-    more than one person is left unresolved, and a near miss is never
-    linked. Both are reported under `AMBIGUOUS_NAME` and `SUGGESTION` into
-    ``diagnostics``, located at the work, when a list is given.
-
-    Editors are resolved by the same machinery. They are not authorships, so
-    an editor that matches nobody is not reported as an unresolved author.
+    Ambiguous names and suggestions are reported into ``diagnostics`` when a
+    list is given. Editors are resolved too, but are not authorships, so an
+    editor that matches nobody is not in the returned list.
 
     Mutates ``person_id`` and ``resolution`` in place.
 
@@ -501,13 +460,8 @@ def resolve_projects(
     diagnostics: Optional[List[Diagnostic]] = None,
     bib_dir: str = ".",
 ) -> List[str]:
-    """Validate project IDs in works against known projects.
-
-    Returns list of unknown project IDs found in works, and reports each
-    unknown tag under `PROJECT_UNKNOWN` into ``diagnostics``, located at the work,
-    when a list is given.
-    Does NOT remove unknown project IDs from works (they're kept
-    for debugging visibility).
+    """Return the unknown project IDs in works, sorted, and report each into
+    ``diagnostics`` when a list is given. They stay on the work (SPEC.md §5).
     """
     known_ids = {p.id for p in projects}
     unknown: Set[str] = set()
@@ -526,15 +480,9 @@ def resolve_projects(
 
 
 def compute_backlinks(data: LabData) -> None:
-    """Populate back-references on people and projects.
-
-    Editing a volume is not an authorship, so `work.editors` contribute to
-    none of these: not to a person's works and not to a project's people.
-
-    Mutates data in place:
-    - Person.work_ids
-    - Project.work_ids, Project.people_ids
-    """
+    """Populate `Person.work_ids`, `Project.work_ids` and
+    `Project.people_ids` in place (SPEC.md §3). Editors are not authorships
+    and contribute to none of them."""
     people_by_id = {p.id: p for p in data.people}
     projects_by_id = {p.id: p for p in data.projects}
 

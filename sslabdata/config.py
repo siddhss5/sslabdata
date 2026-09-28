@@ -21,31 +21,19 @@ from pathlib import Path, PureWindowsPath
 from .diagnostics import Diagnostic, diagnostic
 
 
-# A configured `.bib` name reaches the document as `work.source.file`, where
-# it is promised never to be an absolute path (SPEC.md section 5): a document
-# is shared, and one carrying a compiling machine's directory layout leaks it
-# to every consumer. Rejecting the input is what makes the promise true;
-# rewriting the name would quietly discard a relative directory the user
-# meant. Both path flavours are checked, so the same configuration is
-# accepted or rejected wherever it is compiled.
+# A `.bib` name is emitted as `work.source.file`, never absolute (SPEC.md §5).
+# Both path flavours are checked, so a configuration is accepted or rejected
+# alike wherever it is compiled.
 BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
 
-# A relative name can still leave `bib_dir`, by `..` or through a symlink:
-# it would read a file the configuration was never meant to reach, and emit a
-# name that exposes the layout above `bib_dir`. Fatal at load for the same
-# reason as the absolute name.
 BIB_FILE_OUTSIDE = "CONFIG-BIB-FILE-OUTSIDE-BIB-DIR"
 
-# A `lab.yaml` sslabdata cannot compile from, found while it is read. Each is
-# fatal at load, like the absolute name above: nothing is assembled from a
-# configuration whose shape is wrong, so there is no partial document either.
 NOT_A_MAPPING = "CONFIG-NOT-A-MAPPING"
 KEY_MISSING = "CONFIG-KEY-MISSING"
 TYPE_INVALID = "CONFIG-TYPE-INVALID"
 
-# Every key `lab.yaml` may hold. `site` is read by renderers, not by sslabdata,
-# and is accepted without being checked. Any other key is reported, because a
-# misspelt `people_fil` would otherwise be silently the same as no key at all.
+# Every key `lab.yaml` may hold; any other is reported. `site` is read by
+# renderers, not by sslabdata, and is accepted without being checked.
 KNOWN_KEYS = ("lab", "site", "bib_dir", "bib_files", "pdf_base_url",
               "people_file", "projects_file", "collaborators_file")
 
@@ -60,30 +48,17 @@ _LAB_TYPES = {**dict.fromkeys(("name", "description", "institution",
                                "department", "website", "email", "address",
                                "logo"), str), "links": dict}
 
-# `lab` is otherwise open, and it reaches both formats of the document, so
-# every value in it at any depth must have one JSON form that YAML writes
-# alike. A date or a timestamp becomes its ISO 8601 text, which keeps what the
-# author wrote. Anything else JSON cannot carry is refused rather than
-# guessed at: NaN and the infinities have no JSON form, a set's order changes
-# between runs, binary has no meaning as text, and a key that is not a string
-# is written as `2019` by YAML and `"2019"` by JSON. Fatal at load, because
-# `--output` could not write it and `--validate` must fail where that does.
+# `lab` reaches both formats of the document, so every value in it must have
+# one JSON form that YAML writes alike (SPEC.md "Diagnostic codes").
 VALUE_NOT_JSON = "CONFIG-VALUE-NOT-JSON"
 
-# A key given twice in one mapping of `lab.yaml`. PyYAML keeps the last value
-# and says nothing, so the first would be lost without a trace, and which of
-# the two the user meant is not sslabdata's to guess. Fatal at load, like
-# every other `lab.yaml` of the wrong shape.
 KEY_REPEATED = "CONFIG-KEY-REPEATED"
 
 MERGE_TAG = "tag:yaml.org,2002:merge"
 
-# A C0 control character other than tab, line feed and carriage return, or
-# DEL. None is text (SPEC.md section 2): it makes an XML rendering of the
-# document invalid, and U+0001 and U+0002 are the LaTeX conversion's own
-# markers. Each is removed where the input is read, before anything else sees
-# the value, and reported at the value: a `.bib` field value, or a YAML
-# scalar, which can carry one as an escape (`"\x01"`).
+# The control characters that are not text (SPEC.md §2). They are removed
+# where the input is read, before anything else sees the value: U+0001 and
+# U+0002 are also the LaTeX conversion's own markers.
 CONTROL_CHARACTER = "TEXT-CONTROL-CHARACTER"
 _CONTROL = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -127,14 +102,13 @@ class ControlCharacters(NamedTuple):
 
 
 class YAMLLoader(yaml.SafeLoader):
-    """PyYAML's safe loader, which also records every repeated mapping key,
-    and removes and records every control character (`CONTROL_CHARACTER`).
+    """PyYAML's safe loader, which also records every repeated mapping key
+    -- PyYAML alone keeps the last value silently -- and removes and records
+    every control character.
 
     Every YAML file sslabdata reads is read with it, through `read_yaml()`.
     Keys are compared as the loader constructs them, so `1` and `0x1`, which
-    one dict would hold as one key, are a repeat too. A merge key (`<<`) is
-    not: the keys it merges in are overridden by the mapping's own, which is
-    what a merge is for, and PyYAML merges them as it always has.
+    one dict would hold as one key, are a repeat too.
     """
 
     def __init__(self, stream):
@@ -217,33 +191,22 @@ def repeated_message(repeat: RepeatedKey) -> str:
 
 
 class ConfigurationError(ValueError):
-    """A configuration sslabdata will not compile from.
-
-    Its own type, not a bare ``ValueError``, so that a caller can tell a
-    rejected configuration from anything else that raises one. Its message
-    is one coded diagnostic line (SPEC.md, *Diagnostic codes*).
-    """
+    """A configuration sslabdata will not compile from (SPEC.md §1). Its
+    message is one coded diagnostic line."""
 
 
 def is_absolute_path(name: str) -> bool:
     """True when ``name`` is rooted rather than relative to ``bib_dir``.
 
-    Both path flavours, and a leading separator on its own: ``/x.bib`` is
-    absolute on POSIX, ``C:\\x.bib`` and ``\\\\server\\share\\x.bib`` are absolute
-    on Windows, and ``\\x.bib`` is rooted on Windows even though Python does
-    not call it absolute without a drive. All four escape ``bib_dir``, which
-    is the thing being ruled out.
+    A leading separator counts: ``\\x.bib`` is rooted on Windows even though
+    Python does not call it absolute without a drive.
     """
     return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
 
 
 def reject_absolute_name(name, file: Optional[str] = None) -> None:
-    """Raise when a configured `.bib` name would reach the document absolute.
-
-    The diagnostic is located at `<file>:bib_files:name`. A caller that knows
-    which file the configuration came from names it; one that does not
-    leaves the file part empty.
-    """
+    """Raise when a configured `.bib` name would reach the document absolute,
+    located at `<file>:bib_files:name`."""
     if isinstance(name, str) and is_absolute_path(name):
         raise ConfigurationError(diagnostic(
             BIB_FILE_ABSOLUTE, file, "bib_files", "name",
@@ -253,19 +216,11 @@ def reject_absolute_name(name, file: Optional[str] = None) -> None:
 
 
 def reject_name_outside_bib_dir(name, bib_dir, file: Optional[str] = None) -> None:
-    """Raise when a configured `.bib` name does not stay under ``bib_dir``.
+    """Raise when a configured `.bib` name does not stay under ``bib_dir``
+    (SPEC.md "Diagnostic codes"), located as `reject_absolute_name` locates.
 
-    Two checks. The lexical one reads ``name`` by Windows rules, which take
-    both ``/`` and ``\\`` as separators, on every host: a name with a ``..``
-    component, or a drive (``C:x.bib`` is relative to a drive's current
-    directory, so `is_absolute_path` lets it through), is rejected wherever
-    it is compiled. The filesystem one then resolves symlinks and requires
-    the file to lie inside the resolved ``bib_dir``. A file that does not
-    exist is not rejected here, so a missing one keeps its not-found
-    diagnostic; a dangling symlink whose target is outside is.
-
-    The diagnostic is located at `<file>:bib_files:name`, as for
-    `reject_absolute_name`.
+    The lexical check reads ``name`` by Windows rules on every host, so the
+    result does not depend on where it is compiled.
     """
     if not isinstance(name, str) or "\0" in name:
         return
@@ -286,12 +241,8 @@ def reject_name_outside_bib_dir(name, bib_dir, file: Optional[str] = None) -> No
 
 
 def json_lab(lab: dict, file: Optional[str] = None) -> dict:
-    """``lab`` as the document carries it, by the rule at `VALUE_NOT_JSON`.
-
-    Returns a copy with every date and timestamp as ISO 8601 text, or raises
-    at `<file>:lab:<path>`, where the path is the keys down to the value,
-    joined by `.`, with a list member's index in brackets.
-    """
+    """``lab`` as the document carries it: a copy with every date and
+    timestamp as ISO 8601 text, or `VALUE_NOT_JSON` raised at the value."""
     def plain(value, path):
         def refuse(what):
             raise ConfigurationError(diagnostic(
@@ -323,11 +274,8 @@ def json_lab(lab: dict, file: Optional[str] = None) -> dict:
 class BibFile:
     """A single BibTeX file and its category label.
 
-    ``name`` is a name under ``bib_dir``, not a path of its own: it is
-    emitted as ``work.source.file`` and must never be absolute. The
-    constructor checks it where the mistake is made, but a plain, mutable
-    dataclass can be changed afterwards, so `sslabdata.models.Work.to_dict()`
-    checks again (SPEC.md, *`sslabdata.ConfigurationError`*).
+    ``name`` is a name under ``bib_dir``. It is checked here and, because the
+    dataclass is mutable, again by `Work.to_dict()` (SPEC.md §1).
     """
     name: str
     category: str
@@ -338,26 +286,8 @@ class BibFile:
 
 @dataclass
 class LabDataConfig:
-    """Configuration for sslabdata, loadable from YAML.
-
-    Example lab.yaml:
-        lab:
-          name: "My Lab"
-          description: "What our lab does"
-          website: "https://mylab.edu"
-
-        bib_dir: "data/bib"
-        bib_files:
-          - name: "journal.bib"
-            category: "Journal Papers"
-          - name: "conference.bib"
-            category: "Conference Papers"
-
-        pdf_base_url: "https://lab.edu/pdfs"
-        people_file: "data/people.yaml"
-        projects_file: "data/projects.yaml"
-        collaborators_file: "data/collaborators.yaml"
-    """
+    """Configuration for sslabdata, loadable from a `lab.yaml` (format:
+    README.md)."""
     bib_dir: str
     bib_files: List[BibFile]
     pdf_base_url: Optional[str] = None
@@ -369,14 +299,13 @@ class LabDataConfig:
     # name the file the user would edit. Never emitted.
     path: Optional[str] = None
 
-    # External co-authors whose spellings should be grouped together. After
-    # `path`, so the fields above keep their positions in the constructor.
+    # After `path`, so the fields above keep their positions in the
+    # constructor.
     collaborators_file: Optional[str] = None
 
-    # Keys `lab.yaml` held that sslabdata does not read, in file order, so the
-    # assembler can report them against `path`. A YAML key need not be a
-    # string (`7:`, `2025-01-01:`); it is named as text, as a record's unknown
-    # key is, so that a diagnostic's `key` is always a string. Never emitted.
+    # Keys `lab.yaml` held that sslabdata does not read, for the assembler to
+    # report. Named as text, because a YAML key need not be a string (`7:`).
+    # Never emitted.
     unknown_keys: List[str] = field(default_factory=list)
 
     # A `CONTROL_CHARACTER` diagnostic for each value of `lab.yaml` its

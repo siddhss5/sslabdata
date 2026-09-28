@@ -35,10 +35,9 @@ from ..diagnostics import Diagnostic, diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
 
-# Field values that hold prose and are converted from LaTeX to plain text.
-# The repository fields are among them because they name a venue, and braces
-# around `{arXiv}` are grouping, not part of the name. Everything else (url,
-# doi, eprint, project, ...) is data, and is kept raw.
+# The fields converted from LaTeX to plain text (SPEC.md §2). The repository
+# fields are among them because braces around `{arXiv}` are grouping, not part
+# of the name.
 TEXT_FIELDS = frozenset({
     "title", "abstract", "note", "journal", "booktitle", "school",
     "institution", "type", "series", "publisher", "address", "organization",
@@ -48,75 +47,23 @@ TEXT_FIELDS = frozenset({
 # A name list ending in "and others" means "et al."; it is not an author.
 OTHERS = "others"
 
-# `and others` anywhere but at the end of a name list. It names nobody there
-# either, so it is dropped as a terminal one is, and reported: the list may
-# have been cut or pasted wrongly.
+# The codes this module reports (SPEC.md "Diagnostic codes").
 OTHERS_NOT_LAST = "BIB-OTHERS-NOT-LAST"
-
-# A stable code makes validation output suitable for CI and tooling without
-# making callers depend on its English wording. The code names the condition
-# only: the same duplicate is an error under --validate and a warning
-# elsewhere, so severity is not part of it. See "Diagnostic codes" in SPEC.md.
 DUPLICATE_CITATION_KEY = "BIB-DUPLICATE-KEY"
-
-# An entry that cross-refers to another is rejected rather than resolved, so
-# no work carries a field its own entry did not write. A hard error costs one
-# edit, and going from "rejected" to "supported" later is additive.
 CROSSREF_UNSUPPORTED = "BIB-CROSSREF-UNSUPPORTED"
-
-# An entry with no year is emitted with `year: null` and says so, rather than
-# claiming year 0 — a value indistinguishable from a real year 0 that would
-# also put the entry somewhere meaningless in the order.
 YEAR_MISSING = "BIB-YEAR-MISSING"
-
-# A year that is present but is not a number is treated as no year, and says
-# so, rather than stopping the run: the entry is still a work.
 YEAR_INVALID = "BIB-YEAR-INVALID"
 YEAR_DIGITS = re.compile(r"[0-9]+")
-
-# A `doi` that is a resolver URL with nothing after it. It names no DOI, so
-# the work gets no DOI identifier and no link rather than an empty one.
 DOI_INVALID = "BIB-DOI-INVALID"
-
-# A value naming an `@string` macro that nothing defines. The parser library
-# reads it as empty, as BibTeX does; the entry is kept.
 STRING_UNDEFINED = "BIB-STRING-UNDEFINED"
-
-# Text the parser library could not read as BibTeX. Inside an entry, the
-# entry is kept as far as it was read; outside one, the text is skipped.
 SYNTAX_ERROR = "BIB-SYNTAX-ERROR"
-
-# An `@article` with no `journal`, or an `@inproceedings` with no
-# `booktitle`. Its venue is null, or read from another container field it
-# does carry.
 VENUE_MISSING = "BIB-VENUE-MISSING"
-
-# An entry of a type sslabdata does not document. It is kept, and its venue is
-# read by the field rules alone.
 ENTRY_TYPE_UNSUPPORTED = "BIB-ENTRY-TYPE-UNSUPPORTED"
-
-# Every `@string` macro a run defines more than once, in one summary line.
-# The last definition is used, as in BibTeX. Always a warning, in every mode.
 STRING_REDEFINED = "BIB-STRING-REDEFINED"
-
-# A message the parser library raised that is neither a syntax error nor an
-# undefined macro -- a field repeated in one entry, a name list it cannot
-# split -- kept in the library's own words after the code.
 PARSER_MESSAGE = "BIB-PARSER-MESSAGE"
-
-# A field whose LaTeX the converter could not read at all; its text is kept
-# as written, with the braces taken off.
 LATEX_CONVERSION_FAILED = "LATEX-CONVERSION-FAILED"
-
-# An entry that could not be written back out as BibTeX; its `bibtex` is null.
 WRITE_BACK_FAILED = "BIB-WRITE-BACK-FAILED"
-
-# A `.bib` file that is not UTF-8. Fatal, and no other encoding is guessed:
-# reading Latin-1 bytes as something else would silently change names.
 ENCODING_INVALID = "BIB-ENCODING-INVALID"
-
-# A LaTeX command the converter does not know. It is dropped, and a braced
-# argument after it is kept as plain text.
 LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
 
 # Equal contribution is written as a star on one part of a name, in one of
@@ -127,10 +74,9 @@ LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
 #
 # A star, caret or dollar written with a backslash in front of it is escaped
 # text rather than the start of a marker: `Brown\*` is not marked, and the
-# ordinary LaTeX conversion then consumes the escaped star, so the name reads
-# `Brown` (tests/COVERAGE.md row `names.equal_contribution_escaped`). The
-# accent in `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the marker after
-# it is not, which is why that name reads `Côté` and is marked.
+# ordinary LaTeX conversion then consumes the escaped star. The accent in
+# `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the marker after it is
+# not, which is why that name reads `Côté` and is marked.
 _WRITTEN = r"\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}"
 _MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
 
@@ -157,14 +103,7 @@ _MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
 # The command name pybtex is about to read, when that name is `comment`.
 _COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
 
-# An entry BibTeX's brace matching read differently from how it was written,
-# with no syntax error to say so: an opening brace too many reads the next
-# field into a value, and a closing brace too many ends the entry early,
-# losing the fields after it. Braces are still matched as BibTeX matches
-# them; the entry is only reported. Two shapes are looked for, and nothing
-# else, so a well-formed file never draws one: a value holding `, name = {`
-# or `, name = "`, and text on the line an entry ended on, after its closing
-# brace, other than a `%` comment or the next `@` command.
+# The two shapes `BIB-BRACE-MISMATCH` looks for (SPEC.md "Diagnostic codes").
 BRACE_MISMATCH = "BIB-BRACE-MISMATCH"
 _FIELD_IN_VALUE = re.compile(r',\s*([A-Za-z][\w-]*)\s*=\s*[{"]')
 _TEXT_AFTER_ENTRY = re.compile(r'[ \t]*([^\s%@][^\r\n]*)')
@@ -180,9 +119,6 @@ def _redefined_macros(text: str,
     ``definitions`` are the ``(name, offset)`` of every ``@string`` the parser
     actually read from ``text``, so a definition inside an ``@comment`` group
     is not one. Names compare without case, as the parser's macros do.
-
-    pybtex takes the last definition, as BibTeX does, and says nothing about
-    it. sslabdata reports it instead of letting a redefinition pass unnoticed.
     """
     seen: set = set()
     repeated: List[Tuple[str, int]] = []
@@ -196,12 +132,8 @@ def _redefined_macros(text: str,
 
 
 def redefined_summary(redefinitions: List[Tuple[str, str, int]]) -> Optional[Diagnostic]:
-    """One `STRING_REDEFINED` line for ``(file, name, line)`` redefinitions.
-
-    The macros are named once each, sorted, and every redefinition is listed
-    as `file:line`, by file and then by line. The location names the file when every redefinition is
-    in one, and is otherwise left empty. None when there is nothing to say.
-    """
+    """One `STRING_REDEFINED` line for ``(file, name, line)`` redefinitions,
+    in the form SPEC.md §7 shows; None when there is nothing to say."""
     if not redefinitions:
         return None
     names = sorted({name for _, name, _ in redefinitions})
@@ -419,10 +351,9 @@ def _on_comment_line(text: str, position: Optional[int]) -> bool:
 
     The parser library reads an `@` anywhere outside an entry as the start of
     a command, so prose on a `%` line that mentions `@article` fails to parse.
-    That failure is not reported: the prose was never meant as BibTeX
-    (`tests/COVERAGE.md` row `structure.comment_lines`). Only the report is
-    suppressed. A well-formed command on such a line is read, as the library
-    reads it.
+    That failure is not reported: the prose was never meant as BibTeX. Only
+    the report is suppressed. A well-formed command on such a line is read,
+    as the library reads it.
     """
     if position is None:
         return False
@@ -689,16 +620,10 @@ def given_words(name: str) -> List[str]:
 
 def readable_name(parts: Dict[str, Optional[str]]) -> str:
     """The parts of a name joined in reading order: ``John van Last Jr.``
+    (SPEC.md §5).
 
-    This is *a readable form of the input name, not a citation form*. It does
-    not abbreviate, expand or normalise anything, so an entry writing
-    ``Brown, B.`` yields ``B. Brown`` and one writing ``Brown, Bob`` yields
-    ``Bob Brown``. The resolver matches on the structured parts rather than
-    on this string (`sslabdata.resolver`), so matching can change without
-    changing what the document displays.
-
-    A name written as one brace-protected unit keeps its full form, because
-    there is nothing to join.
+    The resolver matches on the structured parts rather than on this string,
+    so matching can change without changing what the document displays.
     """
     if parts["literal"]:
         return parts["literal"]
@@ -707,12 +632,11 @@ def readable_name(parts: Dict[str, Optional[str]]) -> str:
 
 
 def _contributors(entry: Entry, role: str, on_unknown) -> List[Dict]:
-    """The entry's names for one role, in source order, as parts plus position.
+    """The entry's names for one role, in source order, as parts plus position
+    (SPEC.md §3).
 
-    ``and others`` is BibTeX's "et al." and is dropped rather than emitted as
-    a person, wherever it is (``check_others`` reports one that is not last).
-    A name that reads as empty is dropped too, so ``position`` counts the
-    names that reach the document and nothing else.
+    A name that reads as empty is dropped, as ``and others`` is, so
+    ``position`` counts the names that reach the document and nothing else.
     """
     found: List[Dict] = []
     for person in entry.persons.get(role, []):
@@ -739,13 +663,8 @@ def check_others(entry: Entry, bib_id: str, source: str, report) -> None:
 
 
 def parse_author_list(entry: Entry, on_unknown) -> List[Author]:
-    """The entry's authors, in source order, with no contributor resolved yet.
-
-    Each authorship carries the parts BibTeX split its name into, a readable
-    form built from them, its 1-based position, and whether the entry marked
-    it as an equal contribution. Matching those parts to a person is the
-    resolver's.
-    """
+    """The entry's authors, in source order, with no contributor resolved yet;
+    matching them to a person is the resolver's."""
     return [Author(name=found["name"],
                    position=found["position"],
                    equal_contribution=marks_equal_contribution(found["person"]),
@@ -755,11 +674,7 @@ def parse_author_list(entry: Entry, on_unknown) -> List[Author]:
 
 def parse_editor_list(entry: Entry, on_unknown) -> List[Contributor]:
     """The entry's editors, read by the same machinery as its authors.
-
-    An editor is name-parsed and resolved to a person the same way, but
-    editing a volume is not an authorship: editors are excluded from
-    `person.work_ids`, from a project's people and from `collaborators`, so an editor who matches nobody is simply unresolved.
-    """
+    Editing a volume is not an authorship (SPEC.md §5)."""
     return [Contributor(name=found["name"], position=found["position"],
                         **found["parts"])
             for found in _contributors(entry, "editor", on_unknown)]
@@ -798,13 +713,9 @@ class _VerbatimWriter(BibTeXWriter):
 
 def format_bibtex(bib_id: str, entry: Entry, source: str,
                   report) -> Optional[str]:
-    """The entry written back out as BibTeX, for readers to copy.
+    """The entry written back out as BibTeX, for readers to copy (SPEC.md §5).
 
-    This is the entry as it was read, before LaTeX conversion, so fields
-    sslabdata does not emit as properties are preserved rather than rewritten,
-    each value byte for byte. It is a re-serialization of the entry's data and
-    explicitly not a source of properties: nothing in sslabdata reads a value
-    back out of it.
+    Nothing in sslabdata reads a value back out of it.
     """
     try:
         return _VerbatimWriter().to_string(
@@ -817,11 +728,8 @@ def format_bibtex(bib_id: str, entry: Entry, source: str,
 
 
 
-# The one place sslabdata normalises across entry types: the field that names
-# the container a work appeared in. Everything else bibliographic is flat on
-# the work, because it describes the work's placement rather than the
-# container. The order is the precedence, so an entry carrying more than one
-# of them gets the most specific.
+# The fields that name a work's container, in order of precedence
+# (SPEC.md §5).
 CONTAINER_FIELDS = ("journal", "booktitle", "school", "institution")
 
 # The venue kind each container field implies. `booktitle` depends on the
@@ -834,9 +742,9 @@ BOOKTITLE_KINDS = {"inproceedings": "conference", "conference": "conference",
                    "inbook": "book", "book": "book"}
 OTHER_KIND = "other"
 
-# A preprint's venue is the repository it sits in, which is what
-# `archivePrefix` or `eprinttype` names. arXiv is the default, because a bare `eprint` is
-# read as an arXiv identifier (`build_identifiers`) and linked as one.
+# A preprint's venue is the repository `archivePrefix` or `eprinttype` names.
+# arXiv is the default, because a bare `eprint` is read as an arXiv
+# identifier (`build_identifiers`) and linked as one.
 ARXIV = "arXiv"
 REPOSITORY_KIND = "repository"
 
@@ -849,8 +757,7 @@ FLAT_FIELDS = ("volume", "number", "pages", "series", "edition", "publisher",
                "type")
 
 # The identifier schemes sslabdata reads out of an entry, and the field each
-# comes from. The registry is open: a scheme is documented, never enumerated
-# in the schema, so one can be added without a version bump.
+# comes from.
 IDENTIFIER_FIELDS = {"doi": "doi", "isbn": "isbn", "issn": "issn"}
 
 # A DOI written as a URL is the resolver plus the DOI; the identifier is the
@@ -862,9 +769,7 @@ DOI_RESOLVERS = ("https://doi.org/", "http://doi.org/",
 DOI_BASE = "https://doi.org/"
 ARXIV_BASE = "https://arxiv.org/abs/"
 
-# Link kinds, and the origin of each. Only `input` means the entry's own
-# field supplied the link; a link sslabdata built from an identifier or from
-# `pdf_base_url` is `derived`, and says so.
+# Link origins and hosts (SPEC.md §5).
 FROM_INPUT = "input"
 DERIVED = "derived"
 VIDEO_HOSTS = ("youtube.com", "youtu.be", "vimeo.com")
@@ -873,12 +778,8 @@ UNCHECKED, VERIFIED, MISSING = "unchecked", "verified", "missing"
 
 
 def build_venue(entry: dict) -> Optional[Venue]:
-    """The container this work appeared in, or None when the entry names none.
-
-    The four container fields collapse to one name plus a kind, which is the
-    single biggest gain over raw BibTeX: a consumer asks for the venue's name
-    once instead of branching on the entry type to find it.
-    """
+    """The container this work appeared in, or None when the entry names none
+    (SPEC.md §5)."""
     entry_type = entry.get("ENTRYTYPE", "")
     for field_name in CONTAINER_FIELDS:
         value = (entry.get(field_name) or "").strip()
@@ -921,11 +822,8 @@ def bare_doi(doi: str) -> str:
 def build_identifiers(entry: dict, source: str, report) -> Dict[str, List[str]]:
     """The entry's identifiers, as a map from scheme to a list of identifiers.
 
-    The list shape is there because ISBN and ISSN genuinely repeat — a print
-    and an electronic one are two values of one identifier — even though a
-    BibTeX field holds one value, so v4 emits at most one per scheme. A `doi`
-    that is a resolver and nothing after it names no DOI, and is reported
-    rather than emitted empty.
+    A list, because ISBN and ISSN genuinely repeat -- a print and an
+    electronic one -- even though a BibTeX field holds one value.
     """
     identifiers: Dict[str, List[str]] = {}
     for scheme, field_name in IDENTIFIER_FIELDS.items():
@@ -944,8 +842,6 @@ def build_identifiers(entry: dict, source: str, report) -> Dict[str, List[str]]:
 
     eprint = (entry.get("eprint") or "").strip()
     if eprint:
-        # The scheme is what `archivePrefix` said, which is why the prefix
-        # field needs no property of its own: it is the scheme.
         identifiers[_archive_prefix(entry).lower()] = [eprint]
     return identifiers
 
@@ -967,14 +863,8 @@ def is_video_url(url: str) -> bool:
 
 
 def pdf_link(bib_id: str, pdf_base_url: Optional[str]) -> Optional[Link]:
-    """The PDF this work would be at under ``pdf_base_url``, checked if local.
-
-    A local base is checked against the filesystem and the link is labelled
-    `verified` or `missing`; a remote base is labelled `unchecked`, because a
-    build never fetches. The link is kept either way, so "no base configured",
-    "the file is not there" and "nobody has looked" are three distinct
-    answers rather than one null.
-    """
+    """The PDF this work would be at under ``pdf_base_url``, checked only if
+    local: a build never fetches (SPEC.md §5)."""
     if not pdf_base_url:
         return None
     base = pdf_base_url.rstrip('/')
@@ -987,14 +877,7 @@ def pdf_link(bib_id: str, pdf_base_url: Optional[str]) -> Optional[Link]:
 
 def build_links(entry: dict, bib_id: str, identifiers: Dict[str, List[str]],
                 pdf_base_url: Optional[str]) -> Dict[str, List[Link]]:
-    """Every URL this work can be reached at, filed by kind.
-
-    A map from kind to a *list* of links, so that two code repositories or a
-    talk video beside a supplementary one can both be carried, which a plain
-    kind-to-url map cannot express. A link does not name the identifier it was
-    built from: that is redundant with its kind and origin, and it would be a
-    cross-record constraint JSON Schema cannot express.
-    """
+    """Every URL this work can be reached at, filed by kind (SPEC.md §5)."""
     links: Dict[str, List[Link]] = {}
 
     def add(kind: str, link: Optional[Link]) -> None:
@@ -1043,13 +926,11 @@ def parse_project_ids(entry: dict) -> List[str]:
 
 
 def entry_year(entry: dict, source: str, report) -> Optional[int]:
-    """The entry's year, or None with a diagnostic when it has none.
+    """The entry's year, or None with a diagnostic when it has none or it is
+    not a number.
 
-    A work with no year sorts last, and its year is None rather than 0, so a
-    consumer can tell "no year" from "the year zero". A year that is not a
-    number is reported and read as no year. Only an unsigned run of ASCII
-    digits is a number here: `int()` would also read `-5`, `+2020`, `2_020`
-    and full-width `２０２０`.
+    Only an unsigned run of ASCII digits is a number here: `int()` would also
+    read `-5`, `+2020`, `2_020` and full-width `２０２０`.
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
@@ -1065,10 +946,8 @@ def entry_year(entry: dict, source: str, report) -> Optional[int]:
     return None
 
 
-# The container field checked for an entry type, and the entry types sslabdata
-# documents (tests/COVERAGE.md, *Entry types*, with `@conference` and
-# `@proceedings`, which the venue rule names). Any other type is kept and
-# reported.
+# The container field checked for an entry type, and the entry types
+# sslabdata documents (SPEC.md "Diagnostic codes").
 REQUIRED_CONTAINER = {"article": "journal", "inproceedings": "booktitle"}
 SUPPORTED_TYPES = frozenset({
     "article", "inproceedings", "conference", "proceedings", "incollection",
@@ -1141,10 +1020,7 @@ def entry_to_work(
 
 
 def _encoding_error(path: str, error: UnicodeDecodeError) -> Diagnostic:
-    """The one diagnostic for a `.bib` file that is not UTF-8.
-
-    No other encoding is tried: a wrong guess would silently change names.
-    """
+    """The one diagnostic for a `.bib` file that is not UTF-8."""
     line = error.object[:error.start].count(b"\n") + 1
     return diagnostic(ENCODING_INVALID, path, None, None,
                       f"the file is not UTF-8: byte "
@@ -1179,13 +1055,11 @@ def parse_all_works(
         bib_dir: Directory containing the BibTeX files
         bib_files: List of dicts with 'name' and 'category' keys
         diagnostics: The list that receives every coded diagnostic, in the
-            order found; its class in `sslabdata.diagnostics.CLASSES` decides
-            its severity
+            order found
         pdf_base_url: Base URL/path for PDFs
 
     Returns:
-        List of Work objects, sorted by year descending, works with no year
-        last.
+        List of Work objects, in the order SPEC.md §3 gives.
     """
     read: List[Tuple[str, str, str, Entry, str]] = []
     first_source: Dict[str, Tuple[str, str]] = {}
@@ -1210,10 +1084,7 @@ def parse_all_works(
                 report(_duplicate_key_error(path, bib_id, previous_path, previous_key))
             else:
                 first_source[normalized] = (path, bib_id)
-            # Rejected on presence, not on value, and not emitted. An empty
-            # `crossref = {}` is a field the entry carries, so it is an error
-            # too: otherwise an entry could cross-refer without a diagnostic
-            # under a different spelling.
+            # Rejected on presence, not on value (SPEC.md "Diagnostic codes").
             crossref = [value for field_name, value in entry.fields.items()
                         if field_name.lower() == "crossref"]
             if crossref:

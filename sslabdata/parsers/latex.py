@@ -1,10 +1,6 @@
 """
-LaTeX → plain Unicode text, via pylatexenc.
-
-One field value at a time. Math is left as TeX (``math_mode='verbatim'``) so
-``$...$`` reaches KaTeX or MathJax untouched; everything else becomes plain
-Unicode. Callers convert field by field and fall back to ``strip_braces`` when
-a value cannot be converted, so a bad field never costs the whole entry.
+LaTeX → plain Unicode text, via pylatexenc, one field value at a time
+(SPEC.md §2).
 
 Together with bibtex.py this is the adapter: no other module imports pybtex or
 pylatexenc.
@@ -34,12 +30,10 @@ _TEXT_MACROS = {
     "emdash": "\u2014", "endash": "\u2013", "slash": "/",
 }
 
-# Marks a command that leaves nothing, or a parenthesis, where it stood: the
-# spaces before it go too, so `planners~\cite{k}.` reads `planners.`.
-# This marker and `_PLACEHOLDER` below are control characters, which cannot
-# collide with the input: every control character is removed from a field
-# value where it is read, before it is converted (`CONTROL_CHARACTER` in
-# sslabdata/config.py).
+# Marks a command that leaves nothing, or a parenthesis, where it stood, so
+# the spaces before it go too. This marker and `_PLACEHOLDER` below are control
+# characters, which cannot collide with the input: those are removed where a
+# value is read, before it is converted (`CONTROL_CHARACTER` in config.py).
 _JOIN = '\x02'
 _JOIN_RE = re.compile(f'[ \t\xa0]*{_JOIN}')
 
@@ -54,10 +48,8 @@ def _item(node, l2tobj):
     return _JOIN + '\n\u2022 '
 
 
-# The converter's table renders these as syntax rather than text: `\url{u}`
-# as the autolink `<u>`, `\footnote{n}` as `[n]`, a citation as `<cit.>`, a
-# list item as a Markdown bullet. Each is replaced by plain text or by nothing
-# (SPEC.md section 2).
+# The converter's own table writes these as syntax rather than text
+# (SPEC.md "What sslabdata converts, and what it does not").
 _PLAIN_TEXT_RULES = [
     # A `\url` whose argument holds braces is not set aside by `_prepared()`.
     MacroTextSpec("url", "%s"),
@@ -69,17 +61,13 @@ _PLAIN_TEXT_RULES = [
     "includegraphics",
 )] + [MacroTextSpec("maketitle", "")]
 
-# Commands whose argument is the text itself, set in another face or box, or
-# given as a document's title, author or date. Each becomes its argument, as
-# `\textbf` does in the converter's own table; the converter's own rule for
-# `\title`, `\author` and `\date` drops the argument.
+# Commands whose argument is the text itself; the converter's own rule for
+# `\title`, `\author` and `\date` drops it.
 _TEXT_ARGUMENT = ("texttt", "textsf", "textmd", "textup", "textnormal",
                   "mbox", "fbox", "hbox", "title", "author", "date")
 
-# Commands whose arguments are not text: a citation, a label or a
-# cross-reference becomes nothing and takes the spaces before it, as `\cite`
-# does above; a colour, a package, a length, a counter or a phantom becomes
-# nothing and leaves the text around it as it was (SPEC.md section 2).
+# Commands whose arguments are not text: a reference takes the spaces before
+# it, and a setting does not (SPEC.md §2).
 _REFERENCES = ("citealp", "citealt", "citeauthor", "citefullauthor",
                "citenum", "citeyear", "citeyearpar", "citepalias",
                "citetalias", "Citealp", "Citealt", "Citeauthor", "Citep",
@@ -114,12 +102,9 @@ _PARSING.add_context_category(
     prepend=True)
 
 # A command the walker knows the arguments of but the converter has no rule
-# for is read as taking no arguments, like a command the walker does not know
-# at all: it is dropped and what follows it is kept, braced arguments included,
-# so `\keywords{Tidy} Robots` reads `Tidy Robots`. Otherwise the converter
-# would drop its arguments with it. This covers the commands that define
-# another, too: `\newcommand zqx` would read `zq` as the name and body being
-# defined, or a set-aside URL as one.
+# for is read as taking no arguments, like one the walker does not know at
+# all; otherwise the converter would drop its arguments with it. That includes
+# `\newcommand` and its kin, which would read a set-aside URL as a name.
 _WITHOUT_RULE = sorted({spec.macroname for spec in _PARSING.iter_macro_specs()
                         if _KNOWN.get_macro_spec(spec.macroname) is None})
 _PARSING.add_context_category(
@@ -129,10 +114,8 @@ _PARSING.add_context_category(
 
 _CONVERTER = LatexNodes2Text(latex_context=_KNOWN, math_mode='verbatim')
 
-# Two commands outside that table whose conversion sslabdata documents, so they
-# are known rather than unknown (tests/COVERAGE.md, `names.equal_contribution`
-# and `names.equal_contribution_escaped`): `\textsuperscript{...}` becomes its
-# argument as plain text, and an escaped star `\*` is consumed.
+# Two commands outside that table whose conversion sslabdata documents, so
+# they are not reported as unknown (SPEC.md "Diagnostic codes").
 _DOCUMENTED = frozenset({"textsuperscript", "*"})
 
 # pylatexenc 2.11 raises IndexError on every \href, so the link is rewritten
