@@ -38,6 +38,7 @@ import random
 import re
 import shutil
 import traceback
+import unicodedata
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
 
@@ -847,7 +848,9 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
                          f"{e.key}.{name}: {value_text(f)!r}"[:400], evidence)
         if f.delim and name not in ("author", "editor") \
                 and not excused(name, LOSS_EXPLAINED):
-            source = " ".join(value_text(f).split())
+            # The record is written from the value as read, which is NFC
+            # (SPEC.md §2), so `e` + U+0301 comes back as `é`.
+            source = unicodedata.normalize("NFC", " ".join(value_text(f).split()))
             if source and source not in " ".join(bibtex.split()):
                 fail(f"5 bibtex rewrites {_specials(source)}",
                      f"{e.key}.{name}: {source!r}"[:400])

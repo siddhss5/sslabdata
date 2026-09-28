@@ -1,0 +1,11 @@
+# CASE text.nfc_equivalent
+# Fictional regression input for tests/COVERAGE.md: valid, and kept in the
+# invalid corpus so the valid corpus output is unchanged. The `lab` key and
+# value below are written decomposed (e + U+0301, e + U+0300).
+bib_dir: "."
+bib_files:
+  - name: "nfc.bib"
+    category: "Papers"
+people_file: "people.yaml"
+lab:
+  Café: "Crème"

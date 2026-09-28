@@ -1,0 +1,6 @@
+# CASE text.nfc_equivalent
+# The name is written decomposed: E + U+0301, e + U+0308.
+- id: "enoel"
+  name: "Émile Noël"
+  role: "professor"
+  status: "current"

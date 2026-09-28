@@ -30,7 +30,9 @@ from pybtex.database.input.bibtex import (
 from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces, unknown_commands
-from ..config import CONTROL_CHARACTER, control_message, without_control_characters
+from ..config import (
+    CONTROL_CHARACTER, control_message, nfc, without_control_characters,
+)
 from ..diagnostics import Diagnostic, diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
@@ -173,6 +175,17 @@ class _CommentSkippingParser(LowLevelParser):
         # (macro name, offset of its `@`) for every `@string` read in full.
         self.definitions: List[Tuple[str, int]] = []
 
+    # The ingress for a citation key: it is put in NFC as the tokenizer reads
+    # it, so the key an entry is stored, compared and located under is one
+    # string however its accents were written (SPEC.md §2).
+    @property
+    def current_entry_key(self) -> Optional[str]:
+        return self._entry_key
+
+    @current_entry_key.setter
+    def current_entry_key(self, key: Optional[str]) -> None:
+        self._entry_key = None if key is None else nfc(key)
+
     def parse_string_body(self, body_end):
         """Read one ``@string`` body, and remember the definition it made."""
         super().parse_string_body(body_end)
@@ -257,8 +270,9 @@ class _Parser(PybtexParser):
         if key is not None and key in self.data.entries:
             self.duplicate_keys.append(key)
         # The ingress for field text: control characters are removed here,
-        # before pybtex splits a name list or normalises whitespace, and
-        # before any LaTeX is read (`CONTROL_CHARACTER`).
+        # and the value put in NFC, before pybtex splits a name list or
+        # normalises whitespace, and before any LaTeX is read
+        # (`CONTROL_CHARACTER`, SPEC.md §2).
         fields = [(name, self._without_controls(key, name, parts))
                   for name, parts in fields]
         captured = pybtex.errors.captured_errors
@@ -268,13 +282,15 @@ class _Parser(PybtexParser):
             self.message_keys[id(error)] = key
 
     def _without_controls(self, key, name: str, parts: List[str]) -> List[str]:
-        """One field's value parts with control characters removed, and the
-        field recorded when there were any."""
+        """One field's value, joined from its parts, with control characters
+        removed and in NFC, and the field recorded when there were any
+        control characters. Joined first, because a part can begin with a
+        mark that composes with the end of the one before."""
         cleaned = [without_control_characters(part) for part in parts]
         found = list(dict.fromkeys(c for _, chars in cleaned for c in chars))
         if found:
             self.control_characters.append((key, name.lower(), found))
-        return [part for part, _ in cleaned]
+        return [nfc("".join(part for part, _ in cleaned))]
 
     def parse_string(self, text: str):
         self.unnamed_entry_counter = 1
@@ -454,15 +470,20 @@ def _convert(value: str, on_unknown: _FieldReport) -> str:
     Each command the converter does not know is passed to ``on_unknown``,
     which knows where the field is, and so is a value it cannot read at all
     (``on_unknown.failed()``).
+
+    Every converted value leaves here, in NFC: the value was NFC as read, but
+    dropping a brace can bring a letter and its mark together, `n{\u0303}`
+    (SPEC.md §2).
     """
     try:
         text = latex_to_text(value)
     except Exception:  # noqa: BLE001 - never drop an entry over one field
         on_unknown.failed()
-        return strip_braces(value)
-    for command in unknown_commands(value):
-        on_unknown(command)
-    return text
+        text = strip_braces(value)
+    else:
+        for command in unknown_commands(value):
+            on_unknown(command)
+    return nfc(text)
 
 
 def unknown_command_diagnostic(command: str, where: Tuple[str, str, str],
