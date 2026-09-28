@@ -557,9 +557,9 @@ def compute_backlinks(data: LabData) -> None:
     for project in data.projects:
         people_set: Set[str] = set()
         for work_id in project.work_ids:
-            work = next((w for w in data.works if w.bib_id == work_id), None)
-            if work:
-                for author in work.authors:
+            linked = next((w for w in data.works if w.bib_id == work_id), None)
+            if linked:
+                for author in linked.authors:
                     if author.person_id:
                         people_set.add(author.person_id)
         project.people_ids = sorted(people_set)

@@ -396,7 +396,7 @@ def unresolved_name_diagnostics(works: List[Work], names: List[str],
     Each is located at the first authorship, in document order, that is
     written that way and linked to no person; its message is the name.
     """
-    first: Dict[str, Tuple[str, str]] = {}
+    first: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
     for work in works:
         for author in work.authors:
             if author.person_id is None and author.name not in first:
@@ -508,7 +508,7 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
               if config.people_file and people_found else [])
     projects = (load_projects(config.projects_file, found)
                 if config.projects_file and projects_found else [])
-    if people:
+    if people and config.people_file:
         found.extend(shared_declarations(people, config.people_file))
 
     unresolved_authors = resolve_authors(works, people, diagnostics=found,

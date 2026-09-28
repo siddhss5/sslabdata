@@ -8,12 +8,12 @@ MIT License - see LICENSE file for details.
 
 import yaml
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 from pathlib import Path
 
 from .config import (
-    CONTROL_CHARACTER, _kind, control_message, dotted, read_yaml,
-    repeated_message,
+    CONTROL_CHARACTER, RepeatedKey, _kind, control_message, dotted,
+    read_yaml, repeated_message,
 )
 from .diagnostics import Diagnostic, diagnostic
 from .models import Person, Project
@@ -132,7 +132,7 @@ def _records(path: str, codes, required, known, optional,
 
     # Each repeat inside a record is reported with that record, below; one
     # anywhere else is reported here, at the file and the path to the key.
-    in_record = {}
+    in_record: Dict[int, List[RepeatedKey]] = {}
     for repeat in repeated:
         index = repeat.path[0] if repeat.path else None
         if (isinstance(data, list) and isinstance(index, int)
