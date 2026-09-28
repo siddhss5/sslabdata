@@ -390,6 +390,14 @@ LATEX = [
     case("latex.layout_dropped", "tex-layout", "note",
          "A figure and a title block are left out"),
     case("latex.textfrac", "tex-textfrac", "title", "A 3/2-Approximation"),
+    case("latex.text_argument", "tex-text-argument", "title",
+         "The zqplan Library for Tidy Robots"),
+    case("latex.text_argument", "tex-text-argument", "note",
+         "Set in upright, medium, normal, boxed and held type"),
+    case("latex.argument_not_text", "tex-argument-not-text", "abstract",
+         "Tidy robots are fast, as showed and page says."),
+    case("latex.argument_not_text", "tex-argument-not-text", "note",
+         "Colour kept"),
 ]
 
 

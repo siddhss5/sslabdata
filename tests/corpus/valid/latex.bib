@@ -233,3 +233,22 @@
   journal = {Journal of Fictional Robots},
   year    = {2021}
 }
+
+% CASE latex.text_argument
+@article{tex-text-argument,
+  title   = {The \texttt{zqplan} Library for \mbox{Tidy} \textsf{Robots}},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021},
+  note    = {Set in \textup{upright}, \textmd{medium}, \textnormal{normal}, \fbox{boxed} and \hbox{held} type.}
+}
+
+% CASE latex.argument_not_text
+@article{tex-argument-not-text,
+  title    = {Labels, Colours and Author Citations},
+  author   = {Adams, Alice},
+  journal  = {Journal of Fictional Robots},
+  year     = {2021},
+  abstract = {Tidy robots\label{sec:intro} are {\color{red}fast}, as \citeauthor{k1} showed~\citeyearpar{k1} and page~\pageref{app} says.},
+  note     = {\usepackage{zqpkg}\definecolor{zq}{rgb}{1,0,0}Colour \textcolor{zq}{kept}}
+}
