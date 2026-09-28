@@ -80,9 +80,20 @@ _KNOWN.add_context_category(
 
 # How the walker reads each command's arguments. `\textfrac` has a text rule
 # but no argument spec, so without this its rule would print `%s/%s`.
+# A command that defines another has no meaning in a field, and no rule: it
+# takes no arguments here, so it is an unknown command like any other and the
+# text after it is kept. With the walker's own spec, `\newcommand zqx` would
+# read `zq` as the name and body being defined, or a set-aside URL as one.
+# `\def` and `\let` have no spec to replace.
+_DEFINITIONS = ("newcommand", "renewcommand", "providecommand",
+                "newenvironment", "renewenvironment", "provideenvironment",
+                "DeclareMathOperator")
 _PARSING = get_default_parsing_db()
 _PARSING.add_context_category(
-    "sslabdata-arguments", macros=[std_macro("textfrac", False, 2)], prepend=True)
+    "sslabdata-arguments",
+    macros=[std_macro("textfrac", False, 2)]
+    + [std_macro(name, False, 0) for name in _DEFINITIONS],
+    prepend=True)
 
 _CONVERTER = LatexNodes2Text(latex_context=_KNOWN, math_mode='verbatim')
 
@@ -115,8 +126,9 @@ _PLACEHOLDER_RE = re.compile(f'{_PLACEHOLDER}(\\d+){_PLACEHOLDER}')
 def latex_to_text(text: str) -> str:
     """Convert one LaTeX field value to plain Unicode text.
 
-    Raises whatever pylatexenc raises; callers decide what to do with a value
-    that cannot be converted.
+    Raises whatever pylatexenc raises, and ValueError when a marker survives
+    conversion; callers decide what to do with a value that cannot be
+    converted.
     """
     if not text:
         return text
@@ -130,7 +142,13 @@ def latex_to_text(text: str) -> str:
     converted = _CONVERTER.latex_to_text(_prepared(text, set_aside),
                                          latex_context=_PARSING)
     converted = _JOIN_RE.sub('', converted)
-    return _PLACEHOLDER_RE.sub(lambda m: verbatim[int(m.group(1))], converted)
+    converted = _PLACEHOLDER_RE.sub(lambda m: verbatim[int(m.group(1))],
+                                    converted)
+    # A command that read part of a placeholder as its argument leaves the
+    # rest behind. The input holds no marker, so any left is one of ours.
+    if _PLACEHOLDER in converted or _JOIN in converted:
+        raise ValueError("a conversion marker survived")
+    return converted
 
 
 def _prepared(text: str, set_aside) -> str:

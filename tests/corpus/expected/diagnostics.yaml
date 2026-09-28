@@ -175,6 +175,24 @@ text.control_characters:
       expect: {name: Alice Adams}
   not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\x7f"]
 
+# A definition command is an unknown command like any other: it is dropped
+# and reported, and the words, the link and the URL after it are kept. An
+# accent that reads part of a set-aside URL leaves a marker behind, which is
+# a conversion failure: the abstract is kept as written, with no marker.
+latex.definition_commands:
+  dir: definition_commands
+  exit: 0
+  diagnostics:
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./define.bib, key: definition-commands, field: title, values: ["\\newcommand", 3 fields]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./define.bib, key: definition-commands, field: note, values: ["\\def"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./define.bib, key: definition-commands, field: note, values: ["\\x"]}
+    - {code: LATEX-CONVERSION-FAILED, severity: warning, file: ./define.bib, key: definition-commands, field: abstract}
+  kept: [definition-commands]
+  emits:
+    - work: definition-commands
+      expect: {title: zqx Tidy Robots, venue.name: https://x.org/x Letters, note: site (https://x.org/y) and y z,
+               abstract: "Accented \\'\\urlhttps://x.org/z link"}
+
 # One record for the command, however many fields use it, with the count and
 # the first field in document order.
 latex.unknown_macro_repeated:
