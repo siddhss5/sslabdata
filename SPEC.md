@@ -412,7 +412,15 @@ therefore the same string as one written precomposed (`Ç`): it matches,
 groups, is compared for repeats and is emitted alike, whichever form the
 editor or export tool wrote. This is a canonical equivalence, so nothing
 is lost and nothing is reported. The `bibtex` record is written from the
-value as read, so it is NFC too.
+value as read, so it is NFC too. Text converted from LaTeX is put in NFC
+again as it leaves the conversion (`sslabdata.parsers.bibtex._convert()`),
+because dropping a brace can bring a letter and its mark together:
+`Sen{` + U+0303 + `}or` is NFC as read and converts to `Señor`,
+precomposed. So every display string and every id read from the input is
+NFC in the emitted document. The one exception is derived: the readable
+part of a `collaborator_key` is built from `normalize_name()`, which leaves
+text decomposed (§5), so a key built from a name holding a Hangul syllable
+holds its conjoining jamo.
 
 ### What sslabdata converts, and what it does not
 
@@ -839,7 +847,10 @@ The match decides in this order:
    exactly one person's name or alias: resolved, `method: exact`. Equal to two
    people's: `ambiguous`.
 2. **A declared alias, only where the input is abbreviated** — where some part
-   of the given name is an initial. The name abbreviated to initials, equal
+   of the given name is an initial: a letter, its full stop optional, or a
+   hyphenated run of them (`A.`, `J-P`), read once combining marks are
+   removed, so `Ç.` and `Q̇.` (`Q` + U+0307, which has no precomposed form)
+   are initials as `C.` and `Q.` are. The name abbreviated to initials, equal
    to a name or alias exactly one person declares, resolves only if no other
    person's name or alias *could be* it: same family, particles and suffix,
    and the given names agreeing part by part, an initial agreeing with any

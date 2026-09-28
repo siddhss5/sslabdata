@@ -210,23 +210,35 @@ text.control_characters:
 # accents decomposed and written precomposed is read as one text, silently:
 # both resolve the member and group each collaborator alike, and every name,
 # title, citation key and `lab` key is emitted precomposed (NFC). JSON writes
-# a combining mark as \u03XX, which is what `not_emitted` looks for. The only
-# diagnostic is the one `Vale, Ç.` draws as an initial, beside `Vale, Çelik`.
+# a combining mark as \u03XX, which is what `not_emitted` looks for. A title
+# decomposed only by LaTeX, `Sen{̃}or`, is emitted NFC too; U+0303 is not
+# looked for, because the `bibtex` record keeps that LaTeX as written. The
+# diagnostics are the ones initials draw beside a fuller name under the same
+# family: `Vale, Ç.` either way, and `Wren, Q̇.` and `Wren, Q̇.Q̇.`, whose
+# U+0307 has no precomposed form, as `Q.` and `Q.Q.` would.
 text.nfc_equivalent:
   dir: nfc_equivalent_text
   exit: 0
   diagnostics:
     - {code: ID-GROUPING-INITIALS-AMBIGUOUS, severity: warning, file: ./nfc.bib, key: nfc-decomposed, field: author, values: [celik-vale]}
+    - {code: ID-GROUPING-INITIALS-AMBIGUOUS, severity: warning, file: ./nfc.bib, key: qdot-initials, field: author, values: ["'q-wren-", quade-wren, quade-quill-wren]}
+    - {code: ID-GROUPING-INITIALS-AMBIGUOUS, severity: warning, file: ./nfc.bib, key: qdot-initials, field: author, values: ["'q-q-wren-", quade-quill-wren]}
   unresolved_only:
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: nfc-decomposed, field: author, values: [Çağla Zorn]}
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: nfc-decomposed, field: author, values: [Ç. Vale]}
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: vale-çelik, field: author, values: [Çelik Vale]}
-  kept: [nfc-decomposed, nfc-precomposed, vale-çelik]
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-initials, field: author, values: [Q̇. Wren]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-initials, field: author, values: [Q̇.Q̇. Wren]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-full, field: author, values: [Quade Wren]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-full, field: author, values: [Quade Quill Wren]}
+  kept: [nfc-decomposed, nfc-precomposed, vale-çelik, qdot-initials, qdot-full]
   emits:
     - work: nfc-decomposed
       expect: {title: Décor for Fictional Robots, authors.*.name: [Émile Noël, Çağla Zorn, Ç. Vale], authors.*.person_id: [enoel, null, null], authors.*.collaborator_key: [null, cagla-zorn-ac0c2687, c-vale-1b04bcc4]}
     - work: nfc-precomposed
       expect: {title: Décor for Fictional Robots, authors.*.name: [Émile Noël, Çağla Zorn, Ç. Vale], authors.*.person_id: [enoel, null, null], authors.*.collaborator_key: [null, cagla-zorn-ac0c2687, c-vale-1b04bcc4]}
+    - work: vale-çelik
+      expect: {title: Señor Fictional Robots}
     - person: enoel
       expect: {name: Émile Noël}
   not_emitted: ["\\u0300", "\\u0301", "\\u0306", "\\u0308", "\\u0327"]

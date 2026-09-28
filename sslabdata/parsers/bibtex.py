@@ -470,15 +470,20 @@ def _convert(value: str, on_unknown: _FieldReport) -> str:
     Each command the converter does not know is passed to ``on_unknown``,
     which knows where the field is, and so is a value it cannot read at all
     (``on_unknown.failed()``).
+
+    Every converted value leaves here, in NFC: the value was NFC as read, but
+    dropping a brace can bring a letter and its mark together, `n{\u0303}`
+    (SPEC.md §2).
     """
     try:
         text = latex_to_text(value)
     except Exception:  # noqa: BLE001 - never drop an entry over one field
         on_unknown.failed()
-        return strip_braces(value)
-    for command in unknown_commands(value):
-        on_unknown(command)
-    return text
+        text = strip_braces(value)
+    else:
+        for command in unknown_commands(value):
+            on_unknown(command)
+    return nfc(text)
 
 
 def unknown_command_diagnostic(command: str, where: Tuple[str, str, str],

@@ -5,7 +5,13 @@
 % each collaborator is one spelling, and `Vale, Ç.` is an initial whichever
 % way its cedilla is written, so it could be `Vale, Çelik`. The decomposed
 % entry comes first, so its grouping is the one reported. The third entry's
-% citation key is written decomposed too.
+% citation key is written decomposed too, and its title puts a brace between
+% `n` and U+0303, so the text is NFC as read and decomposed only once LaTeX
+% drops the braces: the converted title is put in NFC as well.
+%
+% `Q` + U+0307 has no precomposed form, so it stays decomposed. `Wren, Q̇.`
+% and `Wren, Q̇.Q̇.` are initials all the same, as `Q.` and `Q.Q.` are,
+% and could be `Wren, Quade` or `Wren, Quade Quill`.
 
 @article{nfc-decomposed,
   title   = {Décor for Fictional Robots},
@@ -22,8 +28,22 @@
 }
 
 @article{vale-çelik,
-  title   = {Another Fictional Title},
+  title   = {Sen{̃}or Fictional Robots},
   author  = {Vale, Çelik},
   journal = {Journal of Fictional Robots},
   year    = {2022}
+}
+
+@article{qdot-initials,
+  title   = {A Third Fictional Title},
+  author  = {Wren, Q̇. and Wren, Q̇.Q̇.},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+@article{qdot-full,
+  title   = {A Fourth Fictional Title},
+  author  = {Wren, Quade and Wren, Quade Quill},
+  journal = {Journal of Fictional Robots},
+  year    = {2020}
 }

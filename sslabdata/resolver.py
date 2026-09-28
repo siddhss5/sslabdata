@@ -39,9 +39,10 @@ PROJECT_UNKNOWN = "RESOLVE-PROJECT-UNKNOWN"
 # One part of a given name that is an initial rather than a name: a letter,
 # its period optional, and a hyphenated run of them -- `A.`, `A`, `G.-A.`,
 # `J-P`. A Unicode letter, so `Ç.` is read as an initial and a name outside
-# ASCII is not silently exempt. A part that is anything else is read as a
-# name, which is the safe direction for a warning: it reports one grouping
-# key too few rather than one too many.
+# ASCII is not silently exempt. Tested once combining marks are off, so a
+# letter with a mark that has no precomposed form, `Q̇.`, is one too. A part
+# that is anything else is read as a name, which is the safe direction for a
+# warning: it reports one grouping key too few rather than one too many.
 _INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
 
 # Initials written without a space between them, `S.S.` or `T.A.K.`, read as
@@ -54,18 +55,24 @@ def _is_mark(c: str) -> bool:
     return unicodedata.category(c) == 'Mn'
 
 
+def _without_marks(text: str) -> str:
+    return ''.join(c for c in unicodedata.normalize('NFD', text) if not _is_mark(c))
+
+
+def _is_initial(part: str) -> bool:
+    return bool(_INITIAL.match(_without_marks(part)))
+
+
 def _split_initials(word: str) -> List[str]:
-    """``S.S.`` → ``["S.", "S."]``; any other word is returned whole."""
-    decomposed = unicodedata.normalize('NFD', word)
-    if not _RUN_TOGETHER.match(''.join(c for c in decomposed if not _is_mark(c))):
+    """``S.S.`` → ``["S.", "S."]``; any other word is returned whole.
+
+    The initials come back without their combining marks: every reader of
+    them removes marks too (`normalize_name()`, `_is_initial()`).
+    """
+    bare = _without_marks(word)
+    if not _RUN_TOGETHER.match(bare):
         return [word]
-    letters: List[str] = []
-    for c in decomposed:
-        if _is_mark(c) and letters:
-            letters[-1] += c
-        elif c != '.':
-            letters.append(c)
-    return [unicodedata.normalize('NFC', letter) + '.' for letter in letters]
+    return [c + '.' for c in bare if c != '.']
 
 
 def _spaced_initials(text: str) -> str:
@@ -128,12 +135,12 @@ def _given_parts(given: Optional[str]) -> List[str]:
 def initials_only(given: Optional[str]) -> bool:
     """True when every part of a given name is an initial rather than a name."""
     parts = _given_parts(given)
-    return bool(parts) and all(_INITIAL.match(part) for part in parts)
+    return bool(parts) and all(_is_initial(part) for part in parts)
 
 
 def has_initial(given: Optional[str]) -> bool:
     """True when any part of a given name is an initial: ``Dave M.``, ``A.``"""
-    return any(_INITIAL.match(part) for part in _given_parts(given))
+    return any(_is_initial(part) for part in _given_parts(given))
 
 
 def given_initials(given: Optional[str]) -> Tuple[str, ...]:
