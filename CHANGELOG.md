@@ -50,7 +50,25 @@ differently:
   - an unknown key in the people, projects or collaborators file is reported
     under `RECORD-KEY-UNKNOWN`, a warning that `--strict` makes an error (#103);
   - a value under `lab` that JSON cannot carry is fatal at load under
-    `CONFIG-VALUE-NOT-JSON` (see below).
+    `CONFIG-VALUE-NOT-JSON` (see below);
+  - a key given twice in one YAML mapping, which 2.0.0 read as its last value,
+    is fatal at load under `CONFIG-KEY-REPEATED` in `lab.yaml`, and fatal under
+    `RECORD-KEY-REPEATED` in the people, projects or collaborators file (#145);
+  - an empty `people_file`, `projects_file` or `collaborators_file`, which
+    2.0.0 read as no file, is fatal under `CONFIG-FILE-NOT-FOUND`; only a key
+    left out, or left with no value, means no file (#138);
+  - a configured file path that is a directory or anything else that is not
+    a regular file, or a `bib_dir` that is not a directory, is fatal under
+    `CONFIG-PATH-WRONG-KIND` (#147).
+
+  All three are under *Repeated YAML keys and configured paths* below.
+- **New warnings.** Input that was read silently is now reported, and the run
+  continues: a DOI that is only a resolver (`BIB-DOI-INVALID`), `and others`
+  before the end of a name list (`BIB-OTHERS-NOT-LAST`), braces that merge or
+  drop BibTeX fields (`BIB-BRACE-MISMATCH`) and control characters in any
+  input (`TEXT-CONTROL-CHARACTER`). Each is a warning, and `--strict` makes it
+  an error. `BIB-YEAR-INVALID` also covers years such as `-5` and `+2020`,
+  which were read as numbers. They are described below.
 - **Links.** A BibTeX `video` field is read as a video link (#105), and a `pdf`
   field as the work's PDF link, replacing the one guessed from `pdf_base_url`
   (#107). A `url` is a video link only when its parsed hostname is a video
@@ -60,12 +78,26 @@ differently:
   Adams` and `S. S. Adams` are the same name (#83). How matching changed more
   broadly is under *Author matching reads the structured full name* below.
 - **Output.** `--output` writes atomically: on any failure the file already
-  there is left as it was, and no partial file is written (#124).
-- **Unicode.** Emitted text, including text converted from LaTeX, and the
-  citation keys and ids read from input are in NFC, so input written with
-  decomposed accents changes bytes, and it matches and groups as its
-  precomposed spelling does. An initial whose mark has no precomposed form,
-  `Q̇.`, is read as an initial (#185).
+  there is left as it was, and no partial file is written (#124). A
+  destination it cannot write is reported under `OUTPUT-WRITE-FAILED` (see
+  *Values under `lab`* below). A missing `bib_dir` is reported once, under
+  `CONFIG-FILE-NOT-FOUND` at `lab.yaml:bib_dir:`, and not once per `bib_files`
+  name (#147).
+- **`bibtex`.** Each field value in a work's `bibtex` is the value as it was
+  read, byte for byte, so the record's text can differ from what 2.0.0 wrote
+  (#154; see *`bibtex` holds each value as it was read* below).
+- **Converted text is plain text.** `\url`, `\footnote`, citations, `\item`
+  and similar commands no longer become Markdown or placeholder syntax, and
+  the text argument of a formatting command such as `\texttt` is kept. See
+  *Converter markup becomes plain text* and *Command arguments are kept*
+  below.
+- **Unicode.** Emitted text, including text converted from LaTeX, the
+  citation keys and ids read from input, and every `collaborator_key` are in
+  NFC, so input written with decomposed accents changes bytes, and it matches
+  and groups as its precomposed spelling does. An initial whose mark has no
+  precomposed form, `Q̇.`, is read as an initial (#185). A name in Hangul
+  syllables keeps them in its `collaborator_key` rather than splitting them
+  into conjoining jamo (#187).
 - **Python API.** The elements of `AssemblyResult.diagnostics` and
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
@@ -234,6 +266,73 @@ space), a footnote is written in parentheses, `\item` starts a line
 with `•`, `\textfrac{a}{b}` is `a/b`, and the rest are left out. Only works
 whose converted fields use one of these commands emit different text.
 
+### Command arguments are kept (#169, #174, #176)
+
+Before 3.0.0 three kinds of command lost text that followed them:
+
+- About 90 commands that pylatexenc parses with arguments but has no text rule
+  for were reported under `LATEX-COMMAND-UNKNOWN` and dropped together with
+  their arguments, so `\texttt{abc} d` read ` d`.
+- `\newcommand`, `\renewcommand`, `\providecommand`, the environment
+  definitions and `\DeclareMathOperator` read the text after them as their
+  arguments, so part of it was lost: `\newcommand zqx Tidy Robots` read `x
+  Tidy Robots`.
+- `\title`, `\author` and `\date` dropped their argument with no diagnostic.
+
+Each such command now falls into one of three groups, which
+[`SPEC.md` §2](SPEC.md#what-sslabdata-converts-and-what-it-does-not) lists: a
+formatting or box command, and `\title`, `\author` and `\date`, keep their
+argument as text and are not reported; a citation, label, cross-reference or
+setting such as `\color` is dropped with its arguments and not reported; and
+any other command is reported under `LATEX-COMMAND-UNKNOWN`, dropped, and the
+text after it, braced arguments included, is kept. Only works whose converted
+fields use one of these commands emit different text.
+
+### `bibtex` holds each value as it was read (#154)
+
+The package's BibTeX writer encoded every field value as LaTeX again, so
+`\%`, `\&`, `\_` and `\#` gained a second backslash and a bare `%`, `&`,
+`_` or `#` gained one: the demo's `87\%` was emitted as `87\\%`. Each field
+value in `bibtex` is now the value the entry was read with, byte for byte
+([`SPEC.md` §5](SPEC.md#5-input-versus-derived)). Field order, quoting and
+layout are unchanged, and `BIB-WRITE-BACK-FAILED` is reported as before.
+
+### Years, DOIs, repositories and `and others` (#135, #136, #137, #146)
+
+- **Year.** A `year` is read only from an unsigned run of the ASCII digits
+  0-9. `-5`, `+2020`, `2_020` and full-width `２０２０` were read as numbers;
+  each is now reported under `BIB-YEAR-INVALID` and emitted as `year: null`,
+  as `in press` already was.
+- **DOI.** A `doi` that is only a resolver, such as `https://doi.org/`, gave an
+  empty DOI. It is now reported under the new `BIB-DOI-INVALID`, a warning, and
+  the work gets no DOI identifier and no `doi` link. An empty `doi` is still
+  read as absent and not reported.
+- **Repository.** `eprinttype` is read as an alias of `archivePrefix`, which
+  wins when both are written, and both are converted from LaTeX before they
+  are matched. An `eprint` with `eprinttype = {hal}` had been filed under
+  arXiv, and `archivePrefix = {{arXiv}}` now reads as `{arXiv}` does. arXiv
+  is still the default when neither is written.
+- **`and others`.** One anywhere but at the end of an `author` or `editor`
+  list was read as an author named `others`. It is now dropped, as a trailing
+  one is, and reported under the new `BIB-OTHERS-NOT-LAST`, a warning, once
+  per list. A trailing `and others` is dropped with no diagnostic, as before.
+
+### Control characters and brace mismatches (#165, #170)
+
+- **Control characters.** A C0 control character other than tab, line feed
+  and carriage return, or DEL, was kept in the text it was read with. It
+  could make a field fall back under `LATEX-CONVERSION-FAILED` or a name fail
+  to resolve. It is now removed where the input is read, from every `.bib`
+  field value and every YAML scalar, and reported under the new
+  `TEXT-CONTROL-CHARACTER`, a warning, once per value
+  ([`SPEC.md` §2](SPEC.md#2-the-text-rule)).
+- **Brace mismatches.** One opening brace too many reads the next field into a
+  value, and one closing brace too many ends the entry early, so the fields
+  after it are lost. Both happened silently. The entry is still read as
+  BibTeX reads it, and is now reported under the new `BIB-BRACE-MISMATCH`, a
+  warning, once per entry. An entry that already has a `BIB-SYNTAX-ERROR` is
+  not checked.
+
 ### Values under `lab`, `--validate`, and output write failures (#121, #134, #142)
 
 Before 3.0.0, `lab` was copied into the document unchanged, and three problems
@@ -258,7 +357,29 @@ code `--output` writes it with, so it cannot pass a document that `--output`
 would refuse. A destination `--output` cannot write, such as a directory, a
 path under a file, or a directory without permission, is reported under
 `OUTPUT-WRITE-FAILED` with exit `1` instead of a traceback, and the file
-already there is left as it was.
+already there is left as it was. `OUTPUT-WRITE-FAILED` is fatal.
+
+### Repeated YAML keys and configured paths (#138, #145, #147)
+
+- **Repeated keys.** YAML reads a key given twice in one mapping as its last
+  value, and that is what sslabdata did, silently dropping the first. Every
+  YAML file is now read with a loader that reports it. In `lab.yaml` it is
+  fatal at load under `CONFIG-KEY-REPEATED`, and the first repeat is
+  reported; in the people, projects or collaborators file it is fatal under
+  `RECORD-KEY-REPEATED`, every repeat is reported, and the record is not
+  loaded. A merge key (`<<`) is not a repeat.
+- **Empty data-file paths.** An empty `people_file`, `projects_file` or
+  `collaborators_file` was read as no file. It is now fatal under
+  `CONFIG-FILE-NOT-FOUND`. A key left out, or YAML null, still means no file.
+- **Paths of the wrong kind.** A configured file that was a directory was
+  reported under `CONFIG-FILE-NOT-FOUND` as not existing. A `bib_files` name,
+  `people_file`, `projects_file` or `collaborators_file` that is not a regular
+  file, or a `bib_dir` that is not a directory, is now fatal under the new
+  `CONFIG-PATH-WRONG-KIND`. A missing `bib_dir` is one `CONFIG-FILE-NOT-FOUND`
+  at `lab.yaml:bib_dir:`, where it had been one per `bib_files` name.
+
+Where each is located is in
+[`SPEC.md`, *Diagnostic codes*](SPEC.md#diagnostic-codes).
 
 ### Diagnostics in the Python API are dataclasses (#141)
 
