@@ -14,7 +14,8 @@ import re
 import yaml
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import (Dict, List, NamedTuple, NoReturn, Optional, Sequence,
+                    Tuple, Union)
 from pathlib import Path, PureWindowsPath
 
 from .diagnostics import Diagnostic, diagnostic
@@ -164,7 +165,7 @@ class YAMLLoader(yaml.SafeLoader):
                 for index, child in enumerate(node.value):
                     walk(child, (*path, index))
             elif isinstance(node, yaml.MappingNode):
-                first = {}
+                first: Dict[object, int] = {}
                 for key_node, value_node in node.value:
                     if key_node.tag == MERGE_TAG:
                         walk(value_node, (*path, "<<"))
@@ -362,7 +363,7 @@ class LabDataConfig:
     pdf_base_url: Optional[str] = None
     people_file: Optional[str] = None
     projects_file: Optional[str] = None
-    lab: Optional[Dict[str, str]] = None
+    lab: Optional[Dict[str, object]] = None
 
     # Where this configuration was read from, so a diagnostic about it can
     # name the file the user would edit. Never emitted.
@@ -389,7 +390,8 @@ class LabDataConfig:
         with open(path, 'r', encoding='utf-8') as f:
             data, repeated, controls = read_yaml(f)
 
-        def reject(code, key, field_name, message):
+        def reject(code: str, key: Optional[str], field_name: Optional[str],
+                   message: str) -> NoReturn:
             raise ConfigurationError(
                 diagnostic(code, str(path), key, field_name, message))
 

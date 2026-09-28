@@ -17,7 +17,7 @@ MIT License - see LICENSE file for details.
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 import pybtex.errors
@@ -231,6 +231,10 @@ class _CommentSkippingParser(LowLevelParser):
     the rest of the file itself: at worst a commented-out entry stays visible,
     never a real entry disappears.
     """
+
+    # The scanner's position, which pybtex's `Scanner` sets.
+    pos: int
+    lineno: int
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -470,6 +474,8 @@ def parse_bibtex_file(
 
     redefinitions.extend((path, name, line) for name, line
                          in _redefined_macros(text, parser.string_definitions))
+    key: Optional[str]
+    field_name: Optional[str]
     for key, field_name, found in parser.control_characters:
         diagnostics.append(diagnostic(CONTROL_CHARACTER, path, key, field_name,
                                       control_message(found)))
@@ -498,7 +504,20 @@ _UNREADABLE_LATEX = ("could not read the LaTeX in this field; keeping the text "
                      "as written")
 
 
-def _convert(value: str, on_unknown) -> str:
+class _FieldReport:
+    """Where one field's unknown LaTeX commands, and LaTeX that cannot be read
+    at all, are reported: called with a command, or ``failed()``."""
+
+    def __init__(self, unknown: Callable[[str], None],
+                 failed: Callable[[], None]):
+        self.unknown = unknown
+        self.failed = failed
+
+    def __call__(self, command: str) -> None:
+        self.unknown(command)
+
+
+def _convert(value: str, on_unknown: _FieldReport) -> str:
     """Convert one field from LaTeX, keeping the raw text if that fails.
 
     Each command the converter does not know is passed to ``on_unknown``,
@@ -539,7 +558,7 @@ def _unknown_command_reporter(report, file: str, key: str,
     """
     reported = set()
 
-    def in_field(field_name: str):
+    def in_field(field_name: str) -> _FieldReport:
         def on_unknown(command: str) -> None:
             if (field_name, command) in reported:
                 return
@@ -553,8 +572,7 @@ def _unknown_command_reporter(report, file: str, key: str,
         def failed() -> None:
             report(diagnostic(LATEX_CONVERSION_FAILED, file, key, field_name,
                               _UNREADABLE_LATEX))
-        on_unknown.failed = failed
-        return on_unknown
+        return _FieldReport(on_unknown, failed)
     return in_field
 
 
@@ -696,7 +714,7 @@ def _contributors(entry: Entry, role: str, on_unknown) -> List[Dict]:
     A name that reads as empty is dropped too, so ``position`` counts the
     names that reach the document and nothing else.
     """
-    found = []
+    found: List[Dict] = []
     for person in entry.persons.get(role, []):
         if _is_others(person):
             continue
@@ -1115,6 +1133,9 @@ def entry_to_work(
         links=build_links(fields, bib_id, identifiers, pdf_base_url),
         project_ids=parse_project_ids(fields),
         bibtex=format_bibtex(bib_id, entry, source, report),
+        # Empty, as its default is; named so that the mapping below is
+        # type-checked against the flat fields alone.
+        derived={},
         **{name: fields.get(name) for name in FLAT_FIELDS},
     )
 
