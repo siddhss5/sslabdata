@@ -416,11 +416,9 @@ value as read, so it is NFC too. Text converted from LaTeX is put in NFC
 again as it leaves the conversion (`sslabdata.parsers.bibtex._convert()`),
 because dropping a brace can bring a letter and its mark together:
 `Sen{` + U+0303 + `}or` is NFC as read and converts to `Señor`,
-precomposed. So every display string and every id read from the input is
-NFC in the emitted document. The one exception is derived: the readable
-part of a `collaborator_key` is built from `normalize_name()`, which leaves
-text decomposed (§5), so a key built from a name holding a Hangul syllable
-holds its conjoining jamo.
+precomposed. So every display string and every id in the emitted document
+is NFC, `collaborator_key` included: its readable part is built from
+`normalize_name()`, which ends in NFC (§5).
 
 ### What sslabdata converts, and what it does not
 
@@ -783,7 +781,8 @@ function does exactly this, in this order:
    (nonspacing mark). That removes combining accents, so `José` becomes
    `jose`, but also any other `Mn` character, such as the emoji variation
    selector U+FE0F and the Devanagari virama. Marks of category `Mc` and `Me`
-   are kept, and the result stays decomposed: `각` comes out as three jamo.
+   are kept, and the result is recomposed to NFC, so a character NFD split
+   without a mark comes back whole: `각` stays one syllable.
 3. Deletes every ASCII full stop (U+002E). Other full stops, such as the
    fullwidth `．`, stay.
 4. Deletes each non-overlapping match of the regular expression

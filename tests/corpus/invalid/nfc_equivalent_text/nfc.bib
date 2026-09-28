@@ -12,6 +12,9 @@
 % `Q` + U+0307 has no precomposed form, so it stays decomposed. `Wren, Q̇.`
 % and `Wren, Q̇.Q̇.` are initials all the same, as `Q.` and `Q.Q.` are,
 % and could be `Wren, Quade` or `Wren, Quade Quill`.
+%
+% `Pak, 한결` is written in Hangul syllables, which NFD splits into
+% conjoining jamo: its collaborator key is NFC like every other id.
 
 @article{nfc-decomposed,
   title   = {Décor for Fictional Robots},
@@ -46,4 +49,11 @@
   author  = {Wren, Quade and Wren, Quade Quill},
   journal = {Journal of Fictional Robots},
   year    = {2020}
+}
+
+@article{hangul-key,
+  title   = {Fictional Robots in Hangul},
+  author  = {Pak, 한결},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
 }

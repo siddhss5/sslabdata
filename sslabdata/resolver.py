@@ -87,10 +87,10 @@ def normalize_name(name: str) -> str:
     here is a change to the contract.
     """
     name = name.lower().strip()
-    name = ''.join(
+    name = unicodedata.normalize('NFC', ''.join(
         c for c in unicodedata.normalize('NFD', name)
         if unicodedata.category(c) != 'Mn'
-    )
+    ))
     name = name.replace('.', '')
     name = re.sub(r'<sup>.*?</sup>', '', name)
     name = re.sub(r'\s+', ' ', name).strip()
