@@ -231,7 +231,8 @@ text.nfc_equivalent:
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-initials, field: author, values: [Q̇.Q̇. Wren]}
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-full, field: author, values: [Quade Wren]}
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: qdot-full, field: author, values: [Quade Quill Wren]}
-  kept: [nfc-decomposed, nfc-precomposed, vale-çelik, qdot-initials, qdot-full]
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: hangul-key, field: author, values: [한결 Pak]}
+  kept: [nfc-decomposed, nfc-precomposed, vale-çelik, qdot-initials, qdot-full, hangul-key]
   emits:
     - work: nfc-decomposed
       expect: {title: Décor for Fictional Robots, authors.*.name: [Émile Noël, Çağla Zorn, Ç. Vale], authors.*.person_id: [enoel, null, null], authors.*.collaborator_key: [null, cagla-zorn-ac0c2687, c-vale-1b04bcc4]}
@@ -241,7 +242,7 @@ text.nfc_equivalent:
       expect: {title: Señor Fictional Robots}
     - person: enoel
       expect: {name: Émile Noël}
-  not_emitted: ["\\u0300", "\\u0301", "\\u0306", "\\u0308", "\\u0327"]
+  not_emitted: ["\\u0300", "\\u0301", "\\u0306", "\\u0308", "\\u0327", "\\u1100", "\\u1112", "\\u1161", "\\u1167", "\\u11ab", "\\u11af"]
 
 # A definition command is an unknown command like any other: it is dropped
 # and reported, and the words, the link and the URL after it are kept. An
