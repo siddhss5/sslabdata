@@ -14,7 +14,7 @@ MIT License - see LICENSE file for details.
 import re
 import unicodedata
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 from .diagnostics import Diagnostic, diagnostic
 from .models import Contributor, Work, Person, Project, LabData
@@ -180,13 +180,6 @@ def _initials(given: str) -> str:
     return "-".join(f"{part[0]}." for part in parts)
 
 
-def _joined(given: str, contributor: Contributor) -> str:
-    name = " ".join(part for part in (given, contributor.von,
-                                      contributor.family) if part)
-    suffix = contributor.suffix
-    return f"{name}, {suffix}" if suffix and name else (name or suffix or "")
-
-
 def full_form(contributor: Contributor) -> str:
     """The form a full name is matched on: ``Alice Jane van Last, Jr.``
 
@@ -196,7 +189,10 @@ def full_form(contributor: Contributor) -> str:
     """
     if contributor.literal:
         return contributor.literal
-    return _joined(contributor.given or "", contributor)
+    name = " ".join(part for part in (contributor.given, contributor.von,
+                                      contributor.family) if part)
+    suffix = contributor.suffix
+    return f"{name}, {suffix}" if suffix and name else (name or suffix or "")
 
 
 def is_abbreviated(name: str) -> bool:
@@ -281,6 +277,49 @@ def _tokens_agree(written: str, declared: str) -> bool:
     return written == declared
 
 
+class NameKey(NamedTuple):
+    """A name as matching compares it, through `normalize_name()`: its given
+    name piece by piece, run-together initials one piece per letter, and the
+    rest as one string. ``S.S. van Kim, Jr.`` is ``(("s", "s"), "van kim, jr")``.
+    """
+    given: Tuple[str, ...]
+    rest: str
+
+
+def _pieces(given: str) -> Tuple[str, ...]:
+    """The normalised pieces of a given name, run-together initials spaced."""
+    return tuple(piece for piece in (normalize_name(part) for part in
+                                     _spaced_initials(given).split()) if piece)
+
+
+def _written_key(contributor: Contributor) -> NameKey:
+    """The key of a name from a work. A brace-protected name is all rest."""
+    if contributor.literal:
+        return NameKey((), normalize_name(contributor.literal))
+    rest = normalize_name(" ".join(part for part in (contributor.von,
+                                                     contributor.family) if part))
+    if contributor.suffix:
+        rest = f"{rest}, {normalize_name(contributor.suffix)}"
+    return NameKey(_pieces(contributor.given or ""), rest)
+
+
+def _declared_keys(name: str, key: str) -> List[NameKey]:
+    """A declared name or alias divided at each of its words in turn.
+
+    A declared string is not parsed into name parts: the division that counts
+    is the one whose rest is the compared name's own. Its words are
+    normalised one at a time and lined up with ``key``, the whole name
+    normalised; where they do not line up, each word of ``key`` is one piece.
+    """
+    words = [(normalize_name(word), _pieces(word)) for word in name.split()]
+    words = [(plain, pieces) for plain, pieces in words if plain]
+    if " ".join(plain for plain, _ in words) != key:
+        words = [(word, (word,)) for word in key.split()]
+    return [NameKey(tuple(piece for _, pieces in words[:at] for piece in pieces),
+                    " ".join(plain for plain, _ in words[at:]))
+            for at in range(len(words) + 1)]
+
+
 class Candidates:
     """The names a matcher compares against: ``(id, [name, *aliases])`` each.
 
@@ -289,48 +328,25 @@ class Candidates:
     """
 
     def __init__(self, entries: Sequence[Tuple[str, Sequence[str]]]):
-        self.forms: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = []
         self.exact: Dict[str, Set[str]] = {}
+        # (id, declared given name) for each declared key, by its rest.
+        self._by_rest: Dict[str, List[Tuple[str, Tuple[str, ...]]]] = {}
         for entity_id, names in entries:
             for name in names:
                 key = normalize_name(name)
                 if not key:
                     continue
-                self.forms.append((entity_id, key, _declared_parts(name, key)))
                 self.exact.setdefault(key, set()).add(entity_id)
+                for declared in _declared_keys(name, key):
+                    self._by_rest.setdefault(declared.rest, []).append(
+                        (entity_id, declared.given))
 
-    def ids_for(self, key: str) -> Set[str]:
-        return set(self.exact.get(key, ()))
+    def named(self, key: NameKey) -> Set[str]:
+        """Every entity with a form whose key is ``key``."""
+        return {entity_id for entity_id, given in self._by_rest.get(key.rest, ())
+                if given == key.given}
 
-    def _given(self, contributor: Contributor):
-        """``(id, declared given parts)`` for every form ending in this
-        name's particles, family name and suffix.
-
-        A declared string is not parsed into name parts: its given name is
-        what is left once the contributor's own tail is taken off, and only
-        there are run-together initials read one per letter.
-        """
-        tail = normalize_name(" ".join(part for part in (contributor.von,
-                                                     contributor.family) if part))
-        if contributor.suffix:
-            tail = f"{tail}, {normalize_name(contributor.suffix)}"
-        size = len(tail.split())
-        for entity_id, _, parts in self.forms:
-            if len(parts) < size or " ".join(
-                    plain for plain, _ in parts[len(parts) - size:]) != tail:
-                continue
-            yield entity_id, [piece for _, spaced in parts[:len(parts) - size]
-                              for piece in spaced]
-
-    def named(self, contributor: Contributor, given: List[str]) -> Set[str]:
-        """Every entity with a form equal to this name, its given name read
-        as ``given``. A brace-protected name is compared as written."""
-        if contributor.literal:
-            return self.ids_for(normalize_name(contributor.literal))
-        return {entity_id for entity_id, declared in self._given(contributor)
-                if declared == given}
-
-    def compatible(self, contributor: Contributor) -> Set[str]:
+    def compatible(self, key: NameKey) -> Set[str]:
         """Every entity one of whose forms this name could be.
 
         Same family, particles and suffix, and the given names agreeing part
@@ -339,31 +355,9 @@ class Candidates:
         `Alan Kim` could not be `Alex Kim`. Used to find everyone a name
         could be, never on its own to link one.
         """
-        if contributor.literal or not contributor.family:
-            return set()
-        written = _normalized_given(contributor.given)
-        return {entity_id for entity_id, declared in self._given(contributor)
-                if written and declared and all(
-                    _tokens_agree(w, d) for w, d in zip(written, declared))}
-
-
-def _declared_parts(name: str, key: str) -> List[Tuple[str, List[str]]]:
-    """Each word of a declared name as ``(normalised, normalised with
-    run-together initials spaced)``, lined up with the words of ``key``."""
-    parts = [(normalize_name(word),
-              [piece for piece in (normalize_name(p)
-                                   for p in _spaced_initials(word).split()) if piece])
-             for word in name.split()]
-    parts = [(plain, spaced) for plain, spaced in parts if plain]
-    if " ".join(plain for plain, _ in parts) != key:
-        return [(word, [word]) for word in key.split()]
-    return parts
-
-
-def _normalized_given(given: Optional[str]) -> List[str]:
-    """The parts of a given name, normalised, run-together initials spaced."""
-    return [piece for piece in (normalize_name(part) for part in _given_parts(given))
-            if piece]
+        return {entity_id for entity_id, given in self._by_rest.get(key.rest, ())
+                if key.given and given and all(
+                    _tokens_agree(w, d) for w, d in zip(key.given, given))}
 
 
 class Match:
@@ -396,18 +390,21 @@ def match(contributor: Contributor, candidates: Candidates) -> Match:
     3. Otherwise nothing is linked, and every entity the name could be is a
        suggestion.
     """
-    exact = candidates.named(contributor, _normalized_given(contributor.given))
-    if len(exact) == 1 and not (contributor.given and has_initial(contributor.given)):
+    written = _written_key(contributor)
+    abbreviated = has_initial(contributor.given)
+    exact = candidates.named(written)
+    if len(exact) == 1 and not abbreviated:
         return Match(RESOLVED, exact)
     if len(exact) > 1:
         return Match(AMBIGUOUS, exact)
 
-    compatible = candidates.compatible(contributor)
-    if contributor.literal or not has_initial(contributor.given):
+    compatible = (set() if contributor.literal or not contributor.family
+                  else candidates.compatible(written))
+    if contributor.literal or not abbreviated:
         return Match(UNRESOLVED, compatible)
 
-    declared = exact | candidates.named(contributor, [
-        normalize_name(_initials(part)) for part in _given_parts(contributor.given)])
+    declared = exact | candidates.named(written._replace(given=tuple(
+        normalize_name(_initials(part)) for part in _given_parts(contributor.given))))
     fits = compatible | declared
     if len(fits) > 1:
         return Match(AMBIGUOUS, fits)
