@@ -35,22 +35,13 @@ from .resolver import (
 )
 
 
-# The policy that built a collaborator key. It is a declared, open string, so
-# a new policy can be emitted without a schema version bump.
-# `declared` is a grouping `collaborators_file` asked for: its name and
-# aliases joined the spellings, and it is still a grouping, never a person.
+# `grouped_by` and `name_kind` values, both open strings (SPEC.md §5).
 GROUPED_BY_NORMALIZED_NAME = "normalized_name"
 GROUPED_BY_DECLARED = "declared"
 
-# Whether the name was written as one brace-protected unit. Not
-# `person`/`organization`: braces in BibTeX mean "do not parse this", which
-# covers organisations but also mononyms, so the document must not assert
-# corporate-ness.
 PERSONAL, LITERAL = "personal", "literal"
 
-# The digest is always present, never conditional on a collision, so adding
-# an unrelated collaborator can never change an existing key. Eight hex
-# characters of SHA-256 over the name kind and the normalised name.
+# The digest is always present, never conditional on a collision (SPEC.md §5).
 _DIGEST_LENGTH = 8
 
 # A slug long enough to stay readable and short enough to stay a key.
@@ -58,43 +49,14 @@ _SLUG_LENGTH = 60
 
 _NOT_SLUG = re.compile(r"-+")
 
-# Two ways a grouping key can be wrong that the document would otherwise keep
-# to itself. Neither is ever an error: an author who matched no lab member is
-# not (SPEC.md section 1).
+# The codes this module reports (SPEC.md "Diagnostic codes").
 GROUPING_SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
-
-# An unresolved authorship that fits more than one `collaborators_file`
-# entry, or an entry and a lab member it did not resolve to, so it is grouped
-# by its own name. Never an error, as above.
-# `RESOLVE-AMBIGUOUS-NAME` is about lab members only; it is reported as well,
-# as an error under `--strict`, when the name also fits more than one member.
 GROUPING_AMBIGUOUS_DECLARED = "ID-GROUPING-AMBIGUOUS-DECLARED"
-
-# One author name that matched no person, as `--unresolved --format json`
-# lists it. Never an error, as above.
 UNRESOLVED_NAME = "RESOLVE-UNRESOLVED-NAME"
-
-# A `collaborators_file` name or alias that a lab member already declares.
-# Resolving to the member wins, because the collaborator file never produces
-# a `person_id`, and the collaborator entry is not used for that spelling;
-# saying so is what keeps the choice from being silent.
 COLLABORATOR_ALIAS_IS_MEMBER = "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER"
-
-# A document needs a header, and a header with no name is one a renderer
-# cannot title a page from.
 LAB_NAME_MISSING = "CONFIG-LAB-NAME-MISSING"
-
-# A `.bib`, people, projects or collaborators file the configuration names
-# that is not there. Fatal: compiling on without it would emit a document
-# missing its works, people, projects or declared groupings.
 FILE_NOT_FOUND = "CONFIG-FILE-NOT-FOUND"
-
-# A path the configuration names that is there but is the wrong kind: a
-# directory, or anything else that is not a regular file, where a file is
-# named, or a `bib_dir` that is not a directory. Its own code, because "not
-# found" would send the user looking for a typo in a path that exists. Fatal,
-# as a missing file is.
 PATH_WRONG_KIND = "CONFIG-PATH-WRONG-KIND"
 
 
@@ -118,25 +80,14 @@ def path_problem(path: str, directory: bool = False
                              if target.is_dir() else
                              f"'{path}' is not a regular file")
 
-# A key `lab.yaml` holds that sslabdata does not read, such as a misspelt
-# `people_fil`. A warning: nothing is lost that was ever read.
 KEY_UNKNOWN = "CONFIG-KEY-UNKNOWN"
-
-# No `.bib` file is configured, so the document has no works. A warning,
-# because that can be meant, but it is never silently normal.
 BIB_FILES_MISSING = "CONFIG-BIB-FILES-MISSING"
 
 
 @dataclass
 class AssemblyResult:
-    """Result of assembling lab data, including diagnostics.
-
-    ``diagnostics`` holds every coded diagnostic in report order
-    (`sslabdata.diagnostics.in_report_order()`). Each one's severity is not
-    stored: it depends on the run as well as the code, and
-    `sslabdata.diagnostics.severity()` decides it (SPEC.md, *Diagnostic
-    codes*).
-    """
+    """Result of assembling lab data: the document and every coded
+    diagnostic, in report order, with no severity stored (SPEC.md §1)."""
     data: LabData
     unresolved_authors: List[str] = field(default_factory=list)
     unknown_projects: List[str] = field(default_factory=list)
@@ -144,8 +95,7 @@ class AssemblyResult:
 
 
 class AssemblyError(ValueError):
-    """Raised by `assemble()` when a diagnostic is fatal, so no document is
-    returned from input sslabdata will not compile from.
+    """Raised by `assemble()` when a diagnostic is fatal (SPEC.md §1).
 
     The message is the fatal diagnostics, one per line; ``diagnostics``
     holds every diagnostic the run found, in report order.
@@ -157,18 +107,8 @@ class AssemblyError(ValueError):
 
 
 def collaborator_key(name_kind: str, normalized: str) -> str:
-    """A lookup key for one grouping of unresolved authorships.
-
-    A readable slug of the normalised name plus a short digest of the name
-    kind and that same normalised name. It is explicitly **not** an assertion
-    about a human: a name-derived value used as an id is an identity claim
-    however it is described, because that is how consumers use it.
-
-    The digest is always present rather than added on collision, so an
-    unrelated collaborator arriving later can never change an existing key.
-    A name that leaves no slug behind -- one written entirely in punctuation,
-    or the corpus name with a newline in it -- is keyed on the digest alone.
-    """
+    """A lookup key for one grouping of unresolved authorships, not an
+    identity (SPEC.md §5)."""
     digest = hashlib.sha256(
         (name_kind + "\x00" + normalized).encode("utf-8")).hexdigest()[:_DIGEST_LENGTH]
     slug = "".join(c if c.isalnum() else "-" for c in normalized)
@@ -186,10 +126,8 @@ class _Grouping:
         self.normalized = normalized
         self.name_kind = LITERAL if author.literal else PERSONAL
         self.author = author            # the first spelling, in document order
-        # Read from the structured parts rather than from the key, so a
-        # particle, a second initial, a hyphenated family name and a name
-        # outside ASCII are all visible. Used by the diagnostics below and by
-        # nothing else: they decide nothing about grouping or matching.
+        # Read from the structured parts rather than from the key, and used
+        # only by the diagnostics below, which decide nothing about grouping.
         self.family = normalize_name(author.family or "")
         self.von = normalize_name(author.von or "")
         self.suffix = normalize_name(author.suffix or "")
@@ -215,19 +153,11 @@ class _Grouping:
             self.last_year = max(self.last_year or work.year, work.year)
 
     def could_be(self, other: "_Grouping") -> bool:
-        """True when this initials-only key could be that fuller one.
+        """True when this initials-only key could be that fuller one
+        (`ID-GROUPING-INITIALS-AMBIGUOUS` in SPEC.md "Diagnostic codes").
 
-        Same family and same particles, and one set of initials a prefix of
-        the other, in whichever direction is shorter: `A. Smith` could be
-        `Alice Smith` or `Alice Jane Smith`, and `A. J. Smith` could be
-        either as well. A name written as one brace-protected unit has no
-        parts to compare and takes part in neither side.
-
-        Two lineage suffixes that disagree are two people: `J. Smith, Jr.` is
-        not `John Smith, Sr.`, and saying so would be a warning about a
-        merge that cannot happen. One suffix against none is not a
-        disagreement -- an entry that omits it has said nothing -- so those
-        still pair.
+        One suffix against none still pairs: an entry that omits its suffix
+        has said nothing about it.
         """
         if other.key == self.key or not self.initials_only:
             return False
@@ -269,10 +199,9 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
     """The `collaborators_file` entries as ``(normalised name, spellings)``,
     minus any spelling a lab member already declares.
 
-    The normalised name is what the entry's collaborator key is built from. A
-    name or alias equal to a member's name or alias is reported under
-    `COLLABORATOR_ALIAS_IS_MEMBER` and left out, so the member is never
-    shadowed and the collaborator never silently chosen.
+    The normalised name is what the entry's collaborator key is built from.
+    A spelling a member declares is reported and left out, so the member is
+    never shadowed.
     """
     members: Dict[str, set] = {}
     for person in people:
@@ -301,17 +230,10 @@ def group_collaborators(works: List[Work], bib_dir: str,
                         diagnostics: List[Diagnostic],
                         declared: Optional[List[Tuple[str, List[str]]]] = None,
                         people: Optional[List[Person]] = None) -> List[Collaborator]:
-    """Group every unresolved authorship, and say where the grouping is risky.
+    """Group every unresolved authorship (SPEC.md §5), and say where the
+    grouping is risky.
 
-    The grouping is keyed on the normalised full name. An authorship that
-    matches exactly one `collaborators_file` entry -- by the same rules a
-    person is matched by, with the lab members competing -- is grouped under
-    that entry's key instead, which is what joins `Patel, Priya` and
-    `Patel, P.` once `P. Patel` is declared. A name that fits a declared
-    collaborator and anyone else is reported and grouped by name.
-
-    Mutates ``author.collaborator_key`` in place, so every authorship
-    references exactly one contributor.
+    Mutates ``author.collaborator_key`` in place.
     """
     rivals = None
     if declared:
@@ -351,10 +273,7 @@ def group_collaborators(works: List[Work], bib_dir: str,
 
     diagnostics.extend(_grouping_warnings(groups))
 
-    # The readable name breaks ties, because it is what a reader sees, and
-    # `key` breaks the rest: two keys can carry the same readable name -- a
-    # parsed and a brace-protected spelling of one string are two keys -- so
-    # the name alone is not a total order.
+    # The order is SPEC.md §3's; `key` last makes it total.
     ordered = sorted(groups.values(),
                      key=lambda g: (g.last_year is None, -(g.last_year or 0),
                                     -len(g.work_ids), g.author.name, g.key))
@@ -362,13 +281,10 @@ def group_collaborators(works: List[Work], bib_dir: str,
 
 
 def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[Diagnostic]:
-    """The two ways a key over- or under-groups, reported against a work.
-
-    Both are located at the first authorship the key grouped, which is where
-    a human goes to fix the spelling. A grouping `collaborators_file`
-    declared spans its spellings because a human said it should, so neither
-    is reported against it.
-    """
+    """The two ways a key over- or under-groups, located at the first
+    authorship the key grouped, which is where a human goes to fix the
+    spelling. A declared grouping spans its spellings on purpose, so neither
+    is reported against it."""
     reported = []
     for group in sorted(groups.values(), key=lambda g: g.key):
         if group.grouped_by == GROUPED_BY_DECLARED:
@@ -417,8 +333,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
 
     Raises:
         AssemblyError: when any diagnostic is fatal, whatever
-            ``diagnostics`` is: a document built from input sslabdata will
-            not compile from is never returned.
+            ``diagnostics`` is (SPEC.md §1).
     """
     result = assemble_result(config)
     if not diagnostics:
@@ -434,21 +349,11 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
 def assemble_result(config: LabDataConfig) -> AssemblyResult:
     """The document and every diagnostic, whether or not one is fatal.
 
-    1. Parse all BibTeX files into Works
-    2. Load people and projects from YAML
-    3. Resolve contributor names → person IDs
-    4. Validate project IDs
-    5. Group the authorships that resolved to nobody
-    6. Compute back-links (people→works, projects→works, projects→people)
-
     The CLI reads this rather than `assemble()` because it reports a run
     with fatal diagnostics too; it never writes that run's document.
     """
-    # Every configured name, checked before anything is parsed, so a
-    # configuration sslabdata will not compile from fails here rather than
-    # after the work of reading every file. The CLI never reaches these:
-    # `LabDataConfig.from_yaml()` rejects the same things first, with the file
-    # the user would edit named.
+    # For a configuration built in Python; `from_yaml()` has already checked
+    # one read from a file. Before anything is parsed, so it fails early.
     for bib_file in config.bib_files:
         reject_absolute_name(getattr(bib_file, 'name', None))
     for bib_file in config.bib_files:
@@ -468,10 +373,8 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
             BIB_FILES_MISSING, source, 'bib_files', None,
             "no bib_files are configured, so the document has no works"))
 
-    # Every path the configuration names, checked before any is read, so a
-    # missing one, or one of the wrong kind, is reported against the key that
-    # names it. Only a key left out means no file: an empty path is more
-    # likely a mistake than that, and it names no file.
+    # Every path is checked before any is read, so a problem is reported
+    # against the key that names it. An empty path is a mistake, not "none".
     def present(path: Optional[str], key: str, field_name=None,
                 directory: bool = False) -> bool:
         if path is None:
@@ -485,9 +388,8 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
                                 problem[1]))
         return False
 
-    # `bib_dir` is checked only when a file is read from it, and then once:
-    # when it is not a directory, no file under it is looked for. The files
-    # are opened as `<bib_dir>/<name>`, so an empty one is the root.
+    # `bib_dir` is checked only when a file is read from it. The files are
+    # opened as `<bib_dir>/<name>`, so an empty one is the root.
     bib_dir_found = not config.bib_files or present(
         config.bib_dir or "/", 'bib_dir', directory=True)
     bib_files = [{'name': bf.name, 'category': bf.category}
@@ -524,10 +426,8 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
     collaborators = group_collaborators(works, config.bib_dir, found,
                                         declared, people)
 
-    # A header a renderer cannot title a page from. A `lab` that is not a
-    # mapping at all is a different condition -- the header is malformed
-    # rather than unnamed -- and `LabDataConfig.from_yaml()` rejects it under
-    # its own code, so this one is not reported against it.
+    # A `lab` that is not a mapping is malformed rather than unnamed, and
+    # `from_yaml()` rejects it under its own code.
     if config.lab is None or isinstance(config.lab, dict):
         if not (config.lab or {}).get("name"):
             found.append(diagnostic(
