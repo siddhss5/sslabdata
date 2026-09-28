@@ -69,10 +69,12 @@ _PLAIN_TEXT_RULES = [
     "includegraphics",
 )] + [MacroTextSpec("maketitle", "")]
 
-# Commands whose argument is the text itself, set in another face or box.
-# Each becomes its argument, as `\textbf` does in the converter's own table.
+# Commands whose argument is the text itself, set in another face or box, or
+# given as a document's title, author or date. Each becomes its argument, as
+# `\textbf` does in the converter's own table; the converter's own rule for
+# `\title`, `\author` and `\date` drops the argument.
 _TEXT_ARGUMENT = ("texttt", "textsf", "textmd", "textup", "textnormal",
-                  "mbox", "fbox", "hbox")
+                  "mbox", "fbox", "hbox", "title", "author", "date")
 
 # Commands whose arguments are not text: a citation, a label or a
 # cross-reference becomes nothing and takes the spaces before it, as `\cite`

@@ -394,6 +394,8 @@ LATEX = [
          "The zqplan Library for Tidy Robots"),
     case("latex.text_argument", "tex-text-argument", "note",
          "Set in upright, medium, normal, boxed and held type"),
+    case("latex.title_author_date", "tex-title-author-date", "note",
+         "First read as Tidy Robots by Ann Zq in May 2020"),
     case("latex.argument_not_text", "tex-argument-not-text", "abstract",
          "Tidy robots are fast, as showed and page says."),
     case("latex.argument_not_text", "tex-argument-not-text", "note",

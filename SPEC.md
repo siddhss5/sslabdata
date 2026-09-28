@@ -448,7 +448,7 @@ Two more groups of commands have a rule, so neither is reported as
 
 | Commands | What sslabdata emits |
 |---|---|
-| Text in another face or box (`_TEXT_ARGUMENT`): `\texttt`, `\textsf`, `\textmd`, `\textup`, `\textnormal`, `\mbox`, `\fbox`, `\hbox` | The argument as plain text, as for `\textbf`: `The \texttt{zqplan} Library` arrives as `The zqplan Library` |
+| Text in another face or box, or a document's title, author or date (`_TEXT_ARGUMENT`): `\texttt`, `\textsf`, `\textmd`, `\textup`, `\textnormal`, `\mbox`, `\fbox`, `\hbox`, `\title`, `\author`, `\date` | The argument as plain text, as for `\textbf`: `The \texttt{zqplan} Library` arrives as `The zqplan Library`, and `\title{Deep Nets} y` as `Deep Nets y` |
 | A citation, label or cross-reference (`_REFERENCES`): `\citealp`, `\citealt`, `\citeauthor`, `\citefullauthor`, `\citenum`, `\citeyear`, `\citeyearpar`, `\citepalias`, `\citetalias`, `\Citealp`, `\Citealt`, `\Citeauthor`, `\Citep`, `\Citet`, `\nocite`, `\label`, `\pageref`, `\nameref` | Nothing, with the spaces before it, as for `\cite` and `\ref` |
 | A setting whose arguments are not text (`_SETTINGS`): `\color`, `\colorlet`, `\definecolor`, `\providecolor`, `\pagecolor`, `\nopagecolor`, `\rowcolors`, `\documentclass`, `\usepackage`, `\RequirePackage`, `\bibliography`, `\hypersetup`, `\selectlanguage`, `\setcounter`, `\addcounter`, `\setlength`, `\addlength`, `\defcitealias`, `\hphantom`, `\vphantom` | Nothing; the text around it is kept as it was, so `{\color{red}fast}` arrives as `fast` |
 
