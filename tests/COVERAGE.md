@@ -62,6 +62,90 @@ Cases that fail today are not fixed here (that is the linked issue's job):
 #20 (verifying a remote link), #27 (explicit link and award fields), #28
 (`keywords` project tags).
 
+## Generated inputs
+
+The rows below pin the cases someone thought of.
+`tests/conformance/test_generated_inputs.py` explores the values nobody wrote
+down. From a fixed seed it generates `.bib` entries and `lab.yaml`, people,
+projects and collaborators files: every special character (`% & # _ $ ~ ^ \
+{ }`), escaped and bare, unbalanced braces, known and unknown LaTeX commands,
+`\url` and `\href`, math, Unicode with combining marks, right-to-left and
+zero-width characters, empty and whitespace-only values, malformed years,
+DOI and URL shapes, `eprint` with `archivePrefix` and `eprinttype`, author
+lists with `and others` anywhere, `{literal}` names, `Jr.` and von parts,
+repeated citation keys, `lab` values YAML types JSON cannot carry, and
+repeated YAML keys. About a third of the cases draw every configuration
+value from that range. The rest keep the configuration well formed, so that
+the run writes a document and the `.bib` values can be checked in it.
+
+Each input runs through `cli.main()` in four modes: `--validate` and
+`--output`, each in YAML and in JSON. Every input must keep these
+invariants:
+
+1. No run raises an uncaught exception.
+2. A run that exits 0 writes a document that validates against
+   `schema/v5/output.schema.json`, and the YAML and JSON documents hold the
+   same data.
+3. A run that exits 1 reports at least one coded error.
+4. `--validate` exits 0 only where `--output` in the same format writes.
+5. No text is lost silently. A sentinel word follows the special characters
+   in each generated value, and some values hold one as the braced argument
+   of a LaTeX command: a formatting command such as `\texttt` or `\mbox`, a
+   command whose arguments are not text such as `\label`, `\color` or
+   `\setcounter`, or a generated unknown name. Every word must reach the
+   work's `bibtex`, and `bibtex` must carry each field value as it was
+   written. Every word must reach the value's place in the document too,
+   except one inside a command that §2 of SPEC.md turns into nothing: a
+   citation, label or cross-reference, a setting, or `\includegraphics`.
+   The test writes these out as `DROPS_ARGUMENT`, with the number of
+   arguments each takes, rather than importing them, so that the list
+   checks the code. An unknown command keeps its braced argument as text
+   (`LATEX-COMMAND-UNKNOWN`). A URL inside `\url` or `\href` must reach the
+   text unchanged. A value can lose text only with a coded diagnostic that
+   explains the loss at its entry, or a syntax error in its file.
+6. No input is silently read as something else. A year that is not an
+   unsigned run of ASCII digits is never a number. An `eprint` is filed
+   under the repository its entry names, and arXiv only when it names none.
+   `others` is never an author. An empty `*_file` path, a repeated YAML key
+   and a path that is a directory are each reported. LaTeX conversion does
+   not add `<`, `>`, `[` or `]` that the source did not have.
+
+A failure is grouped by the invariant and the kind of value that broke it.
+Each group is then reduced: parts of the input are removed one at a time
+while the failure persists. When one group has several causes, each one is
+reduced separately, up to six per group. The reduced input is small enough
+to become a corpus fixture.
+
+To reproduce, from the repository root:
+
+```
+SSLABDATA_GENERATED_FAILURES=generated-failures.json \
+  uv run --frozen --extra test pytest --no-cov tests/conformance/test_generated_inputs.py
+```
+
+The default is 1000 inputs and runs in well under a minute.
+`SSLABDATA_GENERATED_CASES=3000` runs a longer search. The first 1000 of
+those inputs are the default ones, because each input is seeded by its
+index. The artifact is a JSON file. Each entry of its `failures` gives:
+
+- the class;
+- the index of the first input that showed the failure;
+- a detail line;
+- the reduced `input`, as file paths and their text, beside the
+  `directories` every case also has;
+- each mode's exit status, crash and coded lines;
+- the `--validate --format json` diagnostics.
+
+The artifact is written atomically, holds no paths or times, and is the
+same on every host, so two runs can be compared with `sha256sum`. To turn a
+failure into a fixture, write each `input` file into a directory under
+`tests/corpus/invalid/`, create the listed directories, and give the case
+an entry in `tests/corpus/expected/diagnostics.yaml`.
+
+The test is expected to fail until the issues it finds are fixed. It is not
+marked `xfail`, because a failure names the bug, and the reduced input is
+the fixture for its fix.
+
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
 in BibTeX itself. `strings.bib` defines `rss`, `cfx` and `jfx` twice each, and
