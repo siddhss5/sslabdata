@@ -1,0 +1,11 @@
+% CASE latex.unknown_macro_in_math
+% Regression input, not invalid input: a command the converter has no rule
+% for, inside math. Math is left as TeX for the renderer and is not searched,
+% so the command is neither reported nor dropped.
+
+@article{macro-in-math,
+  title   = {A Bound of $\fictionalop{n}$ Steps},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2024}
+}

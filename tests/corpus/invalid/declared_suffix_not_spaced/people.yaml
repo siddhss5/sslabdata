@@ -1,0 +1,18 @@
+# CASE identity.declared_suffix_not_spaced
+# Regression input, not invalid input. Two aliases that differ only in how
+# the run-together initials after the comma are written. Between
+# declarations the given name before the comma is spaced (`T.T.` is
+# `T. T.`), and nothing after the comma is, so these are two spellings and
+# neither person's alias is ambiguous.
+
+- id: "tivers"
+  name: "Tara Ivers"
+  aliases: ["T.T. Ivers, S.S."]
+  role: "phd_student"
+  status: "current"
+
+- id: "tiversb"
+  name: "Theo Ivers"
+  aliases: ["T.T. Ivers, S. S."]
+  role: "postdoc"
+  status: "current"

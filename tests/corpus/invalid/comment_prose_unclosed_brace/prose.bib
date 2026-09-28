@@ -1,0 +1,12 @@
+% CASE structure.comment_mentions_unclosed_group
+% Regression input, not invalid input. The next line mentions a comment
+% command and opens a brace group inside it that never closes, so there is
+% no comment group to step over, and the entry after it is read.
+% To hide an entry, write @comment{ and then {the entry, and close both.
+
+@article{after-prose,
+  title   = {A Fictional Title},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2024}
+}
