@@ -12,38 +12,25 @@ MIT License - see LICENSE file for details.
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-# `work.source.file` must never be absolute (SPEC.md section 5).
-# `sslabdata.config` owns the code and the exception type because the
-# condition is a configuration mistake; `Work.to_dict()` checks as well.
-# So with `lab`: `LabData.to_dict()` applies the rule `from_yaml()` does to
-# a `lab` built in Python.
+# `config` owns these checks and their codes. `to_dict()` repeats them
+# because every document passes through it, including one built in Python
+# (SPEC.md §1).
 from .config import json_lab, reject_absolute_name
 
 
-# Version of the output format (see schema/v5/output.schema.json). Bump it when
-# a change to to_dict() output could break a consumer (SPEC.md section 6).
-# CHANGELOG.md says what each version changed.
+# The document's schema version (schema/v5/output.schema.json). When it
+# changes is SPEC.md §6.
 SCHEMA_VERSION = 5
 
-# The name of the compiler, as the document's `generator` record reports it.
 GENERATOR_NAME = "sslabdata"
 
-# The one policy for closed objects (SPEC.md section 4): every declared
-# property is present, and `null` when it does not apply. The open maps --
-# `lab`, `links`, `identifiers` and every `derived` bag -- carry only the keys
-# that have values, because emitting nulls over an unbounded key set says
-# nothing.
+# Every to_dict() emits every declared key, `null` when it does not apply;
+# the open maps carry only keys with values (SPEC.md §4).
 
 
 @dataclass
 class Venue:
-    """Where a work appeared, normalised across entry types.
-
-    ``kind`` is an open string. v4 emits ``journal``, ``conference``, ``book``,
-    ``institution`` and ``repository``; a consumer branches on the ones it
-    knows and falls back for the rest, so a new kind is not a breaking change.
-    ``name`` is the container's own name, as plain text.
-    """
+    """Where a work appeared (SPEC.md §5)."""
     kind: str
     name: str
 
@@ -53,14 +40,8 @@ class Venue:
 
 @dataclass
 class Link:
-    """One URL a work can be reached at, with where it came from and whether
-    anything has checked it.
-
-    ``origin`` is an open string over ``input``, ``sidecar``, ``enrichment``,
-    ``inferred`` and ``derived``: only ``input`` means the entry's own field
-    supplied it. ``status`` is ``unchecked``, ``verified`` or ``missing``; a
-    link that fails verification is kept and labelled, never deleted.
-    """
+    """One URL a work can be reached at, with its origin and verification
+    status (SPEC.md §5)."""
     url: str
     label: Optional[str] = None
     origin: str = "input"
@@ -77,22 +58,11 @@ class Link:
 
 @dataclass
 class Contributor:
-    """One person named on a work: the parts of the name, and who it resolved to.
+    """One person named on a work: the parts of the name, and who it resolved
+    to (SPEC.md §5). The record ``work.editors`` carries.
 
-    ``name`` is the structured parts joined in reading order. It is *a readable
-    form of the input name, not a citation form*: it does not abbreviate,
-    expand or normalise anything. The parts below it carry what the entry
-    supplied, after LaTeX conversion and marker removal, so an entry writing
-    ``Brown, B.`` yields ``given: "B."`` and that is correct rather than a gap.
-    ``literal`` holds a name written as one brace-protected unit, such as
-    ``{Example Robotics Consortium}``, where the other parts do not apply.
-
-    ``position`` is 1-based and is the authorship's address within its work,
-    together with the work's ``bib_id``.
-
-    This is the record ``work.editors`` carries. Editing a volume is not an
-    authorship, so an editor that matched nobody is simply ``person_id: null``
-    and produces no collaborator.
+    ``literal`` holds a name written as one brace-protected unit, where the
+    other parts do not apply.
     """
     name: str
     position: int = 0
@@ -125,20 +95,10 @@ class Contributor:
 
 @dataclass
 class Author(Contributor):
-    """One authorship of a work.
+    """One authorship of a work, addressed by ``(work.bib_id, position)``
+    (SPEC.md §5).
 
-    The authorship, not the contributor, is the primary record: it is
-    addressed by ``(work.bib_id, position)``, so two people who write their
-    names identically are never merged at this level.
-
-    It references exactly one contributor. ``person_id`` is the id of a person
-    in ``people.yaml`` and means nothing else; ``collaborator_key`` is the
-    lookup key of the grouping an unresolved authorship fell into. Both are
-    always present and exactly one is non-null.
-
-    ``equal_contribution`` records that the entry marked this author with a
-    ``*``; the marker itself is taken off the name, so neither the readable
-    form nor the name used for matching carries it.
+    Exactly one of ``person_id`` and ``collaborator_key`` is non-null.
     """
     collaborator_key: Optional[str] = None
     equal_contribution: bool = False
@@ -161,8 +121,7 @@ class Work:
     category: str
     entry_type: str
 
-    # The configured `bib_files[].name` the entry was read from, relative to
-    # `bib_dir`: see `to_dict()`.
+    # The configured `bib_files[].name`, relative to `bib_dir`: see `to_dict()`.
     source_file: str = ""
 
     editors: List[Contributor] = field(default_factory=list)
@@ -196,13 +155,9 @@ class Work:
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization.
 
-        ``source.key`` is the citation key as written, which is ``bib_id``
-        again: a consumer holding only the provenance record can still find
-        the entry it came from.
-
         ``source.file`` is checked here rather than only where it was set:
-        both exporters and the CLI serialize through this method, so a `Work`
-        built by hand cannot carry an absolute path into the document.
+        every serializer passes through this method, so a `Work` built by hand
+        cannot carry an absolute path into the document.
         """
         reject_absolute_name(self.source_file)
         return {
@@ -263,12 +218,8 @@ class Person:
     derived: Dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for serialization.
-
-        ``aliases`` are read for matching and are not emitted. Every other
-        declared property is present, and null when it does not apply — the
-        alumni fields included, whatever the status.
-        """
+        """Convert to dictionary for serialization; ``aliases`` are read for
+        matching and are not emitted."""
         return {
             'id': self.id,
             'name': self.name,
@@ -290,23 +241,7 @@ class Person:
 
 @dataclass
 class Collaborator:
-    """A grouping over unresolved authorships, not an identity.
-
-    ``key`` is a lookup key and explicitly not an assertion about a human:
-    a readable slug of the normalised name plus a short digest, so that
-    adding an unrelated collaborator can never change an existing key.
-    ``grouped_by`` names the policy that built it: ``normalized_name``, or
-    ``declared`` for a grouping `collaborators_file` declares.
-
-    ``name_kind`` is ``personal`` or ``literal``. It is not ``organization``:
-    brace protection in BibTeX means "do not parse this", which covers
-    organisations but also mononyms, so the document must not assert
-    corporate-ness.
-
-    ``authorships`` lists the occurrences that were grouped, each addressed by
-    ``(work_id, position)``. A consumer that distrusts the grouping can ignore
-    it and work from those occurrences instead.
-    """
+    """A grouping over unresolved authorships, not an identity (SPEC.md §5)."""
     key: str
     name: str
     grouped_by: str = "normalized_name"
@@ -386,11 +321,9 @@ class LabData:
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization.
 
-        ``generator`` carries no timestamp: a build timestamp would make every
-        run differ, and two runs over the same inputs must produce the same
-        bytes (SPEC.md section 3). Git records when. The version is read here
-        rather than at import time because the package imports this module
-        while defining it.
+        ``generator`` carries no timestamp, so the document is deterministic
+        (SPEC.md §3). The version is imported here because the package imports
+        this module while defining it.
         """
         from . import __version__
 
