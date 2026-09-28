@@ -1,0 +1,8 @@
+# CASE identity.declared_suffix_not_spaced
+# Fictional regression input for tests/COVERAGE.md: valid, and kept in the
+# invalid corpus so the valid corpus output is unchanged.
+bib_dir: "."
+bib_files:
+  - name: "ivers.bib"
+    category: "Papers"
+people_file: "people.yaml"

@@ -151,6 +151,15 @@ structure.missing_booktitle:
     - {code: BIB-VENUE-MISSING, severity: warning, file: ./nobooktitle.bib, key: no-booktitle, field: booktitle}
   kept: [no-booktitle]
 
+# Valid input kept here as a regression case. Prose that opens an `@comment`
+# group, and a brace group inside it, and closes neither, is not a comment
+# group: the entry after it is read, and nothing is reported.
+structure.comment_mentions_unclosed_group:
+  dir: comment_prose_unclosed_brace
+  exit: 0
+  diagnostics: []
+  kept: [after-prose]
+
 # The macro is read as empty, so the entry has no booktitle either.
 strings.undefined:
   dir: undefined_string
@@ -254,6 +263,17 @@ latex.text_macros:
         title: "The TeX book 1990—2000"
         note: "Typeset with LaTeX and BibTeX, pages 1–2, read/write"
 
+# Valid input kept here as a regression case: math is not searched for
+# unknown commands, so one inside `$…$` is neither reported nor dropped.
+latex.unknown_macro_in_math:
+  dir: unknown_macro_in_math
+  exit: 0
+  diagnostics: []
+  kept: [macro-in-math]
+  emits:
+    - work: macro-in-math
+      expect: {title: "A Bound of $\\fictionalop{n}$ Steps"}
+
 # The first byte that is not UTF-8 is on line 6 of latin1.bib.
 structure.not_utf8:
   dir: bib_not_utf8
@@ -306,6 +326,17 @@ projects.undefined:
   diagnostics:
     - {code: RESOLVE-PROJECT-UNKNOWN, severity: error, file: ./tagged.bib, key: proj-undefined, field: project, values: [nosuchproject]}
   kept: [proj-undefined]
+
+# Valid input kept here as a regression case: a work that names one project
+# twice is back-linked from it once.
+projects.tagged_twice:
+  dir: project_tagged_twice
+  exit: 0
+  diagnostics: []
+  kept: [tagged-twice]
+  emits:
+    - project: homebot
+      expect: {work_ids: [tagged-twice]}
 
 people.duplicate_id:
   dir: duplicate_person_id
@@ -467,6 +498,24 @@ identity.ambiguous_alias:
       expect: {authors.0.person_id: null, authors.0.resolution.status: ambiguous}
   unresolved_only:
     - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./brown.bib, key: brown-initial, field: author, values: [B. Brown]}
+
+# Valid input kept here as a regression case. Between declarations only the
+# given name before the comma is spaced, so `T.T. Ivers, S.S.` and
+# `T.T. Ivers, S. S.` are two spellings, and neither is ambiguous.
+identity.declared_suffix_not_spaced:
+  dir: declared_suffix_not_spaced
+  exit: 0
+  diagnostics: []
+  kept: [ivers-full]
+
+# Valid input kept here as a regression case. A collaborators_file entry
+# `S.S. Quinn` is keyed as `S. S. Quinn`, and `Quinn, SS` is a whole name,
+# so the two authorships are two collaborators and no key spans spellings.
+identity.collaborator_whole_initials:
+  dir: collaborator_whole_initials
+  exit: 0
+  diagnostics: []
+  kept: [quinn-whole, quinn-declared]
 
 # --- Config -------------------------------------------------------------------
 

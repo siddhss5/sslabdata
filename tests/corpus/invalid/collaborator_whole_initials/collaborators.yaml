@@ -1,0 +1,5 @@
+# CASE identity.collaborator_whole_initials
+# Regression input, not invalid input. The entry's key is built from its
+# name with run-together initials spaced, `S. S. Quinn`, so it is not the
+# key of `Quinn, SS`, whose `SS` is a name and is never split.
+- name: "S.S. Quinn"
