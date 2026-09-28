@@ -1,0 +1,7 @@
+# CASE text.control_characters
+# A YAML double-quoted string can carry a control character as an escape.
+- id: "aadams"
+  name: "Alice\x01 Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"

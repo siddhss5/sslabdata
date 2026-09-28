@@ -172,7 +172,7 @@ without depending on English wording. Codes obey three rules:
    | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-KEY-REPEATED`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `CONFIG-PATH-WRONG-KIND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `RECORD-KEY-REPEATED`, `OUTPUT-WRITE-FAILED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `TEXT-CONTROL-CHARACTER`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
@@ -254,6 +254,7 @@ Codes in use:
 | `CONFIG-PATH-WRONG-KIND` | A path the configuration names is there but is the wrong kind: a `bib_files` entry, `people_file`, `projects_file` or `collaborators_file` that is a directory or anything else that is not a regular file, or a `bib_dir` that is not a directory. Located as `CONFIG-FILE-NOT-FOUND` is, and checked by the same helper (`sslabdata.assembler.path_problem()`); the prose names the path and says what it is (`'shelf' is a directory, not a file`). Its own code, because the path exists and "not found" would send the user looking for a typo. Fatal, as a missing file is. |
 | `BIB-PARSER-MESSAGE` | The BibTeX parser library raised a message that is neither a syntax error nor an undefined macro — a field repeated within one entry, or a name list it cannot split. The prose is the **library's own wording**, kept as it phrased it. Located at the file, and at the entry key when the library raised it while reading one; the field is left empty. The entry is kept as the library read it. A warning. |
 | `LATEX-CONVERSION-FAILED` | A text field or a name part whose LaTeX the converter could not read at all. Its text is kept as written, with the braces taken off, so it may still hold LaTeX (§2, *Two degraded cases*). Located at the entry and field. A warning. |
+| `TEXT-CONTROL-CHARACTER` | A value read from the input holds a control character (§2, *No string read from the input carries a control character*): a `.bib` field value, located at `<file>:<key>:<field>`, or a YAML scalar, key or value, located as `RECORD-KEY-REPEATED` locates a key in a people, projects or collaborators file and as `CONFIG-KEY-REPEATED` locates one in `lab.yaml`. One line per value, naming each character as `U+XXXX`. The characters are removed and the rest of the value is kept. A warning. |
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
 | `OUTPUT-WRITE-FAILED` | `--output` names a destination the operating system will not let sslabdata write: a directory, a path under a file, a directory without write permission, a full disk. Located at the `--output` path alone; the prose is the operating system's reason, naming the path it refused when that is not the destination's own directory. Unprefixed on standard error, with no `Wrote …` line. The write is atomic, so a file already at the path is as it was and no temporary file is left behind. Only `--output` writes, so no other mode reports it. Fatal. |
 | `CONFIG-NOT-FOUND` | The `--config` file does not exist. Located at that path alone; `Error: CONFIG-NOT-FOUND …` on standard error. Fatal at load. |
@@ -385,6 +386,18 @@ often does: `Informed RRT*` and `BIT*` are real paper titles. sslabdata does
 not escape them and will not, because it does not know what they are being
 escaped for. **Renderers are responsible for escaping** — for HTML bodies, for
 HTML attributes, for shell arguments, for whatever they emit.
+
+**No string read from the input carries a control character.** A C0 control
+character other than tab, line feed and carriage return (U+0000–U+0008,
+U+000B, U+000C, U+000E–U+001F), or DEL (U+007F), is not text. Each is
+removed where the input is read, before anything else sees the value — from
+every `.bib` field value, names included, before LaTeX is converted
+(`sslabdata.parsers.bibtex._Parser.process_entry()`), and from every scalar
+of `lab.yaml`, `people_file`, `projects_file` and `collaborators_file`,
+which a double-quoted YAML string can carry as an escape
+(`sslabdata.config.YAMLLoader`) — and reported as `TEXT-CONTROL-CHARACTER`.
+The rest of the value is kept. The `bibtex` record is written from the value
+as read, so it carries none either.
 
 ### What sslabdata converts, and what it does not
 

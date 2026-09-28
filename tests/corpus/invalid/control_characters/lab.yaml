@@ -1,0 +1,10 @@
+# CASE text.control_characters
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "control.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"
+lab:
+  description: "Tidy\a robots"
