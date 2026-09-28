@@ -30,6 +30,7 @@ from pybtex.database.input.bibtex import (
 from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces, unknown_commands
+from ..config import CONTROL_CHARACTER, control_message, without_control_characters
 from ..diagnostics import Diagnostic, diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
@@ -156,6 +157,19 @@ _MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
 # The command name pybtex is about to read, when that name is `comment`.
 _COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
 
+# An entry BibTeX's brace matching read differently from how it was written,
+# with no syntax error to say so: an opening brace too many reads the next
+# field into a value, and a closing brace too many ends the entry early,
+# losing the fields after it. Braces are still matched as BibTeX matches
+# them; the entry is only reported. Two shapes are looked for, and nothing
+# else, so a well-formed file never draws one: a value holding `, name = {`
+# or `, name = "`, and text on the line an entry ended on, after its closing
+# brace, other than a `%` comment or the next `@` command.
+BRACE_MISMATCH = "BIB-BRACE-MISMATCH"
+_FIELD_IN_VALUE = re.compile(r',\s*([A-Za-z][\w-]*)\s*=\s*[{"]')
+_TEXT_AFTER_ENTRY = re.compile(r'[ \t]*([^\s%@][^\r\n]*)')
+_FIELD_AFTER_ENTRY = re.compile(r'\s*,\s*([A-Za-z][\w-]*)\s*=')
+
 
 
 def _redefined_macros(text: str,
@@ -280,6 +294,12 @@ class _Parser(PybtexParser):
         # The entry key each captured library message was raised while
         # reading, by the message's identity.
         self.message_keys: Dict[int, str] = {}
+        # (entry key, field name, characters) for every field value its
+        # control characters were removed from.
+        self.control_characters: List[Tuple[str, str, List[str]]] = []
+        # (entry key, field name, message) for every entry whose braces
+        # read it differently from how it was written (`BRACE_MISMATCH`).
+        self.brace_mismatches: List[Tuple[str, Optional[str], str]] = []
 
     def handle_error(self, error):
         """Keep a syntax error with where it happened; relay anything else."""
@@ -300,11 +320,25 @@ class _Parser(PybtexParser):
         """
         if key is not None and key in self.data.entries:
             self.duplicate_keys.append(key)
+        # The ingress for field text: control characters are removed here,
+        # before pybtex splits a name list or normalises whitespace, and
+        # before any LaTeX is read (`CONTROL_CHARACTER`).
+        fields = [(name, self._without_controls(key, name, parts))
+                  for name, parts in fields]
         captured = pybtex.errors.captured_errors
         before = len(captured) if captured is not None else 0
         super().process_entry(entry_type, key, fields)
         for error in (captured or [])[before:]:
             self.message_keys[id(error)] = key
+
+    def _without_controls(self, key, name: str, parts: List[str]) -> List[str]:
+        """One field's value parts with control characters removed, and the
+        field recorded when there were any."""
+        cleaned = [without_control_characters(part) for part in parts]
+        found = list(dict.fromkeys(c for _, chars in cleaned for c in chars))
+        if found:
+            self.control_characters.append((key, name.lower(), found))
+        return [part for part, _ in cleaned]
 
     def parse_string(self, text: str):
         self.unnamed_entry_counter = 1
@@ -318,13 +352,48 @@ class _Parser(PybtexParser):
             macros=self.macros,
         )
         self.string_definitions = commands.definitions
+        read = 0
         for command, arguments in commands:
             kind = command.lower()
             if kind == "preamble":
                 self.process_preamble(*arguments)
             elif kind != "string":
+                # An entry with a syntax error already says its values may
+                # hold text meant for later fields. An undefined macro is
+                # kept as a syntax error too, but says nothing of the kind.
+                key = arguments[0]
+                if all(error[1] != key or isinstance(error[0], UndefinedMacro)
+                       for error in self.syntax_errors[read:]):
+                    self._check_braces(commands, *arguments)
                 self.process_entry(command, *arguments)
+            read = len(self.syntax_errors)
         return self.data
+
+    def _check_braces(self, commands, key, fields) -> None:
+        """Record the entry just read when its braces read it differently
+        from how it was written (`BRACE_MISMATCH`), at the first field whose
+        text did not arrive as written."""
+        for name, parts in fields:
+            merged = _FIELD_IN_VALUE.search("".join(parts))
+            if merged:
+                other = merged.group(1)
+                self.brace_mismatches.append((key, other.lower(), (
+                    f"the field '{other}' is read into the value of '{name}', "
+                    f"because a brace in '{name}' is not closed where it was "
+                    "meant to be")))
+                return
+        after = _TEXT_AFTER_ENTRY.match(commands.text, commands.pos)
+        if after and fields:
+            name = fields[-1][0]
+            lost = _FIELD_AFTER_ENTRY.match(commands.text, commands.pos)
+            line = commands.text.count("\n", 0, commands.pos) + 1
+            self.brace_mismatches.append((
+                key, (lost.group(1) if lost else name).lower(),
+                f"a closing brace in the value of '{name}' ends the entry at "
+                f"line {line}, so " + (
+                    f"the field '{lost.group(1)}' and any after it are not read"
+                    if lost else
+                    f"'{after.group(1).strip()}' after it is not read")))
 
 
 def _duplicate_key_error(
@@ -401,6 +470,12 @@ def parse_bibtex_file(
 
     redefinitions.extend((path, name, line) for name, line
                          in _redefined_macros(text, parser.string_definitions))
+    for key, field_name, found in parser.control_characters:
+        diagnostics.append(diagnostic(CONTROL_CHARACTER, path, key, field_name,
+                                      control_message(found)))
+    for key, field_name, message in parser.brace_mismatches:
+        diagnostics.append(diagnostic(BRACE_MISMATCH, path, key, field_name,
+                                      f"{message}; check its braces"))
     for error, key, field_name, start in parser.syntax_errors:
         if key is None and _on_comment_line(text, start):
             continue

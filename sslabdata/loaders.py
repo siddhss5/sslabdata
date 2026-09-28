@@ -11,7 +11,10 @@ from dataclasses import dataclass, field
 from typing import List
 from pathlib import Path
 
-from .config import _kind, dotted, read_yaml, repeated_message
+from .config import (
+    CONTROL_CHARACTER, _kind, control_message, dotted, read_yaml,
+    repeated_message,
+)
 from .diagnostics import Diagnostic, diagnostic
 from .models import Person, Project
 
@@ -108,11 +111,24 @@ def _records(path: str, codes, required, known, optional,
 
     try:
         with open(path, 'r', encoding='utf-8') as f:
-            data, repeated = read_yaml(f)
+            data, repeated, controls = read_yaml(f)
     except (yaml.YAMLError, UnicodeDecodeError) as error:
         fail(diagnostic(yaml_invalid, path, None, None,
                         " ".join(str(error).split())))
         return []
+
+    # Each located as a repeat is: at the record, named by its first required
+    # field, and the path inside it; or, outside any record, at the path.
+    for found in controls:
+        index = found.path[0] if found.path else None
+        record = (data[index] if isinstance(data, list)
+                  and isinstance(index, int) else None)
+        key = record.get(required[0]) if isinstance(record, dict) else None
+        fail(diagnostic(CONTROL_CHARACTER, path,
+                        key if isinstance(key, str) else None,
+                        dotted(found.path[1:] if isinstance(record, dict)
+                               else found.path) or None,
+                        control_message(found.found)))
 
     # Each repeat inside a record is reported with that record, below; one
     # anywhere else is reported here, at the file and the path to the key.

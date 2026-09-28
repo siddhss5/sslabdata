@@ -36,6 +36,10 @@ _TEXT_MACROS = {
 
 # Marks a command that leaves nothing, or a parenthesis, where it stood: the
 # spaces before it go too, so `planners~\cite{k}.` reads `planners.`.
+# This marker and `_PLACEHOLDER` below are control characters, which cannot
+# collide with the input: every control character is removed from a field
+# value where it is read, before it is converted (`CONTROL_CHARACTER` in
+# sslabdata/config.py).
 _JOIN = '\x02'
 _JOIN_RE = re.compile(f'[ \t\xa0]*{_JOIN}')
 
@@ -65,20 +69,61 @@ _PLAIN_TEXT_RULES = [
     "includegraphics",
 )] + [MacroTextSpec("maketitle", "")]
 
+# Commands whose argument is the text itself, set in another face or box.
+# Each becomes its argument, as `\textbf` does in the converter's own table.
+_TEXT_ARGUMENT = ("texttt", "textsf", "textmd", "textup", "textnormal",
+                  "mbox", "fbox", "hbox")
+
+# Commands whose arguments are not text: a citation, a label or a
+# cross-reference becomes nothing and takes the spaces before it, as `\cite`
+# does above; a colour, a package, a length, a counter or a phantom becomes
+# nothing and leaves the text around it as it was (SPEC.md section 2).
+_REFERENCES = ("citealp", "citealt", "citeauthor", "citefullauthor",
+               "citenum", "citeyear", "citeyearpar", "citepalias",
+               "citetalias", "Citealp", "Citealt", "Citeauthor", "Citep",
+               "Citet", "nocite", "label", "pageref", "nameref")
+_SETTINGS = ("color", "colorlet", "definecolor", "providecolor", "pagecolor",
+             "nopagecolor", "rowcolors", "documentclass", "usepackage",
+             "RequirePackage", "bibliography", "hypersetup", "selectlanguage",
+             "setcounter", "addcounter", "setlength", "addlength",
+             "defcitealias", "hphantom", "vphantom")
+
 # The commands the converter has a rule for. A command outside it is dropped,
-# with any braced argument after it read as a group of plain text.
+# and what follows it is read as plain text (`_WITHOUT_RULE` below).
 _KNOWN = get_default_latex_context_db()
 _KNOWN.add_context_category(
     "sslabdata-text",
     macros=[MacroTextSpec(name, text) for name, text in _TEXT_MACROS.items()]
-    + _PLAIN_TEXT_RULES,
+    + _PLAIN_TEXT_RULES
+    + [MacroTextSpec(name, "%s") for name in _TEXT_ARGUMENT]
+    + [MacroTextSpec(name, _JOIN) for name in _REFERENCES]
+    + [MacroTextSpec(name, "") for name in _SETTINGS],
     prepend=True)
 
 # How the walker reads each command's arguments. `\textfrac` has a text rule
-# but no argument spec, so without this its rule would print `%s/%s`.
+# but no argument spec, so without this its rule would print `%s/%s`; nor do
+# `\textnormal`, `\fbox`, `\hbox`, `\nocite`, `\pageref` and `\nameref`.
 _PARSING = get_default_parsing_db()
 _PARSING.add_context_category(
-    "sslabdata-arguments", macros=[std_macro("textfrac", False, 2)], prepend=True)
+    "sslabdata-arguments",
+    macros=[std_macro("textfrac", False, 2)]
+    + [std_macro(name, False, 1) for name in (
+        "textnormal", "fbox", "hbox", "nocite", "pageref", "nameref")],
+    prepend=True)
+
+# A command the walker knows the arguments of but the converter has no rule
+# for is read as taking no arguments, like a command the walker does not know
+# at all: it is dropped and what follows it is kept, braced arguments included,
+# so `\keywords{Tidy} Robots` reads `Tidy Robots`. Otherwise the converter
+# would drop its arguments with it. This covers the commands that define
+# another, too: `\newcommand zqx` would read `zq` as the name and body being
+# defined, or a set-aside URL as one.
+_WITHOUT_RULE = sorted({spec.macroname for spec in _PARSING.iter_macro_specs()
+                        if _KNOWN.get_macro_spec(spec.macroname) is None})
+_PARSING.add_context_category(
+    "sslabdata-no-arguments",
+    macros=[std_macro(name, False, 0) for name in _WITHOUT_RULE],
+    prepend=True)
 
 _CONVERTER = LatexNodes2Text(latex_context=_KNOWN, math_mode='verbatim')
 
@@ -111,8 +156,9 @@ _PLACEHOLDER_RE = re.compile(f'{_PLACEHOLDER}(\\d+){_PLACEHOLDER}')
 def latex_to_text(text: str) -> str:
     """Convert one LaTeX field value to plain Unicode text.
 
-    Raises whatever pylatexenc raises; callers decide what to do with a value
-    that cannot be converted.
+    Raises whatever pylatexenc raises, and ValueError when a marker survives
+    conversion; callers decide what to do with a value that cannot be
+    converted.
     """
     if not text:
         return text
@@ -126,7 +172,13 @@ def latex_to_text(text: str) -> str:
     converted = _CONVERTER.latex_to_text(_prepared(text, set_aside),
                                          latex_context=_PARSING)
     converted = _JOIN_RE.sub('', converted)
-    return _PLACEHOLDER_RE.sub(lambda m: verbatim[int(m.group(1))], converted)
+    converted = _PLACEHOLDER_RE.sub(lambda m: verbatim[int(m.group(1))],
+                                    converted)
+    # A command that read part of a placeholder as its argument leaves the
+    # rest behind. The input holds no marker, so any left is one of ours.
+    if _PLACEHOLDER in converted or _JOIN in converted:
+        raise ValueError("a conversion marker survived")
+    return converted
 
 
 def _prepared(text: str, set_aside) -> str:

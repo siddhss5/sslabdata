@@ -10,13 +10,14 @@ MIT License - see LICENSE file for details.
 
 import math
 import os
+import re
 import yaml
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 from pathlib import Path, PureWindowsPath
 
-from .diagnostics import diagnostic
+from .diagnostics import Diagnostic, diagnostic
 
 
 # A configured `.bib` name reaches the document as `work.source.file`, where
@@ -76,6 +77,30 @@ KEY_REPEATED = "CONFIG-KEY-REPEATED"
 
 MERGE_TAG = "tag:yaml.org,2002:merge"
 
+# A C0 control character other than tab, line feed and carriage return, or
+# DEL. None is text (SPEC.md section 2): it makes an XML rendering of the
+# document invalid, and U+0001 and U+0002 are the LaTeX conversion's own
+# markers. Each is removed where the input is read, before anything else sees
+# the value, and reported at the value: a `.bib` field value, or a YAML
+# scalar, which can carry one as an escape (`"\x01"`).
+CONTROL_CHARACTER = "TEXT-CONTROL-CHARACTER"
+_CONTROL = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def without_control_characters(text: str) -> Tuple[str, List[str]]:
+    """``text`` with its control characters removed, and each character
+    removed, once, as ``U+XXXX``, in the order first found."""
+    found = list(dict.fromkeys(f"U+{ord(c):04X}" for c in _CONTROL.findall(text)))
+    return (_CONTROL.sub("", text) if found else text), found
+
+
+def control_message(found: List[str]) -> str:
+    """What a control-character diagnostic says, for every input."""
+    what = ("is a control character" if len(found) == 1
+            else "are control characters")
+    return (f"{', '.join(found)} {what}, not text; removed from this value, "
+            "and the rest of it is kept")
+
 
 class RepeatedKey(NamedTuple):
     """A key given again in a mapping it is already in.
@@ -90,8 +115,19 @@ class RepeatedKey(NamedTuple):
     first_line: int
 
 
+class ControlCharacters(NamedTuple):
+    """The control characters removed from one scalar, as ``U+XXXX``.
+
+    ``path`` leads from the document's root to the scalar, as a
+    `RepeatedKey`'s does; for a mapping key, it ends at that key.
+    """
+    path: Tuple[Union[str, int], ...]
+    found: List[str]
+
+
 class YAMLLoader(yaml.SafeLoader):
-    """PyYAML's safe loader, which also records every repeated mapping key.
+    """PyYAML's safe loader, which also records every repeated mapping key,
+    and removes and records every control character (`CONTROL_CHARACTER`).
 
     Every YAML file sslabdata reads is read with it, through `read_yaml()`.
     Keys are compared as the loader constructs them, so `1` and `0x1`, which
@@ -103,9 +139,18 @@ class YAMLLoader(yaml.SafeLoader):
     def __init__(self, stream):
         super().__init__(stream)
         self.repeated: List[RepeatedKey] = []
+        self.controls: List[ControlCharacters] = []
+
+    def construct_scalar(self, node):
+        return without_control_characters(super().construct_scalar(node))[0]
 
     def construct_document(self, node):
         seen = set()
+
+        def controls(node, path):
+            found = without_control_characters(node.value)[1]
+            if found:
+                self.controls.append(ControlCharacters(path, found))
 
         def walk(node, path):
             # An alias is the node it names, so each node is walked once,
@@ -113,7 +158,9 @@ class YAMLLoader(yaml.SafeLoader):
             if id(node) in seen:
                 return
             seen.add(id(node))
-            if isinstance(node, yaml.SequenceNode):
+            if isinstance(node, yaml.ScalarNode):
+                controls(node, path)
+            elif isinstance(node, yaml.SequenceNode):
                 for index, child in enumerate(node.value):
                     walk(child, (*path, index))
             elif isinstance(node, yaml.MappingNode):
@@ -127,6 +174,7 @@ class YAMLLoader(yaml.SafeLoader):
                     if not isinstance(key_node, yaml.ScalarNode):
                         continue
                     key = self.construct_object(key_node)
+                    controls(key_node, (*path, str(key)))
                     line = key_node.start_mark.line + 1
                     if key in first:
                         self.repeated.append(RepeatedKey(
@@ -139,11 +187,13 @@ class YAMLLoader(yaml.SafeLoader):
         return super().construct_document(node)
 
 
-def read_yaml(stream) -> Tuple[object, List[RepeatedKey]]:
-    """One YAML document, and every key repeated in a mapping of it."""
+def read_yaml(stream) -> Tuple[object, List[RepeatedKey],
+                               List[ControlCharacters]]:
+    """One YAML document, every key repeated in a mapping of it, and every
+    scalar its control characters were removed from."""
     loader = YAMLLoader(stream)
     try:
-        return loader.get_single_data(), loader.repeated
+        return loader.get_single_data(), loader.repeated, loader.controls
     finally:
         loader.dispose()
 
@@ -328,24 +378,24 @@ class LabDataConfig:
     # key is, so that a diagnostic's `key` is always a string. Never emitted.
     unknown_keys: List[str] = field(default_factory=list)
 
+    # A `CONTROL_CHARACTER` diagnostic for each value of `lab.yaml` its
+    # control characters were removed from, for the assembler to report.
+    # Never emitted.
+    control_characters: List[Diagnostic] = field(default_factory=list)
+
     @classmethod
     def from_yaml(cls, path: str) -> 'LabDataConfig':
         """Load configuration from a YAML file."""
         with open(path, 'r', encoding='utf-8') as f:
-            data, repeated = read_yaml(f)
+            data, repeated, controls = read_yaml(f)
 
         def reject(code, key, field_name, message):
             raise ConfigurationError(
                 diagnostic(code, str(path), key, field_name, message))
 
-        # Located as any key of this file is: the top-level key, then the
-        # path below it. The first repeat is reported, as the first of any
-        # other fault is.
+        # The first repeat is reported, as the first of any other fault is.
         for repeat in repeated:
-            steps = (*repeat.path, repeat.key)
-            top = steps[0] if isinstance(steps[0], str) else None
-            reject(KEY_REPEATED, top,
-                   dotted(steps[1 if top else 0:]) or None,
+            reject(KEY_REPEATED, *_located((*repeat.path, repeat.key)),
                    repeated_message(repeat))
 
         if not isinstance(data, dict):
@@ -420,7 +470,18 @@ class LabDataConfig:
             path=str(path),
             collaborators_file=data.get('collaborators_file'),
             unknown_keys=[str(key) for key in data if key not in KNOWN_KEYS],
+            control_characters=[
+                diagnostic(CONTROL_CHARACTER, str(path), *_located(found.path),
+                           control_message(found.found))
+                for found in controls],
         )
+
+
+def _located(steps) -> Tuple[Optional[str], Optional[str]]:
+    """A path in `lab.yaml` as any key of the file is located: the top-level
+    key, then the path below it."""
+    top = steps[0] if steps and isinstance(steps[0], str) else None
+    return top, dotted(steps[1 if top else 0:]) or None
 
 
 def _kind(value) -> str:

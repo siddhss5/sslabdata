@@ -40,6 +40,28 @@ structure.unclosed_brace:
     - {code: BIB-YEAR-MISSING, severity: warning, file: ./broken.bib, key: brace-broken, field: year}
   kept: [brace-before, brace-broken, brace-after]
 
+# Braces BibTeX matches as written, so no syntax error: each entry is read as
+# BibTeX reads it, and says that a field was read into another or lost. The
+# two whose fields are lost lose their year too.
+structure.brace_mismatch:
+  dir: brace_mismatch
+  exit: 0
+  diagnostics:
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-merged, field: abstract, values: [organization]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-dropped, field: note, values: [title, line 14]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-trailing, field: howpublished, values: [and more, line 20]}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-dropped, field: year}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-trailing, field: year}
+    - {code: BIB-STRING-UNDEFINED, severity: warning, file: ./braces.bib, key: brace-escaped, field: title, values: [w]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-escaped, field: url, values: [title, line 27]}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-escaped, field: year}
+  kept: [brace-merged, brace-dropped, brace-trailing, brace-escaped, brace-after]
+  emits:
+    - work: brace-merged
+      expect: {abstract: null, organization: {contains: [abstract]}}
+    - work: brace-dropped
+      expect: {title: Dropped Fields, note: null}
+
 structure.duplicate_key_file:
   dir: duplicate_key_same_file
   exit: 1
@@ -154,6 +176,61 @@ latex.unknown_macro:
   emits:
     - work: unknown-macro
       expect: {title: {contains: [Strange], excludes: ["\\"]}}
+
+# A control character is removed where it is read and reported there, once
+# per value, in a .bib field, a people record and lab.yaml alike. The title
+# loses nothing else: U+0002 and U+0001 are the LaTeX conversion's own
+# markers, and are gone before it runs. JSON writes a control character as
+# \u00XX, which is what `not_emitted` looks for; DEL it writes as itself.
+text.control_characters:
+  dir: control_characters
+  exit: 0
+  diagnostics:
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: ./control.bib, key: control-chars, field: title, values: [U+0001, U+0002, U+007F]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: name, values: [U+0001]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: lab.yaml, key: lab, field: description, values: [U+0007]}
+  kept: [control-chars]
+  emits:
+    - work: control-chars
+      expect: {title: Alpha Beta 0 Gamma Delta, authors.*.person_id: [aadams]}
+    - person: aadams
+      expect: {name: Alice Adams}
+  not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\x7f"]
+
+# A definition command is an unknown command like any other: it is dropped
+# and reported, and the words, the link and the URL after it are kept. An
+# accent that reads part of a set-aside URL leaves a marker behind, which is
+# a conversion failure: the abstract is kept as written, with no marker.
+latex.definition_commands:
+  dir: definition_commands
+  exit: 0
+  diagnostics:
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./define.bib, key: definition-commands, field: title, values: ["\\newcommand", 3 fields]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./define.bib, key: definition-commands, field: note, values: ["\\def"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./define.bib, key: definition-commands, field: note, values: ["\\x"]}
+    - {code: LATEX-CONVERSION-FAILED, severity: warning, file: ./define.bib, key: definition-commands, field: abstract}
+  kept: [definition-commands]
+  emits:
+    - work: definition-commands
+      expect: {title: zqx Tidy Robots, venue.name: https://x.org/x Letters, note: site (https://x.org/y) and y z,
+               abstract: "Accented \\'\\urlhttps://x.org/z link"}
+
+# A command the parser library knows the arguments of, and sslabdata has no
+# rule for, keeps them as text, as a command it knows nothing about does.
+latex.unknown_command_arguments:
+  dir: unknown_command_arguments
+  exit: 0
+  diagnostics:
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: title, values: ["\\keywords"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: title, values: ["\\verb"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: journal, values: ["\\subexercise"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: note, values: ["\\xrightarrow"]}
+    - {code: LATEX-COMMAND-UNKNOWN, severity: warning, file: ./args.bib, key: unknown-command-arguments, field: note, values: ["\\fictionalmacro"]}
+  kept: [unknown-command-arguments]
+  emits:
+    - work: unknown-command-arguments
+      expect: {title: Tidy Robots with zqx, venue.name: Journal of Fictional Robots,
+               note: "Moving [fast]there and [a]b too"}
 
 # One record for the command, however many fields use it, with the count and
 # the first field in document order.
