@@ -36,6 +36,13 @@ test = [
     "setuptools>=77"
 ]
 
+# Tools for development and CI only; not part of the published metadata.
+[dependency-groups]
+typecheck = [
+    "mypy==2.3.1",
+    "types-PyYAML==6.0.12.20260906",
+]
+
 [project.scripts]
 sslabdata = "sslabdata.cli:main"
 
@@ -64,6 +71,15 @@ packages = ["sslabdata", "sslabdata.parsers", "sslabdata.schema"]
 
 [tool.setuptools.package-data]
 "sslabdata.schema" = ["v5/output.schema.json"]
+
+[tool.mypy]
+files = ["sslabdata"]
+check_untyped_defs = true
+
+# Neither ships type hints or has a stub package.
+[[tool.mypy.overrides]]
+module = ["pybtex.*", "pylatexenc.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--cov --cov-report=term-missing"

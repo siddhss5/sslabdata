@@ -40,6 +40,13 @@ jobs:
       run: |
         uv sync --frozen --extra test
 
+    # Once, on the minimum supported Python. mypy and its stubs are pinned in
+    # the typecheck dependency group; the settings are in pyproject.toml.
+    - name: Type-check
+      if: matrix.python-version == '3.10'
+      run: |
+        uv run --frozen --group typecheck mypy
+
     # The floor matches [tool.coverage.report] fail_under in pyproject.toml.
     - name: Run tests with coverage
       run: |
