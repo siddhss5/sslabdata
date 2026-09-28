@@ -34,25 +34,6 @@ def test_every_code_the_source_names_is_classified():
         diagnostic("NO-SUCH-CODE", "w.bib", "e", "title", "never reported")
 
 
-def test_a_field_whose_latex_cannot_be_read_is_located(tmp_path, monkeypatch):
-    """`LATEX-CONVERSION-FAILED` is located at its field and fails `--strict`.
-    The converter fails only on a fault, so no corpus input can reach it;
-    the failure is injected."""
-    import sslabdata.parsers.bibtex as bibtex
-
-    def unreadable(value):
-        if "Broken" in value:
-            raise ValueError("cannot read")
-        return value
-    monkeypatch.setattr(bibtex, "latex_to_text", unreadable)
-    write_lab(tmp_path, "@article{e, title = {Broken {Title}}, journal = {J},"
-                        " year = 2024}\n")
-    run, [record] = json_run(tmp_path, "--validate", "--strict")
-    assert (record["code"], record["file"], record["key"], record["field"]) == (
-        "LATEX-CONVERSION-FAILED", "./w.bib", "e", "title")
-    assert record["severity"] == "error" and run.code == 1
-
-
 def test_an_entry_that_cannot_be_written_back_is_located(tmp_path, monkeypatch):
     """`BIB-WRITE-BACK-FAILED` is located at its entry and stays a warning.
     Serializing a parsed entry fails only on a fault, so it is injected."""

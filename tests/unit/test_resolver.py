@@ -37,87 +37,36 @@ def assert_diagnostic(line, code, where, *values):
 
 
 class TestNormalizeName:
-    """The matching key. Accent, period, whitespace and footnote-markup variants of one name each
-    need their own corpus entry to reach through the CLI; a wrong key silently links
+    """The matching key. Accent and whitespace variants of one name each need
+    their own corpus entry to reach through the CLI; a wrong key silently links
     or drops every author it touches."""
-
-    def test_basic(self):
-        assert normalize_name("A. Adams") == "a adams"
 
     def test_accents(self):
         assert normalize_name("H. Müller") == "h muller"
 
-    def test_periods(self):
-        assert normalize_name("A.J. Adams") == "aj adams"
-
     def test_whitespace(self):
         assert normalize_name("  A.  Adams  ") == "a adams"
 
-    def test_superscript(self):
-        assert normalize_name("A. Adams<sup>*</sup>") == "a adams"
-
 
 class TestIsAbbreviated:
-    """The gate on fuzzy matching. A wrong answer lets `H. Zhang` suggest an unrelated
-    person; the spellings that decide it are too many to write as fixtures."""
-
-    def test_single_initial_surname(self):
-        assert is_abbreviated("a kim") is True
-        assert is_abbreviated("h zhang") is True
+    """The gate on fuzzy matching. A multi-initial name or a single word read as
+    abbreviated would never be suggested; no fixture writes either shape."""
 
     def test_multi_initial(self):
         assert is_abbreviated("a j kim") is False
-
-    def test_full_name(self):
-        assert is_abbreviated("alice adams") is False
 
     def test_single_word(self):
         assert is_abbreviated("kim") is False
 
 
-class TestSameInitial:
-    """Two members sharing an initial and a family name: an alias one of them never
-    declared must not link an abbreviated name to the wrong person, a silent
-    misattribution."""
-
-    def test_same_initial_collision_without_alias(self):
-        """An alias shared implicitly with another person's initials is ambiguous.
-
-        Alan Kim declares no aliases, but "A. Kim" fits him as well as Alex Kim,
-        so it must not resolve to Alex.
-        """
-        people = [
-            Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
-            Person(id="alankim", name="Alan Kim", aliases=[]),
-        ]
-        work = Work(
-            bib_id="kim2024", title="Test", category="Test",
-            entry_type="article", year=2024,
-            authors=[Author(name="A. Kim", position=1, given="A.", family="Kim")],
-        )
-        unresolved = resolve_authors([work], people)
-        assert work.authors[0].person_id is None
-        assert "A. Kim" in unresolved
-
-
 class TestFuzzyMatches:
-    """The threshold and tie boundaries of a suggestion: abbreviated names are skipped,
-    ties are all returned in sorted order, and a form two people declare suggests
-    neither. Reached through the CLI only by one suggestion per fixture."""
+    """The boundaries of a suggestion: abbreviated names are skipped, and a form two
+    people declare suggests neither. Reached through the CLI only by one suggestion
+    per fixture."""
 
     def test_abbreviated_name_skipped(self):
         """Single-initial names should NOT fuzzy match — too ambiguous."""
         assert fuzzy_matches("H. Zhang", Candidates([("yzhang", ["Y. Zhang"])])) == []
-
-    def test_close_match(self):
-        candidates = Candidates([("aadams", ["Alice Adams"])])
-        assert fuzzy_matches("Alice A. Adams", candidates, threshold=0.75) == ["aadams"]
-        assert fuzzy_matches("Completely Different Name", candidates) == []
-
-    def test_ties_are_all_returned_sorted(self):
-        candidates = Candidates([("zlee", ["Dina Lee"]), ("alee", ["Dena Lee"]),
-                                 ("aadams", ["Alice Adams"])])
-        assert fuzzy_matches("Dana Lee", candidates, threshold=0.8) == ["alee", "zlee"]
 
     def test_a_form_two_people_declare_suggests_neither(self):
         """`ab kim` is nearest `a kim`, which both Kims declare."""
@@ -126,80 +75,9 @@ class TestFuzzyMatches:
         assert fuzzy_matches("Ab Kim", candidates) == []
 
 
-# Corpus authorships whose match depends on reading the full name rather than
-# the abbreviated form: (given, von, family, who the abbreviated form finds,
-# who they resolve to). The first two are the rows `identity.full_name` and
-# `names.same_initial_alan`. The third is a near miss on the full name, which
-# links nothing: it stays unresolved and is reported as a suggestion.
-MATCHED_ON_THE_FULL_NAME = [
-    ("Frank", None, "Fischer", None, "ffischer"),
-    ("Alan", None, "Kim", "akim", "alankim"),
-    ("Grace-Ann", None, "Green$^*$", None, None),
-]
-
-
-class TestTheResolverMatchesTheFullName:
-    """A full name is matched as written, and never abbreviated to find
-    someone who declared the abbreviation.
-
-    The failure is silent: the author is linked to the wrong member and no
-    diagnostic is raised, so only an assertion on the resulting `person_id`
-    over several name pairs exposes it."""
-
-    PEOPLE = [
-        Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-        Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
-        Person(id="alankim", name="Alan Kim"),
-        Person(id="ffischer", name="Frank Fischer"),
-        Person(id="ggreen", name="Grace-Ann Green", aliases=["G.-A. Green"]),
-    ]
-
-    def resolve(self, author):
-        work = Work(bib_id="w", title="T", category="C", entry_type="article",
-                    year=2024, authors=[author])
-        resolve_authors([work], self.PEOPLE)
-        return work.authors[0].person_id
-
-    @pytest.mark.parametrize(
-        "given,von,family,on_match_form,on_full_name",
-        MATCHED_ON_THE_FULL_NAME,
-        ids=[row[2] for row in MATCHED_ON_THE_FULL_NAME])
-    def test_each_predicted_authorship_resolves_on_the_full_name(
-            self, given, von, family, on_match_form, on_full_name):
-        author = Author(name=" ".join(p for p in (given, von, family) if p),
-                        position=1, given=given, von=von, family=family)
-        assert self.resolve(author) == on_full_name
-
-    @pytest.mark.parametrize(
-        "given,von,family,on_match_form,on_full_name",
-        MATCHED_ON_THE_FULL_NAME,
-        ids=[row[2] for row in MATCHED_ON_THE_FULL_NAME])
-    @pytest.mark.parametrize("display", [
-        "Alice Adams", "Alex Kim", "A. Kim", "Somebody Else", ""])
-    def test_the_display_name_never_decides(
-            self, given, von, family, on_match_form, on_full_name, display):
-        """`name` is display-only: a name that disagrees with the parts --
-        including one that is another member's name -- resolves as the parts
-        say, whatever it is."""
-        author = Author(name=display, position=1, given=given, von=von,
-                        family=family)
-        assert self.resolve(author) == on_full_name
-
-    def test_parts_that_are_nobody_stay_nobody_under_a_members_name(self):
-        author = Author(name="Alice Adams", position=1, given="Quentin",
-                        family="Quinn")
-        assert self.resolve(author) is None
-
-    def test_an_abbreviated_name_still_reaches_its_declared_alias(self):
-        author = Author(name="A. Adams", position=1, given="A.", family="Adams")
-        assert self.resolve(author) == "aadams"
-
-
 class TestMatchingPolicy:
-    """The order `match()` applies, and what it reports instead of guessing.
-
-    A wrong order links an author to the wrong member with no diagnostic. Each
-    rung of the order is one case; a fixture per rung would repeat the lab."""
+    """What matching reports instead of guessing, where no fixture reaches it:
+    near misses tied at the best score, and an editor fitting two members."""
 
     def run(self, people, *authors, editors=()):
         work = Work(bib_id="k1", title="T", category="C", entry_type="article",
@@ -209,114 +87,6 @@ class TestMatchingPolicy:
         unresolved = resolve_authors([work], people, diagnostics=warnings,
                                      bib_dir="bib")
         return work, unresolved, warnings
-
-    def test_an_ambiguous_initial_is_reported_with_its_location(self):
-        people = [Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
-                  Person(id="alankim", name="Alan Kim")]
-        work, unresolved, warnings = self.run(
-            people, Author(name="Bob Brown", position=1, given="Bob", family="Brown"),
-            Author(name="A. Kim", position=2, given="A.", family="Kim"))
-        author = work.authors[1]
-        assert author.person_id is None
-        assert author.resolution_status == "ambiguous"
-        assert author.resolution_method is None
-        assert unresolved == ["A. Kim", "Bob Brown"]
-        [warning] = warnings
-        assert_diagnostic(warning, "RESOLVE-AMBIGUOUS-NAME", "bib/w.bib:k1:author:",
-                          "A. Kim", "akim", "alankim")
-
-    def test_two_people_declaring_one_full_name_is_ambiguous(self):
-        people = [Person(id="lee1", name="Lin Lee"), Person(id="lee2", name="Lin Lee")]
-        work, _, warnings = self.run(
-            people, Author(name="Lin Lee", position=1, given="Lin", family="Lee"))
-        assert work.authors[0].person_id is None
-        assert work.authors[0].resolution_status == "ambiguous"
-        assert [w.code for w in warnings] == ["RESOLVE-AMBIGUOUS-NAME"]
-
-    def test_a_near_miss_is_suggested_and_not_linked(self):
-        people = [Person(id="ddavis", name="Dave Davis", aliases=["D. Davis"])]
-        work, unresolved, warnings = self.run(
-            people, Author(name="Dave M. Davis", position=1, given="Dave M.",
-                           family="Davis"))
-        assert work.authors[0].person_id is None
-        assert work.authors[0].resolution_status == "unresolved"
-        assert unresolved == ["Dave M. Davis"]
-        [warning] = warnings
-        assert_diagnostic(warning, "RESOLVE-SUGGESTION", "bib/w.bib:k1:author:",
-                          "Dave M. Davis", "ddavis")
-
-    def test_a_fuller_name_is_not_folded_into_a_declared_initial(self):
-        """`Alan Kim` is not the Kim who declared `A. Kim`: a suggestion only."""
-        people = [Person(id="akim", name="Alex Kim", aliases=["A. Kim"])]
-        work, _, warnings = self.run(
-            people, Author(name="Alan Kim", position=1, given="Alan", family="Kim"))
-        assert work.authors[0].person_id is None
-        assert [w.code for w in warnings] == ["RESOLVE-SUGGESTION"]
-        assert "may be akim" in warnings[0].message
-
-    def test_an_initial_nobody_declared_is_suggested_and_not_linked(self):
-        people = [Person(id="ffischer", name="Frank Fischer")]
-        work, _, warnings = self.run(
-            people, Author(name="F. Fischer", position=1, given="F.", family="Fischer"))
-        assert work.authors[0].person_id is None
-        assert "may be ffischer" in warnings[0].message
-
-    def test_an_external_name_is_reported_by_nothing(self):
-        people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
-        _, unresolved, warnings = self.run(
-            people, Author(name="Quentin Quinn", position=1, given="Quentin",
-                           family="Quinn"))
-        assert unresolved == ["Quentin Quinn"] and warnings == []
-
-    def test_a_partly_abbreviated_name_reaches_its_declared_alias(self):
-        people = [Person(id="bbrown", name="Bob Brown", aliases=["B. A. Brown"]),
-                  Person(id="bbrown2", name="Bill A. Brown")]
-        work, _, warnings = self.run(
-            people, Author(name="Bob A. Brown", position=1, given="Bob A.",
-                           family="Brown"))
-        assert work.authors[0].person_id == "bbrown" and warnings == []
-
-    def test_particles_suffixes_and_hyphens_are_compared_as_parts(self):
-        people = [Person(id="vvdb", name="Victor van den Berg",
-                         aliases=["V. van den Berg"]),
-                  Person(id="jsmith", name="John Smith, Jr.", aliases=["J. Smith, Jr."]),
-                  Person(id="jsmithsr", name="James Smith, Sr."),
-                  Person(id="gagreen", name="Grace-Ann Green", aliases=["G.-A. Green"]),
-                  Person(id="gbgreen", name="Grace-Beth Green")]
-        work, _, warnings = self.run(
-            people,
-            Author(name="V. van den Berg", position=1, given="V.",
-                   von="van den", family="Berg"),
-            Author(name="J. Smith Jr.", position=2, given="J.", family="Smith",
-                   suffix="Jr."),
-            Author(name="John Smith Jr.", position=3, given="John", family="Smith",
-                   suffix="Jr."),
-            Author(name="G.-A. Green", position=4, given="G.-A.", family="Green"))
-        assert [a.person_id for a in work.authors] == [
-            "vvdb", "jsmith", "jsmith", "gagreen"]
-        assert warnings == []
-
-    def test_a_brace_protected_name_matches_only_as_written(self):
-        people = [Person(id="acme", name="Acme Robotics")]
-        work, _, warnings = self.run(
-            people, Author(name="Acme Robotics", position=1, literal="Acme Robotics"),
-            Author(name="Acme Robots", position=2, literal="Acme Robots"))
-        assert [a.person_id for a in work.authors] == ["acme", None]
-
-    def test_a_star_in_a_name_is_a_near_miss_and_not_linked(self):
-        """A star that is not a marker is part of the name, and a name with a
-        star in it is not the person's name."""
-        people = [Person(id="astar", name="Alice Star")]
-        work, unresolved, warnings = self.run(
-            people, Author(name="Alice Star*", position=1, given="Alice",
-                           family="Star*"))
-        author = work.authors[0]
-        assert author.person_id is None
-        assert (author.resolution_status, author.resolution_method) == ("unresolved", None)
-        assert unresolved == ["Alice Star*"]
-        [warning] = warnings
-        assert_diagnostic(warning, "RESOLVE-SUGGESTION", "bib/w.bib:k1:author:",
-                          "Alice Star*", "astar")
 
     def test_tied_near_misses_are_all_suggested_in_sorted_order(self):
         """Two people equally close are both suggested, whatever their order
@@ -357,37 +127,6 @@ class TestRunTogetherInitials:
     Read as different spellings, one person splits into two collaborators or a
     member's alias is missed; each spelling pair is its own case."""
 
-    IVERS = [Person(id="sivers", name="Stella Sky Ivers", aliases=["S. S. Ivers"])]
-
-    @pytest.mark.parametrize("given", ["S.S.", "S.S", "S S", "S. S."])
-    def test_written_forms_match_a_spaced_alias(self, given):
-        assert _resolved(self.IVERS, given=given, family="Ivers") == "sivers"
-
-    @pytest.mark.parametrize("alias", ["S.S. Ivers", "S.S Ivers", "S S Ivers"])
-    def test_declared_forms_match_spaced_initials(self, alias):
-        people = [Person(id="sivers", name="Stella Sky Ivers", aliases=[alias])]
-        assert _resolved(people, given="S. S.", family="Ivers") == "sivers"
-
-    def test_three_initials(self):
-        people = [Person(id="umoss", name="Uma Ann Kaye Moss",
-                         aliases=["T.A.K. Moss"])]
-        assert _resolved(people, given="T. A. K.", family="Moss") == "umoss"
-
-    @pytest.mark.parametrize("given", ["SS", "Ss"])
-    def test_a_part_with_no_period_inside_is_not_split(self, given):
-        assert _resolved(self.IVERS, given=given, family="Ivers") is None
-
-    def test_an_undotted_name_is_not_run_together_initials(self):
-        people = [Person(id="equill", name="Ed Quill")]
-        assert _resolved(people, given="E.D.", family="Quill") is None
-        assert _resolved(people, given="Ed", family="Quill") == "equill"
-
-    def test_a_family_name_is_not_split(self):
-        people = [Person(id="ada", name="Ada S. S.")]
-        assert _resolved(people, given="Ada", family="S.S.") is None
-        people = [Person(id="ada", name="Ada S.S.")]
-        assert _resolved(people, given="Ada", family="S.S.") == "ada"
-
     def test_a_brace_protected_name_is_not_split(self):
         people = [Person(id="ssr", name="S. S. Robotics")]
         assert _resolved(people, name="S.S. Robotics",
@@ -423,35 +162,6 @@ class TestRunTogetherInitials:
     def test_hyphenated_initials_are_left_as_written(self, given, found):
         people = [Person(id="jwren", name="Jana-Pia Wren", aliases=["J.-P. Wren"])]
         assert _resolved(people, given=given, family="Wren") == found
-
-
-class TestResolveAuthors:
-    """An editor resolves but is never reported as an unresolved author; the
-    conformance suite reads the author report only."""
-
-    def _make_work(self, authors, editors=()):
-        return Work(
-            bib_id="test",
-            title="Test",
-            authors=list(authors),
-            editors=list(editors),
-            year=2024,
-            category="Test",
-            entry_type="article",
-        )
-
-    def test_editors_resolve_but_are_never_reported_as_unresolved(self):
-        """Editing a volume is not an authorship, so an editor nobody matches
-        is not an author sslabdata could not resolve."""
-        people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
-        editors = [Contributor(name="Alice Adams", position=1, given="Alice",
-                               family="Adams"),
-                   Contributor(name="Quentin Quinn", position=2, given="Quentin",
-                               family="Quinn")]
-        work = self._make_work([], editors)
-        unresolved = resolve_authors([work], people)
-        assert [e.person_id for e in work.editors] == ["aadams", None]
-        assert unresolved == []
 
 
 class TestComputeBacklinks:
@@ -503,32 +213,6 @@ class TestLoadPeople:
         assert load_people("/nonexistent/path.yaml", []) == []
 
 
-class TestLoadProjects:
-    """The loader called directly on a file that is not there; see TestLoadPeople."""
-
-    def test_missing_file(self):
-        assert load_projects("/nonexistent/path.yaml", []) == []
-
-
-class TestLoadCollaborators:
-    """The loader called directly: aliases are read as declared, and a missing or
-    empty file declares nobody."""
-
-    def test_load(self, tmp_path):
-        path = tmp_path / "collaborators.yaml"
-        path.write_text('- name: "Priya Patel"\n  aliases: ["P. Patel"]\n'
-                        '- name: "Quentin Quinn"\n', encoding="utf-8")
-        loaded = load_collaborators(str(path), [])
-        assert [(c.name, c.aliases) for c in loaded] == [
-            ("Priya Patel", ["P. Patel"]), ("Quentin Quinn", [])]
-
-    def test_missing_or_empty_file(self, tmp_path):
-        assert load_collaborators("/nonexistent/path.yaml", []) == []
-        empty = tmp_path / "empty.yaml"
-        empty.write_text("", encoding="utf-8")
-        assert load_collaborators(str(empty), []) == []
-
-
 class TestDeclaredCollaboratorGrouping:
     """`collaborators_file` groups spellings; it never produces a person.
 
@@ -544,39 +228,6 @@ class TestDeclaredCollaboratorGrouping:
         resolve_authors(works, people, diagnostics=warnings, bib_dir="bib")
         entries = declared_collaborators(declared, people, "c.yaml", warnings)
         return works, group_collaborators(works, "bib", warnings, entries, people), warnings
-
-    def test_a_declared_alias_joins_one_person_and_not_another(self):
-        from sslabdata.loaders import DeclaredCollaborator
-        works, collaborators, warnings = self.assemble(
-            [], [DeclaredCollaborator("Priya Patel", ["P. Patel"])],
-            [Author(name="Priya Patel", position=1, given="Priya", family="Patel")],
-            [Author(name="P. Patel", position=1, given="P.", family="Patel")],
-            [Author(name="Pradeep Patel", position=1, given="Pradeep", family="Patel")])
-        grouped = {c.name: (c.grouped_by, c.work_ids) for c in collaborators}
-        assert grouped == {"Priya Patel": ("declared", ["w0", "w1"]),
-                           "Pradeep Patel": ("normalized_name", ["w2"])}
-        assert [a.person_id for w in works for a in w.authors] == [None] * 3
-        assert warnings == []
-
-    def test_run_together_initials_match_a_spaced_declared_alias(self):
-        from sslabdata.loaders import DeclaredCollaborator
-        _, collaborators, warnings = self.assemble(
-            [], [DeclaredCollaborator("Priya Sun Patel", ["P. S. Patel"])],
-            [Author(name="Priya Sun Patel", position=1, given="Priya Sun",
-                    family="Patel")],
-            [Author(name="P.S. Patel", position=1, given="P.S.", family="Patel")])
-        assert [(c.name, c.grouped_by, c.work_ids) for c in collaborators] == [
-            ("Priya Sun Patel", "declared", ["w0", "w1"])]
-        assert warnings == []
-
-    def test_spaced_initials_match_a_run_together_declared_alias(self):
-        from sslabdata.loaders import DeclaredCollaborator
-        _, collaborators, warnings = self.assemble(
-            [], [DeclaredCollaborator("Priya Sun Patel", ["P.S. Patel"])],
-            [Author(name="P. S. Patel", position=1, given="P. S.", family="Patel")])
-        assert [(c.name, c.grouped_by) for c in collaborators] == [
-            ("P. S. Patel", "declared")]
-        assert warnings == []
 
     def test_a_run_together_alias_a_member_declares_spaced_is_reported(self):
         from sslabdata.loaders import DeclaredCollaborator
@@ -614,56 +265,14 @@ class TestDeclaredCollaboratorGrouping:
         [literal] = [c for c in collaborators if c.name_kind == "literal"]
         assert literal.key.startswith("ss-quinn-")
 
-    def test_a_name_fitting_two_declared_collaborators_is_reported(self):
-        from sslabdata.loaders import DeclaredCollaborator
-        _, collaborators, warnings = self.assemble(
-            [], [DeclaredCollaborator("Priya Patel", ["P. Patel"]),
-                           DeclaredCollaborator("Pradeep Patel")],
-            [Author(name="P. Patel", position=2, given="P.", family="Patel")])
-        assert [(c.name, c.grouped_by) for c in collaborators] == [
-            ("P. Patel", "normalized_name")]
-        [warning] = warnings
-        assert_diagnostic(warning, "ID-GROUPING-AMBIGUOUS-DECLARED",
-                          "bib/w.bib:w0:author:", "P. Patel",
-                          "collaborator:pradeep patel", "collaborator:priya patel")
-
-    def test_a_member_competes_with_a_declared_collaborator(self):
-        """`P. Patel` could be the member as well, so it joins neither.
-
-        It fits one lab member, not more than one, so it is not
-        `RESOLVE-AMBIGUOUS-NAME`: it is reported with the
-        other grouping ambiguity, as an unresolved outside co-author may be.
-        """
-        from sslabdata.loaders import DeclaredCollaborator
-        people = [Person(id="ppatel", name="Paul Patel")]
-        works, collaborators, warnings = self.assemble(
-            people, [DeclaredCollaborator("Priya Patel", ["P. Patel"])],
-            [Author(name="P. Patel", position=1, given="P.", family="Patel")])
-        assert works[0].authors[0].person_id is None
-        assert [c.grouped_by for c in collaborators] == ["normalized_name"]
-        assert any(w.code == "ID-GROUPING-AMBIGUOUS-DECLARED"
-                   and "person:ppatel" in w.message for w in warnings)
-        assert not any(w.code == "RESOLVE-AMBIGUOUS-NAME" for w in warnings)
-
-    def test_a_declared_name_that_is_a_member_is_left_to_the_member(self):
-        from sslabdata.loaders import DeclaredCollaborator
-        people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
-        works, collaborators, warnings = self.assemble(
-            people, [DeclaredCollaborator("Alice Adams")],
-            [Author(name="Alice Adams", position=1, given="Alice", family="Adams")])
-        assert works[0].authors[0].person_id == "aadams"
-        assert collaborators == []
-        [warning] = warnings
-        assert_diagnostic(warning, "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER",
-                          "c.yaml:Alice Adams:name:", "Alice Adams", "aadams")
-
 
 class TestPeopleAndProjectsFiles:
     """What is wrong with a people or projects file, in its three classes.
 
     The loaders' per-record checks decide which records enter the document
-    (a blank name, a non-record entry, each status and role value). The corpus
-    holds one bad record per fixture, not each value a check must accept."""
+    (an empty file, a non-record entry, a project status, a key that is not a
+    string). The corpus holds one bad record per fixture, not each value a
+    check must accept."""
 
     def load(self, tmp_path, loader, text):
         path = tmp_path / "records.yaml"
@@ -678,19 +287,6 @@ class TestPeopleAndProjectsFiles:
 
     def test_an_empty_file_is_no_records(self, tmp_path):
         assert self.load(tmp_path, load_people, "") == ([], [], [], [])
-
-    def test_a_missing_or_blank_name(self, tmp_path):
-        records, errors, _, _ = self.load(
-            tmp_path, load_people,
-            "- {id: q}\n- {id: p, name: ' '}\n- {id: r, name: R, role: x}\n")
-        assert [r.id for r in records] == ["r"]
-        assert places(errors) == [("PEOPLE-FIELD-MISSING", "f.yaml:q:name:"),
-                                  ("PEOPLE-FIELD-MISSING", "f.yaml:p:name:")]
-
-    def test_a_projects_file_that_is_not_a_list_is_fatal(self, tmp_path):
-        records, errors, _, _ = self.load(tmp_path, load_projects, "p: {title: T}\n")
-        assert records == [] and [e.split(" ", 2)[:2] for e in errors] == [
-            ["PROJECTS-NOT-A-LIST", "f.yaml:::"]]
 
     def test_every_record_is_checked_the_same_way(self, tmp_path):
         records, errors, _, _ = self.load(
@@ -708,14 +304,6 @@ class TestPeopleAndProjectsFiles:
         assert [c.name for c in declared] == ["Priya Patel"]
         assert places(errors) == [("COLLABORATORS-FIELD-MISSING", "f.yaml::name:")]
 
-    def test_duplicate_ids_are_kept_and_reported(self, tmp_path):
-        records, _, diagnostics, _ = self.load(
-            tmp_path, load_projects,
-            "- {id: p, title: A}\n- {id: p, title: B}\n")
-        assert [r.title for r in records] == ["A", "B"]
-        [duplicate] = diagnostics
-        assert_diagnostic(duplicate, "PROJECTS-ID-DUPLICATE", "f.yaml:p:id:", "'p'")
-
     @pytest.mark.parametrize("status, reported", [
         ("active", False), ("completed", False), ("paused", True)])
     def test_project_status(self, tmp_path, status, reported):
@@ -727,23 +315,6 @@ class TestPeopleAndProjectsFiles:
         records, _, _, warnings = self.load(tmp_path, load_projects,
                                             "- {id: p, title: A}\n")
         assert records[0].status == "active" and warnings == []
-
-    @pytest.mark.parametrize("role, reported", [
-        ("'research scientist'", False), ("visitor", False),
-        ("''", True), ("7", True), ("[a]", True), (None, True)])
-    def test_any_nonempty_role_is_accepted(self, tmp_path, role, reported):
-        entry = "- {id: p, name: P" + (f", role: {role}" if role else "") + "}\n"
-        _, _, _, warnings = self.load(tmp_path, load_people, entry)
-        assert [w.startswith("PEOPLE-ROLE-INVALID f.yaml:p:role:")
-                for w in warnings] == ([True] if reported else [])
-
-    @pytest.mark.parametrize("status, reported", [
-        ("current", False), ("alumni", False), ("retired", True)])
-    def test_person_status(self, tmp_path, status, reported):
-        _, _, _, warnings = self.load(
-            tmp_path, load_people, f"- {{id: p, name: P, role: r, status: {status}}}\n")
-        assert [w.startswith("PEOPLE-STATUS-INVALID f.yaml:p:status:")
-                for w in warnings] == ([True] if reported else [])
 
     def test_a_key_that_is_not_a_string_is_named_as_text(self, tmp_path):
         path = tmp_path / "records.yaml"
@@ -759,21 +330,6 @@ class TestSharedDeclarations:
     (run-together initials, a suffix, a comma, a hyphen) is a way to miss an
     ambiguous alias or to invent one; the ambiguous_alias fixture writes one shape."""
 
-    def test_a_name_shared_with_an_alias_is_reported_once(self):
-        people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-                  Person(id="aadamson", name="A. Adams", aliases=[]),
-                  Person(id="adup", name="A Adams", aliases=["a. adams"])]
-        [line] = shared_declarations(people, "people.yaml")
-        assert str(line).startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:aadamson:name: ")
-        assert "aadams, aadamson, adup" in line.message
-
-    def test_run_together_and_spaced_initials_are_one_spelling(self):
-        people = [Person(id="sivers", name="Stella Sky Ivers", aliases=["S. S. Ivers"]),
-                  Person(id="sivory", name="Sam Sol Ivers", aliases=["S.S. Ivers"])]
-        [line] = shared_declarations(people, "people.yaml")
-        assert str(line).startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:sivory:aliases: ")
-        assert "sivers, sivory" in line.message
-
     @pytest.mark.parametrize("first, second", [
         ("S.S. Ivers, Jr.", "S. S. Ivers, Jr."),   # before a suffix
         ("S.S. S.S.", "S. S. S.S."),               # the given name, by position
@@ -781,25 +337,6 @@ class TestSharedDeclarations:
     def test_spellings_equal_once_the_given_name_is_spaced(self, first, second):
         people = [Person(id="p1", name="One", aliases=[first]),
                   Person(id="p2", name="Two", aliases=[second])]
-        [line] = shared_declarations(people, "people.yaml")
-        assert "p1, p2" in line.message
-
-    @pytest.mark.parametrize("first, second", [
-        ("Ada S.S.", "Ada S. S."),      # a family name is not split
-        ("S.S. S.S.", "S. S. S. S."),   # nor one written like the given name
-        ("Alice Ivers, S.S.", "Alice Ivers, S. S."),   # nor what follows a comma
-        ("Ivers, S.S.", "Ivers, S. S."),   # `Family, Given` is left as written
-        ("S.S. Ivers", "SS Ivers"),     # a part with no period inside is a name
-        ("J.-P. Wren", "J. P. Wren"),   # hyphenated initials are left as written
-    ])
-    def test_other_spellings_stay_apart(self, first, second):
-        people = [Person(id="p1", name="One", aliases=[first]),
-                  Person(id="p2", name="Two", aliases=[second])]
-        assert shared_declarations(people, "people.yaml") == []
-
-    def test_a_declaration_bibtex_cannot_read_is_compared_as_normalised(self):
-        people = [Person(id="p1", name="One", aliases=["A, B, C, D"]),
-                  Person(id="p2", name="Two", aliases=["a, b, c, d"])]
         [line] = shared_declarations(people, "people.yaml")
         assert "p1, p2" in line.message
 

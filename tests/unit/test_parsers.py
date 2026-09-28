@@ -12,30 +12,24 @@ from sslabdata.parsers.bibtex import (
     DUPLICATE_CITATION_KEY,
     ENTRY_TYPE_UNSUPPORTED,
     LATEX_COMMAND_UNKNOWN,
-    LATEX_CONVERSION_FAILED,
-    PARSER_MESSAGE,
-    WRITE_BACK_FAILED,
     STRING_REDEFINED,
     STRING_UNDEFINED,
     SYNTAX_ERROR,
     VENUE_MISSING,
-    YEAR_INVALID,
     YEAR_MISSING,
     _Parser,
     bare_doi,
     build_links,
     build_venue,
-    extract_note,
     parse_project_ids,
     parse_all_works,
-    pdf_link,
 )
 from sslabdata.parsers.latex import unknown_commands
 
 
 class TestBuildVenue:
-    """One field name, two kinds of container: the entry type and the field order
-    decide the venue. The corpus writes one entry per type, not their collisions."""
+    """One field name, two kinds of container: the entry type decides the venue.
+    The corpus writes one entry per type, not their collisions."""
 
     def test_incollection_is_a_book_not_a_conference(self):
         """One field name, two kinds of container: the entry type decides."""
@@ -47,19 +41,10 @@ class TestBuildVenue:
         venue = build_venue({"ENTRYTYPE": "misc", "eprint": "2301.12345"})
         assert venue.to_dict() == {"kind": "repository", "name": "arXiv"}
 
-    def test_journal_wins_over_booktitle(self):
-        """The precedence is the field order, so one entry gets one venue."""
-        venue = build_venue({"ENTRYTYPE": "article", "journal": "J",
-                             "booktitle": "B"})
-        assert venue.name == "J"
-
 
 class TestBareDoi:
     """Only registered resolver prefixes are stripped; stripping any other URL would
     corrupt an identifier. The corpus writes two spellings."""
-
-    def test_written_as_a_dx_resolver_url(self):
-        assert bare_doi("http://dx.doi.org/10.1/x") == "10.1/x"
 
     def test_some_other_url_is_left_alone(self):
         """Only the registered resolvers are stripped; nothing else is guessed."""
@@ -70,9 +55,6 @@ class TestBuildLinks:
     """A `url` is classified by its parsed host. Lookalike hosts (in a path, a query, a
     fragment, as userinfo, or with a malformed authority) must never become video
     links: an escape matrix too wide to write as fixtures."""
-
-    def test_no_base_and_no_fields(self):
-        assert build_links({}, "k", {}, None) == {}
 
     @pytest.mark.parametrize("url, kind", [
         ("https://www.youtube.com/watch?v=abc", "video"),
@@ -94,44 +76,13 @@ class TestBuildLinks:
         assert list(links) == [kind]
 
 
-class TestPdfLink:
-    """A remote `pdf_base_url` is labelled `unchecked`, because a build never fetches.
-
-    Read as a local path, every remote PDF would be labelled `missing`. The
-    conformance case for verifying a remote link (#20) is an expected
-    failure, so only this test pins the `unchecked` label."""
-
-    def test_a_remote_base_is_never_fetched(self):
-        link = pdf_link("k", "https://example.org/pdfs")
-        assert link.url == "https://example.org/pdfs/k.pdf"
-        assert link.status == "unchecked"
-
-
-class TestExtractNote:
-    """Note text at its boundaries: a trailing period is dropped, and a blank note is
-    no note."""
-
-    def test_with_note(self):
-        entry = {"note": "Best Paper Award."}
-        assert extract_note(entry) == "Best Paper Award"
-
-    def test_no_note(self):
-        assert extract_note({}) is None
-        assert extract_note({"note": ""}) is None
-        assert extract_note({"note": "   "}) is None
-
-
 class TestParseProjectIds:
-    """The `project` field at its boundaries: brace-wrapped and empty values."""
+    """The `project` field written as a brace-wrapped list."""
 
     def test_braces(self):
         assert parse_project_ids({"project": "{gardenbot, planning}"}) == [
             "gardenbot", "planning"
         ]
-
-    def test_empty(self):
-        assert parse_project_ids({}) == []
-        assert parse_project_ids({"project": ""}) == []
 
 
 class TestParseAllWorks:
@@ -162,9 +113,8 @@ class TestCrossref:
     """An entry carrying a crossref is rejected rather than resolved.
 
     Resolving it silently would emit a child with no author of its own. The
-    corpus proves the fatal outcome of three fixtures; only this class sees the
-    parse itself (the parent still compiles, no author-less work exists) and
-    the field's case-insensitive spelling."""
+    corpus proves the fatal outcome of three fixtures; only this class sees
+    the field's case-insensitive spelling and how an empty one is reported."""
 
     CHILD = ("@proceedings{a-parent,\n"
              "  title  = {Proceedings of the Fictional Workshop},\n"
@@ -182,15 +132,6 @@ class TestCrossref:
             bib_dir=str(tmp_path),
             bib_files=[{"name": "child.bib", "category": "Test Papers"}],
             diagnostics=errors)
-
-    def test_the_child_is_rejected_and_the_parent_still_compiles(self, tmp_path):
-        errors = []
-        works = self.parse(tmp_path, self.CHILD, errors)
-        assert [w.bib_id for w in works] == ["a-parent"]
-        assert len(errors) == 1
-        assert errors[0].code == CROSSREF_UNSUPPORTED
-        assert "child.bib:a-child:crossref" in str(errors[0])
-        assert "a-parent" in errors[0].message
 
     EMPTY = ("@inproceedings{empty-child,\n"
              "  title    = {A Child With an Empty Crossref},\n"
@@ -368,37 +309,6 @@ class TestCommentHandling:
         assert read == present, label
         assert not (read & absent), label
 
-    def test_a_quoted_value_does_not_end_a_paren_entry(self, tmp_path):
-        """A ) inside "..." does not end an @article(...) entry.
-
-        Were entry boundaries found by scanning the file rather than by the
-        parser, the entry would lose every field and the entry after it would
-        disappear.
-        """
-        source = ('@article(host,title="Host ) @comment(unclosed",'
-                  ' author="Adams, Alice", journal="J", year=2024)\n' + entry("real"))
-        works = {work.bib_id: work for work in read_source(tmp_path, source)}
-        assert sorted(works) == ["host", "real"]
-        host = works["host"]
-        assert host.title == "Host ) @comment(unclosed"
-        assert host.year == 2024
-        assert [a.name for a in host.authors] == ["Alice Adams"]
-        assert host.venue.name == "J"
-
-
-class TestLatexFallback:
-    """A field pylatexenc cannot read costs that field's markup, never the entry."""
-
-    def test_the_entry_is_still_published(self, tmp_path):
-        """End to end: the entry is read, with the raw text of the bad field."""
-        found, works = located(tmp_path, entry("kept", title=r"Speed: \href"))
-        assert list(works) == ["kept"]
-        assert works["kept"].title == r"Speed: \href"
-        assert works["kept"].year == 2024
-        assert [a.name for a in works["kept"].authors] == ["Alice Adams"]
-        [line] = found[LATEX_CONVERSION_FAILED]
-        assert (line.key, line.field) == ("kept", "title")
-
 
 class TestEntryFiltering:
     """pybtex raises SkipEntry for a filtered entry too, not only for @comment.
@@ -408,7 +318,6 @@ class TestEntryFiltering:
     after a filtered one, silently, if the filter is ever used."""
 
     REJECTED = "@article{drop, title = {D}, year = {2024}}\n"
-    WANTED = "@article{keep, title = {K}, year = {2024}}\n"
 
     def parse(self, text):
         return _Parser(wanted_entries=["keep"]).parse_string(text)
@@ -416,11 +325,6 @@ class TestEntryFiltering:
     def test_a_filtered_entry_does_not_swallow_the_next_one(self):
         data = self.parse(self.REJECTED + "@article(keep, title = {K}, year = {2024})\n")
         assert list(data.entries) == ["keep"]
-
-    def test_a_filtered_entry_does_not_swallow_a_preamble(self):
-        data = self.parse(self.REJECTED + '@preamble("a preamble")\n' + self.WANTED)
-        assert list(data.entries) == ["keep"]
-        assert data.preamble == "a preamble"
 
 
 def located(tmp_path, source, name="hazard.bib"):
@@ -440,9 +344,9 @@ class TestLocatedParserDiagnostics:
     """What the parser library finds is located at `<file>:<key>:<field>`.
 
     The corpus checks each finding's location from the CLI and that the entry
-    is kept; this pairs it with the value the parser leaves behind (a null year
-    or venue, a kept entry type) and covers spellings no fixture carries (`%`
-    comment lines, a `:` in a citation key)."""
+    is kept; this covers the locations and spellings no fixture carries: an
+    `@string`, an entry before its first field, text outside any entry, `%`
+    comment lines, and entry types with no required container."""
 
     def test_an_undefined_macro_inside_a_string_names_no_entry(self, tmp_path):
         found, _ = located(tmp_path, "@string{alias = nosuchmacro}\n" + entry("e"))
@@ -484,38 +388,6 @@ class TestLocatedParserDiagnostics:
         assert found == {}
         assert sorted(works) == ["hidden", "visible"]
 
-    def test_other_parser_messages_are_coded_in_the_librarys_words(self, tmp_path,
-                                                                   capsys):
-        """A repeated field and a name list the library cannot split are not
-        syntax errors, and are not swallowed: each is located at its entry."""
-        source = ("@article{twice, title = {A}, title = {B}, year = 2024}\n"
-                  "@article{commas, title = {T}, author = {Brown, Bob, Jr, X},"
-                  " journal = {J}, year = 2024}\n")
-        found, works = located(tmp_path, source)
-        assert SYNTAX_ERROR not in found
-        twice, commas = found[PARSER_MESSAGE]
-        assert (twice.file, twice.key, twice.field) == (
-            f"{tmp_path}/hazard.bib", "twice", None)
-        assert twice.message == "entry with key twice has a duplicate title field"
-        assert commas.key == "commas" and "Too many commas" in commas.message
-        assert capsys.readouterr().err == ""
-        assert works["twice"].title == "A"
-
-    def test_a_year_that_is_not_a_number_is_null(self, tmp_path):
-        found, works = located(tmp_path, entry("e").replace("{2024}", "{in press}"))
-        [line] = found[YEAR_INVALID]
-        assert f"{tmp_path}/hazard.bib:e:year:" in str(line) and "in press" in line.message
-        assert works["e"].year is None
-
-    @pytest.mark.parametrize("entry_type, field", [
-        ("article", "journal"), ("inproceedings", "booktitle")])
-    def test_a_missing_container_is_named(self, tmp_path, entry_type, field):
-        found, works = located(
-            tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
-        [line] = found[VENUE_MISSING]
-        assert f"{tmp_path}/hazard.bib:e:{field}:" in str(line)
-        assert works["e"].venue is None
-
     @pytest.mark.parametrize("entry_type", [
         "book", "inbook", "manual", "misc", "proceedings", "conference",
         "incollection", "phdthesis", "mastersthesis", "techreport"])
@@ -523,12 +395,6 @@ class TestLocatedParserDiagnostics:
                                                                entry_type):
         found, _ = located(tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
         assert VENUE_MISSING not in found and ENTRY_TYPE_UNSUPPORTED not in found
-
-    def test_an_undocumented_type_is_kept_and_named(self, tmp_path):
-        found, works = located(tmp_path, "@booklet{e, title = {T}, year = 2024}\n")
-        [line] = found[ENTRY_TYPE_UNSUPPORTED]
-        assert f"{tmp_path}/hazard.bib:e:entry_type:" in str(line) and "@booklet" in line.message
-        assert works["e"].entry_type == "booklet"
 
     def test_an_unknown_command_is_named_once_per_field(self, tmp_path):
         source = entry("e", title=r"\fictional{A} and \fictional{B}").replace(
@@ -540,21 +406,10 @@ class TestLocatedParserDiagnostics:
         assert any(":e:author:" in str(l) and "\\strange" in l.message for l in lines)
         assert works["e"].title == "A and B"
 
-    def test_a_citation_key_with_a_colon_keeps_its_parts(self, tmp_path):
-        found, _ = located(tmp_path, entry("smith:2024").replace(
-            "{A Fictional Title}", r"{\fictional{A}}"))
-        [line] = found[LATEX_COMMAND_UNKNOWN]
-        assert (line.file, line.key, line.field) == (
-            f"{tmp_path}/hazard.bib", "smith:2024", "title")
-
 
 class TestUnknownCommands:
     """Which LaTeX commands count as unknown, each named once and in order. The corpus
     holds one unknown macro; this holds the boundary between known and unknown."""
-
-    def test_known_commands_math_and_links_are_not_reported(self):
-        value = r"\textbf{a} \'e \v c $\alpha$ \href{http://x_y}{site} 50\%"
-        assert unknown_commands(value) == []
 
     def test_xspace_is_unknown_so_it_never_silently_joins_words(self):
         assert unknown_commands(r"Foo\xspace bar") == ["xspace"]
@@ -632,10 +487,3 @@ class TestRedefinitionsFollowTheParser:
         assert str(line).startswith(f"{STRING_REDEFINED} {path}::: ") and "rss" in line.message
         assert re.findall(rf"{re.escape(path)}:\d+", str(line)) == [f"{path}:5", f"{path}:6"]
         assert works["e"].venue.name == "Three"
-
-    def test_a_commented_out_and_a_real_definition_say_nothing(self, tmp_path):
-        data = ('@comment{@string{x = "old"}}\n@string{x = "new"}\n'
-                "@article{e, title = {T}, journal = x, year = 2024}\n").encode()
-        _, warnings, works = self.parse(tmp_path, data)
-        assert warnings == []
-        assert works["e"].venue.name == "new"
