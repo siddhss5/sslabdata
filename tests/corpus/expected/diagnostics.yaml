@@ -40,6 +40,28 @@ structure.unclosed_brace:
     - {code: BIB-YEAR-MISSING, severity: warning, file: ./broken.bib, key: brace-broken, field: year}
   kept: [brace-before, brace-broken, brace-after]
 
+# Braces BibTeX matches as written, so no syntax error: each entry is read as
+# BibTeX reads it, and says that a field was read into another or lost. The
+# two whose fields are lost lose their year too.
+structure.brace_mismatch:
+  dir: brace_mismatch
+  exit: 0
+  diagnostics:
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-merged, field: abstract, values: [organization]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-dropped, field: note, values: [title, line 14]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-trailing, field: howpublished, values: [and more, line 20]}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-dropped, field: year}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-trailing, field: year}
+    - {code: BIB-STRING-UNDEFINED, severity: warning, file: ./braces.bib, key: brace-escaped, field: title, values: [w]}
+    - {code: BIB-BRACE-MISMATCH, severity: warning, file: ./braces.bib, key: brace-escaped, field: url, values: [title, line 27]}
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./braces.bib, key: brace-escaped, field: year}
+  kept: [brace-merged, brace-dropped, brace-trailing, brace-escaped, brace-after]
+  emits:
+    - work: brace-merged
+      expect: {abstract: null, organization: {contains: [abstract]}}
+    - work: brace-dropped
+      expect: {title: Dropped Fields, note: null}
+
 structure.duplicate_key_file:
   dir: duplicate_key_same_file
   exit: 1
