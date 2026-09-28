@@ -61,6 +61,9 @@ differently:
   broadly is under *Author matching reads the structured full name* below.
 - **Output.** `--output` writes atomically: on any failure the file already
   there is left as it was, and no partial file is written (#124).
+- **Unicode.** Emitted text, citation keys and ids are in NFC, so input
+  written with decomposed accents changes bytes, and it matches and groups as
+  its precomposed spelling does (#185).
 - **Python API.** The elements of `AssemblyResult.diagnostics` and
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).

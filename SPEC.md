@@ -400,6 +400,20 @@ which a double-quoted YAML string can carry as an escape
 The rest of the value is kept. The `bibtex` record is written from the value
 as read, so it carries none either.
 
+**Every string read from the input is in Unicode NFC.** Display strings and
+identifiers alike are put in Normalization Form C where the input is read,
+right after control characters are removed and before anything else sees
+them: every `.bib` field value, names included, and every citation key
+(`sslabdata.parsers.bibtex._Parser.process_entry()` and
+`_CommentSkippingParser.current_entry_key`), and every scalar of the four
+YAML files, mapping keys included (`sslabdata.config.YAMLLoader`). A name,
+title, key or id written with its accents decomposed (`C` + U+0327) is
+therefore the same string as one written precomposed (`Ç`): it matches,
+groups, is compared for repeats and is emitted alike, whichever form the
+editor or export tool wrote. This is a canonical equivalence, so nothing
+is lost and nothing is reported. The `bibtex` record is written from the
+value as read, so it is NFC too.
+
 ### What sslabdata converts, and what it does not
 
 This is the part that must be read carefully, because sslabdata enforces the

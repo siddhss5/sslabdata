@@ -206,6 +206,31 @@ text.control_characters:
       expect: {name: Alice Adams}
   not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\x7f"]
 
+# Valid input kept here as a regression case. One text written with its
+# accents decomposed and written precomposed is read as one text, silently:
+# both resolve the member and group each collaborator alike, and every name,
+# title, citation key and `lab` key is emitted precomposed (NFC). JSON writes
+# a combining mark as \u03XX, which is what `not_emitted` looks for. The only
+# diagnostic is the one `Vale, Ç.` draws as an initial, beside `Vale, Çelik`.
+text.nfc_equivalent:
+  dir: nfc_equivalent_text
+  exit: 0
+  diagnostics:
+    - {code: ID-GROUPING-INITIALS-AMBIGUOUS, severity: warning, file: ./nfc.bib, key: nfc-decomposed, field: author, values: [celik-vale]}
+  unresolved_only:
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: nfc-decomposed, field: author, values: [Çağla Zorn]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: nfc-decomposed, field: author, values: [Ç. Vale]}
+    - {code: RESOLVE-UNRESOLVED-NAME, severity: warning, file: ./nfc.bib, key: vale-çelik, field: author, values: [Çelik Vale]}
+  kept: [nfc-decomposed, nfc-precomposed, vale-çelik]
+  emits:
+    - work: nfc-decomposed
+      expect: {title: Décor for Fictional Robots, authors.*.name: [Émile Noël, Çağla Zorn, Ç. Vale], authors.*.person_id: [enoel, null, null], authors.*.collaborator_key: [null, cagla-zorn-ac0c2687, c-vale-1b04bcc4]}
+    - work: nfc-precomposed
+      expect: {title: Décor for Fictional Robots, authors.*.name: [Émile Noël, Çağla Zorn, Ç. Vale], authors.*.person_id: [enoel, null, null], authors.*.collaborator_key: [null, cagla-zorn-ac0c2687, c-vale-1b04bcc4]}
+    - person: enoel
+      expect: {name: Émile Noël}
+  not_emitted: ["\\u0300", "\\u0301", "\\u0306", "\\u0308", "\\u0327"]
+
 # A definition command is an unknown command like any other: it is dropped
 # and reported, and the words, the link and the URL after it are kept. An
 # accent that reads part of a set-aside URL leaves a marker behind, which is

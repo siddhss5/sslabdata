@@ -11,6 +11,7 @@ MIT License - see LICENSE file for details.
 import math
 import os
 import re
+import unicodedata
 import yaml
 from dataclasses import dataclass, field
 from datetime import date
@@ -70,6 +71,16 @@ def without_control_characters(text: str) -> Tuple[str, List[str]]:
     return (_CONTROL.sub("", text) if found else text), found
 
 
+def nfc(text: str) -> str:
+    """``text`` in Unicode Normalization Form C (SPEC.md §2).
+
+    Applied where the input is read, after control characters are removed,
+    whose removal can leave a letter and its combining mark side by side. A
+    canonically equivalent spelling is the same text, so nothing is reported.
+    """
+    return unicodedata.normalize("NFC", text)
+
+
 def control_message(found: List[str]) -> str:
     """What a control-character diagnostic says, for every input."""
     what = ("is a control character" if len(found) == 1
@@ -104,7 +115,7 @@ class ControlCharacters(NamedTuple):
 class YAMLLoader(yaml.SafeLoader):
     """PyYAML's safe loader, which also records every repeated mapping key
     -- PyYAML alone keeps the last value silently -- and removes and records
-    every control character.
+    every control character, and puts every string in NFC.
 
     Every YAML file sslabdata reads is read with it, through `read_yaml()`.
     Keys are compared as the loader constructs them, so `1` and `0x1`, which
@@ -117,7 +128,7 @@ class YAMLLoader(yaml.SafeLoader):
         self.controls: List[ControlCharacters] = []
 
     def construct_scalar(self, node):
-        return without_control_characters(super().construct_scalar(node))[0]
+        return nfc(without_control_characters(super().construct_scalar(node))[0])
 
     def construct_document(self, node):
         seen = set()

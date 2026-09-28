@@ -1,0 +1,29 @@
+% CASE text.nfc_equivalent
+% The first entry writes every accent decomposed (a letter, then U+0301,
+% U+0308, U+0327 or U+0306), the second precomposed. They are canonically
+% equivalent, so both are read as one text: the member resolves from either,
+% each collaborator is one spelling, and `Vale, Ç.` is an initial whichever
+% way its cedilla is written, so it could be `Vale, Çelik`. The decomposed
+% entry comes first, so its grouping is the one reported. The third entry's
+% citation key is written decomposed too.
+
+@article{nfc-decomposed,
+  title   = {Décor for Fictional Robots},
+  author  = {Noël, Émile and Zorn, Çağla and Vale, Ç.},
+  journal = {Journal of Fictional Robots},
+  year    = {2024}
+}
+
+@article{nfc-precomposed,
+  title   = {Décor for Fictional Robots},
+  author  = {Noël, Émile and Zorn, Çağla and Vale, Ç.},
+  journal = {Journal of Fictional Robots},
+  year    = {2023}
+}
+
+@article{vale-çelik,
+  title   = {Another Fictional Title},
+  author  = {Vale, Çelik},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
