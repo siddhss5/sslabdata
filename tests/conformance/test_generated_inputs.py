@@ -221,11 +221,13 @@ SNIPPETS = {
 # Sentinel words are also placed inside the braced arguments of LaTeX
 # commands, as `\cmd{word}`, so that text lost with an argument shows.
 #
-# Commands whose argument is the text itself, in another face or box: SPEC.md
-# section 2 keeps the argument as plain text. A generated unknown name keeps
+# Commands whose argument is the text itself, in another face or box or as a
+# document's title, author or date: SPEC.md section 2 keeps the argument as
+# plain text. A generated unknown name keeps
 # its braced argument too (LATEX-COMMAND-UNKNOWN, issue #174).
 KEEPS_ARGUMENT = (r"\texttt", r"\textsf", r"\textsc", r"\emph", r"\underline",
-                  r"\mbox", r"\hbox", r"\fbox")
+                  r"\mbox", r"\hbox", r"\fbox", r"\title", r"\author",
+                  r"\date")
 # The only commands whose arguments may leave nothing in the document, with
 # the number of braced arguments LaTeX gives each. This is SPEC.md section 2,
 # written out here rather than imported so that it checks the code: the rules
