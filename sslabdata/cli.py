@@ -22,8 +22,6 @@ from .diagnostics import (
 )
 from .exporters import export_to_yaml, export_to_json, serialize
 
-# A configuration sslabdata cannot open or cannot read at all. Both are fatal
-# at load; the second keeps the reading library's words as its prose.
 CONFIG_NOT_FOUND = "CONFIG-NOT-FOUND"
 CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
 
@@ -32,8 +30,6 @@ CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
 # other exception is a defect and is left to propagate.
 CONFIG_READ_ERRORS = (OSError, UnicodeDecodeError, yaml.YAMLError)
 
-# The document could not be written to --output. Fatal: the run exits 1, and
-# the file already there, if any, is as it was.
 OUTPUT_WRITE_FAILED = "OUTPUT-WRITE-FAILED"
 
 
@@ -45,16 +41,14 @@ def main(argv=None):
     if not args.output and not args.validate and not args.unresolved:
         parser.error("One of --output, --validate, or --unresolved is required")
 
-    # With --validate or --unresolved, --format names how the diagnostics are
-    # printed; with --output alone it names the document's format.
+    # --format has two meanings (SPEC.md §1).
     as_json = args.format == 'json' and (args.validate or args.unresolved)
 
     config, result = load(args.config, as_json)
     found = result.diagnostics
 
-    # --validate builds the document in memory, in --format, with the code
-    # --output writes it with, so it cannot pass a document --output would
-    # refuse. What it cannot find is a failure of the write itself.
+    # Serialized as --output would, so --validate cannot pass a document
+    # --output refuses.
     if args.validate:
         try:
             serialize(result.data, args.format)
@@ -149,10 +143,6 @@ def load(path: str, as_json: bool):
         stop(diagnostic(CONFIG_UNREADABLE, path, None, None, str(e)),
              "Error loading configuration: ", as_json)
 
-    # `assemble_result()` raises `ConfigurationError` for an absolute or
-    # escaping `bib_files` name, but `from_yaml()` above has already rejected
-    # that with the file named, so it cannot happen here: the check is for
-    # callers who built a configuration themselves.
     # An input file that exists but cannot be read (permissions, say) is the
     # one failure the loaders leave for here; its message names the file.
     try:
@@ -207,9 +197,8 @@ def report_validation(result, errors, warnings) -> int:
 def report_to_stderr(errors, warnings) -> int:
     """Print the diagnostics on standard error; 1 if any is an error.
 
-    Outside --validate, an error still stops the run: a user must not be
-    able to produce a document by skipping validation. Nothing is written,
-    and a file already at --output is left as it was.
+    An error stops the run outside --validate too, so skipping validation
+    cannot produce a document.
     """
     for error in errors:
         print(error, file=sys.stderr)
@@ -235,12 +224,9 @@ def report_unresolved(config, result) -> int:
 def write_output(data, args) -> int:
     """Write the document to --output in --format; 1 if it could not be.
 
-    A destination the system will not let sslabdata write -- a directory,
-    a path under a file, a directory without write permission -- is an
-    input failure, not a defect. The write is atomic, so nothing has
-    changed. The error names the temporary file when the write itself
-    failed; its name is random and means nothing to the user, so it is
-    given only when it is not beside --output (a parent that is a file).
+    An `OSError` names the path it refused only when that is not beside
+    --output: a name beside it is the random temporary file, which means
+    nothing to the user.
     """
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
     try:
@@ -275,11 +261,8 @@ def located(error: ConfigurationError, config: str) -> Diagnostic:
 
 
 def stop(line, prefix: str, as_json: bool) -> None:
-    """Report a configuration that did not load, and exit 1.
-
-    As text, on standard error after ``prefix``; as JSON, the one record on
-    standard output, so a JSON reader always receives an array.
-    """
+    """Report a configuration that did not load, and exit 1: as text on
+    standard error after ``prefix``, or as a one-record JSON array."""
     if as_json:
         print(json.dumps([record(line, ERROR)], indent=2, ensure_ascii=False))
     else:
