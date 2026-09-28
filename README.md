@@ -328,6 +328,37 @@ committed. It is not in CI because it needs TeX:
 uv run python tools/smoke.py /usr/local/texlive/2025/texmf-dist/bibtex/bib
 ```
 
+### Releasing (maintainers)
+
+Releases are published by `.github/workflows/release.yml` through PyPI
+Trusted Publishing; no token is stored anywhere. The version is written in
+`pyproject.toml` and in `sslabdata/__init__.py`, and every tag must equal it.
+
+1. **Rehearse on TestPyPI.** Set both versions to a release candidate, such
+   as `3.0.0rc1`, merge that, then tag the merge commit and push the tag:
+   `git tag v3.0.0rc1 && git push origin v3.0.0rc1`. The workflow builds and
+   checks the distributions, runs the full test suite, publishes those exact
+   files to TestPyPI, and installs `sslabdata==3.0.0rc1` back from it. A
+   failed rehearsal is repeated as `rc2`, since an index accepts each
+   version once.
+2. **Release.** Set both versions to `3.0.0`, date the CHANGELOG heading,
+   merge, and push the tag `v3.0.0`. The PyPI job waits in the `release`
+   environment for a reviewer's approval, then publishes the files the run
+   checked and creates the GitHub Release with them.
+3. **Approve** from the Actions page, or from the command line:
+
+   ```bash
+   RUN=$(gh run list -R siddhss5/sslabdata --workflow release.yml --event push \
+         --limit 1 --json databaseId -q '.[0].databaseId')
+   gh api repos/siddhss5/sslabdata/actions/runs/$RUN/pending_deployments \
+     -q '.[] | "\(.environment.name) \(.environment.id)"'   # what waits
+   gh api -X POST repos/siddhss5/sslabdata/actions/runs/$RUN/pending_deployments \
+     -F 'environment_ids[]=<id>' -f state=approved -f comment='Release'
+   ```
+
+A manual run of the workflow only builds and checks, unless its
+`publish_testpypi` box is ticked.
+
 ## Dependencies
 
 - **pybtex** — BibTeX parsing
