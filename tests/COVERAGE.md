@@ -495,6 +495,15 @@ a message does not break them.
 | `diag.mode_required` | No mode flag | Names the flags that would be valid | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_mode_required` | pass |
 | `diag.format_invalid` | `--format xml` | Names the bad value and the valid ones | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |
 
+## Input schemas
+The JSON Schemas in [`schema/input/v1/`](../schema/input/v1/), read through
+`importlib.resources` as an installed user reads them.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `input.schema_valid` | Every input file of the valid corpus, the demo, `examples/config.yaml` and `tests/fixtures` | Each validates against its schema | `schema/input/v1/lab.schema.json` | `test_input_schemas.py::test_valid_inputs_validate` | pass |
+| `input.schema_invalid` | Every input file of the invalid corpus | The schema finds an error at the place of each type or shape problem the loaders report there, and a file with none validates; every other code is listed, with why no schema checks it | `schema/input/v1/people.schema.json` | `test_input_schemas.py::test_invalid_corpus_agrees_with_the_loaders`, `test_input_schemas.py::test_every_code_at_an_input_file_is_classified` | pass |
+
 ## Output fields
 Every field of the generated `lab.yml` / `lab.json`, and the checks on the file
 as a whole. The structure is defined by

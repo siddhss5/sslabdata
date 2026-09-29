@@ -1095,6 +1095,19 @@ resolves, because GitHub redirects `labdata` to `sslabdata`. v3's `blob/main`
 `$id` does not resolve, as above. v5's `$id`, title and descriptions say
 `sslabdata`.
 
+**The input schemas are versioned apart from the document.**
+`schema/input/v1/` holds a JSON Schema for each input file: `lab.schema.json`,
+`people.schema.json`, `projects.schema.json` and `collaborators.schema.json`.
+They describe what the loaders accept; the loaders stay the authority, and
+the diagnostic codes above report what a schema cannot see. The input format
+and the document change for different reasons, so the input schemas carry
+their own version rather than `schema_version`. They follow the same rules:
+a published input schema is never edited, any change to one is a new
+version at a new path, and its `$id` is a pinned tag URL,
+`https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/<file>.schema.json`,
+whose `input-schema-v1` tag is created when this version ships and is never
+moved.
+
 **Version history.** What each `schema_version` changed is in
 [`CHANGELOG.md`](CHANGELOG.md).
 
