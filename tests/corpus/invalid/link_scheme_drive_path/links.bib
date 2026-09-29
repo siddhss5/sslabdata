@@ -1,0 +1,24 @@
+% CASE links.scheme_drive_path
+% A Windows drive is not a URL scheme: the PDF link built from a pdf_base_url
+% of C:/papers, and a pdf written drive-relative as c:papers/..., are not
+% reported. A javascript: pdf beside them still is.
+
+@misc{drive-derived,
+  title  = {A PDF Link Built From a Drive Path},
+  author = {Adams, Alice},
+  year   = {2024}
+}
+
+@misc{drive-relative,
+  title  = {A Drive-Relative PDF},
+  author = {Adams, Alice},
+  year   = {2024},
+  pdf    = {c:papers/drive-relative.pdf}
+}
+
+@misc{drive-script,
+  title  = {A Script URL Beside a Drive Path},
+  author = {Adams, Alice},
+  year   = {2024},
+  pdf    = {javascript:alert(1)}
+}

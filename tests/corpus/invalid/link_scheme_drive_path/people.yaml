@@ -1,0 +1,5 @@
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"

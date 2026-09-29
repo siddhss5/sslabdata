@@ -26,6 +26,11 @@ It emits `schema_version` 5, as 3.0.0 does.
   document ([`SPEC.md` §6](SPEC.md#6-version-policy)). The wheel installs them
   under `sslabdata/schema/input/v1/`, and an editor can name them to check
   and complete the files (#194).
+- **A link with an unsupported scheme is reported.** A link in `work.links`
+  whose URL scheme is not `http`, `https` or `mailto`, such as `javascript:`,
+  is reported under the new warning `LINK-SCHEME-UNSUPPORTED`, naming the
+  file, key, field and link kind; `--strict` makes it an error. The link is
+  still emitted, and the document does not change (#85).
 
 ## Package 3.0.0 (tag `v3.0.0`, 2026-09-28)
 

@@ -16,7 +16,7 @@ MIT License - see LICENSE file for details.
 """
 
 import re
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
@@ -67,6 +67,11 @@ LATEX_CONVERSION_FAILED = "LATEX-CONVERSION-FAILED"
 WRITE_BACK_FAILED = "BIB-WRITE-BACK-FAILED"
 ENCODING_INVALID = "BIB-ENCODING-INVALID"
 LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
+LINK_SCHEME_UNSUPPORTED = "LINK-SCHEME-UNSUPPORTED"
+
+# The URL schemes a link may carry without a warning. A link with no scheme is
+# a relative path, and is not reported either (SPEC.md "Diagnostic codes").
+LINK_SCHEMES = frozenset({"http", "https", "mailto"})
 
 # Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
@@ -940,36 +945,76 @@ def pdf_link(bib_id: str, pdf_base_url: Optional[str]) -> Optional[Link]:
                 status=VERIFIED if Path(url).exists() else MISSING)
 
 
+def url_scheme(url: str) -> str:
+    """A URL's scheme, lower-cased, as the URL parser reads it once surrounding
+    whitespace is off; empty for a URL with none, which is a relative path.
+
+    The parser drops a tab or line break anywhere in the URL first, as a
+    browser does, so `java<tab>script:` is `javascript`. It rejects some
+    malformed hosts, such as `javascript://[x`, but only after the scheme is
+    read, and a scheme ends at the first colon: that prefix alone is read then.
+
+    A one-letter scheme is a Windows drive, as `sslabdata.config` reads one
+    (`PureWindowsPath`), whether `/`, `\\` or nothing follows its colon: no
+    registered scheme is one letter long, and `C:/papers` is a local path.
+    """
+    text = url.strip()
+    try:
+        scheme = urlsplit(text).scheme
+    except ValueError:
+        scheme = urlsplit(text[:text.find(":") + 1]).scheme
+    if len(scheme) == 1 and PureWindowsPath(text).drive:
+        return ""
+    return scheme
+
+
 def build_links(entry: dict, bib_id: str, identifiers: Dict[str, List[str]],
-                pdf_base_url: Optional[str]) -> Dict[str, List[Link]]:
-    """Every URL this work can be reached at, filed by kind (SPEC.md §5)."""
+                pdf_base_url: Optional[str], *, source: str = "",
+                report=None) -> Dict[str, List[Link]]:
+    """Every URL this work can be reached at, filed by kind (SPEC.md §5).
+
+    With ``report``, each link whose scheme is not in `LINK_SCHEMES` is
+    reported once, located at the entry field it came from, and is kept.
+    """
     links: Dict[str, List[Link]] = {}
 
-    def add(kind: str, link: Optional[Link]) -> None:
-        if link is not None:
-            links.setdefault(kind, []).append(link)
+    def add(kind: str, link: Optional[Link], field_name: Optional[str]) -> None:
+        if link is None:
+            return
+        links.setdefault(kind, []).append(link)
+        scheme = url_scheme(link.url)
+        if report is None or not scheme or scheme in LINK_SCHEMES:
+            return
+        built = "" if field_name else ", built from pdf_base_url,"
+        report(diagnostic(
+            LINK_SCHEME_UNSUPPORTED, source, bib_id, field_name,
+            f"the link of kind {kind}{built} is '{link.url}', whose scheme "
+            f"'{scheme}' is not http, https or mailto; it is emitted as "
+            "written, and a renderer may refuse to link it"))
 
     url = (entry.get("url") or "").strip()
     if url:
         add("video" if is_video_url(url) else "url",
-            Link(url=url, origin=FROM_INPUT, status=UNCHECKED))
+            Link(url=url, origin=FROM_INPUT, status=UNCHECKED), "url")
     # `video` is always a video, whatever its host, so an entry can name a
     # project website in `url` and its video here.
     video = (entry.get("video") or "").strip()
     if video:
-        add("video", Link(url=video, origin=FROM_INPUT, status=UNCHECKED))
+        add("video", Link(url=video, origin=FROM_INPUT, status=UNCHECKED),
+            "video")
     # A `pdf` the entry names is the work's PDF, so it replaces the one
     # guessed from `pdf_base_url` rather than sitting beside it.
     pdf = (entry.get("pdf") or "").strip()
     if pdf:
-        add("pdf", Link(url=pdf, origin=FROM_INPUT, status=UNCHECKED))
+        add("pdf", Link(url=pdf, origin=FROM_INPUT, status=UNCHECKED), "pdf")
     else:
-        add("pdf", pdf_link(bib_id, pdf_base_url))
+        add("pdf", pdf_link(bib_id, pdf_base_url), None)
     for doi in identifiers.get("doi", []):
-        add("doi", Link(url=DOI_BASE + doi, origin=DERIVED, status=UNCHECKED))
+        add("doi", Link(url=DOI_BASE + doi, origin=DERIVED, status=UNCHECKED),
+            "doi")
     for eprint in identifiers.get(ARXIV.lower(), []):
         add("arxiv", Link(url=ARXIV_BASE + eprint, origin=DERIVED,
-                          status=UNCHECKED))
+                          status=UNCHECKED), "eprint")
     return links
 
 
@@ -1074,7 +1119,8 @@ def entry_to_work(
         abstract=fields.get("abstract"),
         note=extract_note(fields),
         identifiers=identifiers,
-        links=build_links(fields, bib_id, identifiers, pdf_base_url),
+        links=build_links(fields, bib_id, identifiers, pdf_base_url,
+                          source=source, report=report),
         project_ids=parse_project_ids(fields),
         bibtex=format_bibtex(bib_id, entry, source, report),
         # Empty, as its default is; named so that the mapping below is
