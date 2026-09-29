@@ -208,21 +208,28 @@ def valid_pdf_base(tmp_path):
 
 
 # Covers links.pdf.remote_guess
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="#20: a remote PDF link is not verified")
-def test_remote_pdf_url_not_verified(tmp_path):
-    """A remote pdf_base_url gives a link nobody has checked.
-
-    The link is kept and labelled either way, but `unchecked` is not an
-    answer about whether the file is there. #20 makes a remote base say
-    `verified` or `missing`, as a local one already does.
+def test_remote_pdf_base_url_guess_is_unchecked(tmp_path):
+    """A remote pdf_base_url gives every work without its own `pdf` field a
+    guessed link, `derived` and `unchecked`: a build never fetches, so nothing
+    says whether the file is there. It is not checked against local files
+    either, so `present`, whose PDF the corpus holds, is `unchecked` too. An
+    entry's own `pdf` still replaces the guess, and nothing is reported.
     """
-    variant = write_variant(tmp_path, pdf_base_url="https://example.org/pdfs")
+    variant = write_variant(tmp_path, pdf_base_url="https://example.org/pdfs/",
+                            bib_files=[{"name": "links.bib", "category": "Links"}])
     run, data = export(VALID, tmp_path, variant)
     assert run.code == 0 and run.crash is None, run.output
-    link = work(data, "missing")["links"]["pdf"][0]
-    assert link["url"] == "https://example.org/pdfs/missing.pdf"
-    assert link["verification"]["status"] != "unchecked", link
+    for key in ("present", "missing"):
+        assert work(data, key)["links"]["pdf"] == [
+            {"url": f"https://example.org/pdfs/{key}.pdf", "label": None,
+             "origin": "derived", "verification": {"status": "unchecked"}}]
+    assert work(data, "link-pdf-field")["links"]["pdf"] == [
+        {"url": "https://example.org/papers/link-pdf-field.pdf", "label": None,
+         "origin": "input", "verification": {"status": "unchecked"}}]
+    report = run_sslabdata(["--config", variant, "--validate", "--strict",
+                            "--format", "json"], VALID)
+    assert report.code == 0 and report.crash is None, report.output
+    assert json.loads(report.stdout) == []
 
 
 # --- CLI flags and output formats --------------------------------------------

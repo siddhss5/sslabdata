@@ -59,7 +59,7 @@ observed outcome of a case under its ID, and compares it with the expected
 entry of the same ID.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#20 (verifying a remote link), #27 (explicit link and award fields), #28
+#27 (explicit link and award fields), #28
 (`keywords` project tags).
 
 ## Generated inputs
@@ -160,11 +160,12 @@ the second definition is the one that reaches the output.
 | `strings.concat` | `"Joined " # "Title"` and `"Proceedings of the " # cfx` | The parts are concatenated, macros expanded | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.macro_journal` | `journal = jfx # " Letters"` | The journal is the expanded macro plus the literal suffix | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.undefined` | `booktitle = nosuchmacro`, which no `@string` defines | Warning naming the file, key, field and macro; the entry and its neighbours are kept | `tests/corpus/invalid/undefined_string/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
-| `structure.comment_lines` | A `%` comment line between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
+| `structure.comment_lines` | A `%` comment line of prose between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
 | `structure.comment_entry` | `@comment{...}` wrapping something that looks like an entry | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
 | `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
-| `structure.comment_mentions_command` | A `%` comment line whose prose contains `@comment{` | Ignored; it is not read as a command, and the entry after it is read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
+| `structure.comment_mentions_command` | A `%` comment line of prose that contains `@comment{` | Ignored; the prose is not read as a command, and the entry after it is read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
 | `structure.comment_mentions_unclosed_group` | A `%` comment line whose prose contains `@comment{` and then a `{` that never closes | Not a comment group: the entry after it is read, and nothing is reported | `tests/corpus/invalid/comment_prose_unclosed_brace/prose.bib` | `test_invalid_corpus.py::test_outcome` | pass |
+| `structure.comment_line_command` | A well-formed `@string`, `@preamble` and `@article` each on a `%` line, and prose mentioning `@article` | Each command is read, as BibTeX reads it, and warns `BIB-COMMENTED-COMMAND-READ` with its line: the entry at its key and is a work, the `@string` and `@preamble` at the file. The `@string` redefines the macro, warns `BIB-STRING-REDEFINED`, and its value is used. The prose says nothing | `tests/corpus/invalid/comment_line_command/commented.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `structure.uppercase` | `@ARTICLE` with `TITLE`, `AUTHOR`, `JOURNAL`, `YEAR` | Read exactly as the lower-case spelling is | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_quoted` | Field values in `"quotes"` | Read like braced values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_braced` | Field values in `{braces}`, including a doubly braced title | Read; the braces themselves never reach the output | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
@@ -379,7 +380,7 @@ the source text are not markup and must survive unchanged.
 | `links.pdf.local_present` | `pdf_base_url` is a local directory holding `<key>.pdf` | A link of kind `pdf` whose `verification` is `{status: verified}` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.pdf.local_missing` | `pdf_base_url` is a local directory with no `<key>.pdf` | The link is kept with `verification.status: missing`, not deleted: a broken link and an absent one are different answers | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.pdf_field` | `pdf = {…}` with `pdf_base_url` set, the same with no `pdf_base_url`, and an empty `pdf` | One link of kind `pdf` with `origin: input` and `verification.status: unchecked`, in place of the one `pdf_base_url` gives; an empty `pdf` is read as absent; no diagnostic | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_pdf_field_replaces_the_base_url_link` | pass |
-| `links.pdf.remote_guess` | `pdf_base_url` is a remote URL, nothing says the PDF exists | The link says `verified` or `missing` rather than `unchecked`; a build never fetches, so this needs a committed cache | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_remote_pdf_url_not_verified` | xfail #20 |
+| `links.pdf.remote_guess` | `pdf_base_url` is a remote URL, for an entry whose PDF the corpus holds locally, one whose PDF it does not, and one with its own `pdf` | The first two get `<base>/<key>.pdf` with `origin: derived` and `verification.status: unchecked`: a build never fetches, and a remote base is not checked against local files. The entry's own `pdf` replaces the guess. No diagnostic, even under `--strict` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_remote_pdf_base_url_guess_is_unchecked` | pass |
 | `links.note_link_award` | A `note` holding both an `\href` and an award | Both survive; the award is available as its own field | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | xfail #27 |
 
 ## Projects
