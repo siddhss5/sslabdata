@@ -37,4 +37,4 @@ __all__ = [
     "export_to_yaml",
     "export_to_json",
 ]
-__version__ = "3.1.0rc1"
+__version__ = "3.1.0"

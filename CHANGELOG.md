@@ -11,7 +11,7 @@ version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
 
-## Package 3.1.0 (not yet released)
+## Package 3.1.0 (tag `v3.1.0`, 2026-09-29)
 
 It emits `schema_version` 5, as 3.0.0 does.
 
