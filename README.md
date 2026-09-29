@@ -1,5 +1,10 @@
 # sslabdata
 
+[![PyPI](https://img.shields.io/pypi/v/sslabdata.svg)](https://pypi.org/project/sslabdata/)
+[![Python](https://img.shields.io/pypi/pyversions/sslabdata.svg)](https://pypi.org/project/sslabdata/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/siddhss5/sslabdata/blob/main/LICENSE)
+[![Tests](https://github.com/siddhss5/sslabdata/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/siddhss5/sslabdata/actions/workflows/test.yml)
+
 sslabdata compiles BibTeX and a little YAML into one schema-specified document —
 works, people, projects and the links between them — that any website, CV or
 script can read.
