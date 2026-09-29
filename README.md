@@ -54,6 +54,21 @@ pytest
 
 The `test` extra installs `pytest` and `jsonschema`, which the tests need.
 
+## Start a new lab
+
+```bash
+sslabdata init mylab
+cd mylab && sslabdata --config lab.yaml --validate --strict
+```
+
+`init` writes `lab.yaml`, `bib/publications.bib`, `people.yaml`,
+`projects.yaml` and `collaborators.yaml` into `mylab/` (the current directory
+if you name none), each with one fictional record and a comment on each
+field. Replace them with your own. It never overwrites a file that is already
+there and names each one it refuses; `--force` overwrites those files and
+nothing else. The paths in `lab.yaml` are relative to the directory you run
+sslabdata from, so run it from `mylab/`.
+
 ## Write `lab.yaml`
 
 ```yaml

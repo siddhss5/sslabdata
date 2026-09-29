@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/people.schema.json
+#
+# Lab members. A BibTeX author whose name matches a person's name or one of
+# their aliases is linked to that person. This person is fictional.
+
+- id: "aadams"                  # required: unique, and kept stable
+  name: "Alice Adams"           # required: the full name
+  aliases: ["A. Adams"]         # other spellings of the name in BibTeX
+  role: "professor"             # any text, such as professor or phd_student
+  status: "current"             # current (the default) or alumni
+  website: "https://example.org/people/aadams"
+  email: "aadams@example.org"
+  start_year: 2020

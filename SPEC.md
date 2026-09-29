@@ -72,6 +72,35 @@ Flags, as `sslabdata.cli.main()` defines them:
 | `--unresolved` | List author names that matched no person, then exit. A name left ambiguous is one of them. |
 | `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error: a redefined `@string` macro, and anything about an author who matched no lab member. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
 
+**`sslabdata init [DIR] [--force]`** is the one subcommand, recognised only as
+the first argument (`sslabdata.cli.main()`). The flag form takes no positional
+argument, so no command line that form accepts begins with `init`, and every
+such command line behaves as it did before `init` existed. `init` writes a
+minimal starting point that passes `--validate --strict` into `DIR` (default:
+the current directory), creating it if it is missing: `lab.yaml`,
+`bib/publications.bib`, `people.yaml`, `projects.yaml` and
+`collaborators.yaml`, each holding one fictional record and copied unchanged
+from the package's data (`sslabdata.cli.INIT_FILES`). Nothing is fetched.
+The paths in the `lab.yaml` it writes are relative to `DIR`, so the next
+command, which it prints last on standard output after a `Wrote <path>` line
+per file, runs from there. Every problem is found before any file is
+written, so a refused run writes nothing:
+
+- a file already at one of those paths is never overwritten without
+  `--force`, and each one is named (`INIT-FILE-EXISTS`); `--force`
+  overwrites those files and touches nothing else, replacing each
+  atomically, so a failed write leaves the old file as it was. A symlink is
+  replaced itself, never what it points to;
+- `DIR` or `DIR/bib` that is not a directory, or a path it writes that is a
+  directory or is not a regular file, is refused even with `--force`
+  (`INIT-PATH-WRONG-KIND`);
+- a `DIR/bib` that resolves outside `DIR` through a symlink is refused
+  (`INIT-PATH-OUTSIDE-DIR`).
+
+A failure to create `DIR` or write a file is `INIT-WRITE-FAILED`. Every
+`INIT-` diagnostic is unprefixed on standard error and exits `1`; a usage
+error exits `2`.
+
 **At least one** of `--output`, `--validate` or `--unresolved` is required —
 not exactly one. `sslabdata.cli.main()` rejects only the case where all three
 are absent, so combinations are accepted and resolved by **precedence**:
@@ -84,9 +113,9 @@ Exit codes, as `sslabdata.cli.main()` returns them:
 
 | Code | Meaning |
 |---|---|
-| `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
-| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, a `bib_files[].name` that is absolute or leaves `bib_dir`, a `lab.yaml` of the wrong shape, or a value under `lab` that has no one JSON form; a path the configuration names is not there, or is not a file (not a directory, for `bib_dir`); a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; `--output` could not be written; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
-| `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
+| `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported; `init` wrote every file. |
+| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, a `bib_files[].name` that is absolute or leaves `bib_dir`, a `lab.yaml` of the wrong shape, or a value under `lab` that has no one JSON form; a path the configuration names is not there, or is not a file (not a directory, for `bib_dir`); a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; `--output` could not be written; `init` refused or could not write a file; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
+| `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`; for `init`, an unrecognised flag or more than one `DIR`. |
 
 **Streams and message shapes.** Ordinary reporting goes to **standard
 output**: the counts and unresolved names of
@@ -170,7 +199,7 @@ without depending on English wording. Codes obey three rules:
    | Class | `--validate` | Every other mode | Codes |
    |---|---|---|---|
    | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-KEY-REPEATED`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
-   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `CONFIG-PATH-WRONG-KIND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `RECORD-KEY-REPEATED`, `OUTPUT-WRITE-FAILED` |
+   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `CONFIG-PATH-WRONG-KIND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `RECORD-KEY-REPEATED`, `OUTPUT-WRITE-FAILED`, `INIT-FILE-EXISTS`, `INIT-PATH-WRONG-KIND`, `INIT-PATH-OUTSIDE-DIR`, `INIT-WRITE-FAILED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
    | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-BRACE-MISMATCH`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `LINK-SCHEME-UNSUPPORTED`, `TEXT-CONTROL-CHARACTER`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
@@ -258,7 +287,11 @@ Codes in use:
 | `LATEX-CONVERSION-FAILED` | A text field or a name part whose LaTeX the converter could not read at all, or whose conversion left one of the converter's own markers behind — a command that read part of a set-aside URL as its argument, such as an accent written before `\url{…}` (`sslabdata.parsers.latex.latex_to_text()`). Its text is kept as written, with the braces taken off, so it may still hold LaTeX (§2, *Two degraded cases*). Located at the entry and field. A warning. |
 | `TEXT-CONTROL-CHARACTER` | A value read from the input holds a control character (§2, *No string read from the input carries a control character*): a `.bib` field value, located at `<file>:<key>:<field>`, or a YAML scalar, key or value, located as `RECORD-KEY-REPEATED` locates a key in a people, projects or collaborators file and as `CONFIG-KEY-REPEATED` locates one in `lab.yaml`. One line per value, naming each character as `U+XXXX`. The characters are removed and the rest of the value is kept. A warning. |
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
-| `OUTPUT-WRITE-FAILED` | `--output` names a destination the operating system will not let sslabdata write: a directory, a path under a file, a directory without write permission, a full disk. Located at the `--output` path alone; the prose is the operating system's reason, naming the path it refused when that is not the destination's own directory. Unprefixed on standard error, with no `Wrote …` line. The write is atomic, so a file already at the path is as it was and no temporary file is left behind. Only `--output` writes, so no other mode reports it. Fatal. |
+| `OUTPUT-WRITE-FAILED` | `--output` names a destination the operating system will not let sslabdata write: a directory, a path under a file, a directory without write permission, a full disk. Located at the `--output` path alone; the prose is the operating system's reason, naming the path it refused when that is not the destination's own directory. Unprefixed on standard error, with no `Wrote …` line. The write is atomic, so a file already at the path is as it was and no temporary file is left behind. Only `--output` writes the document, so no other mode reports it; `init` reports its own writes as `INIT-WRITE-FAILED`. Fatal. |
+| `INIT-FILE-EXISTS` | `sslabdata init` found a file already at a path it writes, and `--force` was not given. Located at that path alone, one line per file. Nothing is written. Fatal. |
+| `INIT-PATH-WRONG-KIND` | `sslabdata init` found something other than a directory at `DIR` or at its `bib` directory, or something other than a regular file or a symlink at a path it writes, such as a directory. Located at that path alone. Nothing is written, with or without `--force`. Fatal. |
+| `INIT-PATH-OUTSIDE-DIR` | A directory `sslabdata init` writes into, `DIR/bib`, resolves outside `DIR` once symlinks are followed, so a file written there would land outside `DIR`. Located at the file's path alone. Nothing is written, with or without `--force`. Fatal. |
+| `INIT-WRITE-FAILED` | `sslabdata init` could not create `DIR` or write one of its files: a directory without write permission, a full disk. Located at that path alone; the prose is the operating system's reason. The file that failed is not left half written, and one already there is as it was; files written before it stay. Fatal. |
 | `CONFIG-NOT-FOUND` | The `--config` file does not exist. Located at that path alone; `Error: CONFIG-NOT-FOUND …` on standard error. Fatal at load. |
 | `CONFIG-UNREADABLE` | The `--config` file exists but cannot be read — not valid YAML, not UTF-8, or a file the operating system will not open — or another input file, such as a `people_file`, exists but the operating system will not open it. Located at the `--config` path alone; the prose is the reading library's own wording, on one line. Fatal at load. |
 | `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute (§5). Raised as a `sslabdata.ConfigurationError`, which the Python API paragraphs below say more about. |

@@ -124,6 +124,20 @@ jobs:
         print(f"{sys.argv[1]} matches schema v5 from {where.parent}")
         EOF
 
+    # A new lab, outside the checkout: init copies the starting point from
+    # the wheel's package data, it passes strict validation, and a second
+    # init refuses to overwrite it.
+    - name: Start a new lab with the installed wheel
+      working-directory: ${{ runner.temp }}
+      run: |
+        "$SMOKE/bin/sslabdata" init new-lab
+        cd new-lab
+        "$SMOKE/bin/sslabdata" --config lab.yaml --validate --strict
+        if "$SMOKE/bin/sslabdata" init; then
+          echo "::error::init overwrote an existing lab"
+          exit 1
+        fi
+
     - name: Upload distributions
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:

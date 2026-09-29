@@ -15,6 +15,12 @@ them. Numbers such as #101 are issue or pull request numbers in this repository.
 
 It emits `schema_version` 5, as 3.0.0 does.
 
+- **`sslabdata init [DIR]`** writes a minimal starting point that passes
+  `--validate --strict`: `lab.yaml`, one fictional `.bib` file, and people,
+  projects and collaborators files with one record each, copied from the
+  package. It never overwrites a file without `--force`, which overwrites
+  only the files it writes. Every command line without `init` behaves as
+  before; its failures are the new `INIT-` codes (#193).
 - **A doubled spaced marker comes off.** `Brown\textsuperscript
   {*}\textsuperscript {*}, Bob` sets `equal_contribution` and reads `Bob
   Brown`, where it read `Bob Brown * *` with its stars split between the
