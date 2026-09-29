@@ -1,0 +1,16 @@
+% CASE links.scheme_unsupported_pdf_base_url
+% The PDF link built from pdf_base_url carries that base's scheme. An entry's
+% own pdf replaces that link, and is not reported.
+
+@misc{base-derived,
+  title  = {A PDF Link Built From the Base},
+  author = {Adams, Alice},
+  year   = {2024}
+}
+
+@misc{base-replaced,
+  title  = {A PDF Link of Its Own},
+  author = {Adams, Alice},
+  year   = {2024},
+  pdf    = {https://example.org/base-replaced.pdf}
+}
