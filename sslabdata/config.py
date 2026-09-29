@@ -226,6 +226,17 @@ def reject_absolute_name(name, file: Optional[str] = None) -> None:
             "never absolute"))
 
 
+def reject_empty_pdf_base_url(value, file: Optional[str] = None) -> None:
+    """Raise when ``pdf_base_url`` is empty or whitespace alone, located at
+    `<file>:pdf_base_url:`. Only leaving the key out, or `None`, means no PDF
+    link is guessed: an empty base is more likely a mistake than that."""
+    if isinstance(value, str) and not value.strip():
+        raise ConfigurationError(diagnostic(
+            TYPE_INVALID, file, "pdf_base_url", None,
+            "pdf_base_url is empty or whitespace alone; name a base URL or "
+            "directory, or leave pdf_base_url out to guess no PDF links"))
+
+
 def reject_name_outside_bib_dir(name, bib_dir, file: Optional[str] = None) -> None:
     """Raise when a configured `.bib` name does not stay under ``bib_dir``
     (SPEC.md "Diagnostic codes"), located as `reject_absolute_name` locates.
@@ -364,6 +375,7 @@ class LabDataConfig:
             if data.get(key) is not None and not isinstance(data[key], str):
                 reject(TYPE_INVALID, key, None,
                        f"{key} is {_kind(data[key])}; it must be a string")
+        reject_empty_pdf_base_url(data.get('pdf_base_url'), str(path))
         entries = data.get('bib_files')
         if entries is None:
             entries = []

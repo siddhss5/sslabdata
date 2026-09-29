@@ -1,0 +1,8 @@
+# CASE config.pdf_base_url.blank
+# Fictional invalid input for tests/COVERAGE.md.
+# A pdf_base_url of whitespace alone names no base, as an empty one does.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+pdf_base_url: " \t "

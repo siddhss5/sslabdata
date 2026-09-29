@@ -50,8 +50,10 @@
       }
     },
     "pdf_base_url": {
-      "description": "A work with no pdf field gets this URL plus its citation key as its pdf link. Leave it out to guess no pdf links.",
-      "type": ["string", "null"]
+      "description": "A work with no pdf field gets this URL plus its citation key as its pdf link. Leave it out to guess no pdf links; an empty or blank value is an error.",
+      "type": ["string", "null"],
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "people_file": {
       "description": "The people file (people.schema.json), relative to the directory sslabdata is run from.",

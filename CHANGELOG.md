@@ -15,6 +15,11 @@ them. Numbers such as #101 are issue or pull request numbers in this repository.
 
 It emits `schema_version` 5, as 3.0.0 does.
 
+- **An empty `pdf_base_url` is an error.** `pdf_base_url: ""`, or one of
+  whitespace alone, is reported as `CONFIG-TYPE-INVALID` at
+  `lab.yaml:pdf_base_url:` and the configuration does not load, where 3.0.0
+  read it silently as "guess no PDF links". Leave the key out for that, as
+  for an empty data-file path (#138). The input schema rejects it too (#204).
 - **`sslabdata init [DIR]`** writes a minimal starting point that passes
   `--validate --strict`: `lab.yaml`, one fictional `.bib` file, and people,
   projects and collaborators files with one record each, copied from the

@@ -789,6 +789,22 @@ config.pdf_base_url.wrong_type:
   diagnostics:
     - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: pdf_base_url}
 
+# An empty or blank pdf_base_url names no base. Only leaving the key out means
+# no PDF link is guessed, as only leaving a data-file key out means no file.
+config.pdf_base_url.empty:
+  dir: config_pdf_base_url_empty
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: pdf_base_url}
+
+config.pdf_base_url.blank:
+  dir: config_pdf_base_url_blank
+  exit: 1
+  fatal: load
+  diagnostics:
+    - {code: CONFIG-TYPE-INVALID, severity: error, file: lab.yaml, key: pdf_base_url}
+
 config.people_file.wrong_type:
   dir: config_people_file_type
   exit: 1
