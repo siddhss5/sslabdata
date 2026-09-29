@@ -588,3 +588,11 @@ declares the alias.
 | `probe.identity_one_person` | `Patel, Priya` on two works and `Patel, P.` on a third | Exactly one contributor in the `collaborator:` namespace touches any of the three works, and it holds exactly those three | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_joins_one_co_author_written_two_ways` | pass |
 | `probe.identity_distinct_people` | `Patel, Pradeep` on a fourth work | Exactly one contributor in the `collaborator:` namespace holds that work, it holds exactly that work, and it shares no contributor with the three above | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_separates_co_authors_sharing_an_initial` | pass |
 | `probe.identity_authorship` | `Lee, Lin and Lee, Lin`, two different people on one work | The document declares each authorship's `position`, and the graph carries two `authored` edges at those two positions from **one** contributor: one grouping, two addressable authorships | `examples/demo/bib/conference.bib` | `test_consumer_probes.py::test_graph_keeps_two_authorships_written_alike_apart` | pass |
+
+## Specification references
+`SPEC.md` cites the code by name rather than by line. The check below keeps
+those names pointing at something.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `spec.references_resolve` | Every function, method, constant and module `SPEC.md` names, every JSON Pointer into the output schema, and every row key of this table | Each resolves; one that does not fails with the `SPEC.md` line and section that cites it | `SPEC.md` | `test_spec_references.py::test_every_spec_reference_resolves` | pass |
