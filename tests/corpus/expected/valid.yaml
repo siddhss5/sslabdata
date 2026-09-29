@@ -7,7 +7,6 @@
 schema_version: 5
 generator:
   name: sslabdata
-  version: 3.0.0
   schema_version: 5
 lab:
   name: Corpus Lab

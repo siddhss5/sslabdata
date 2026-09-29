@@ -17,6 +17,8 @@ import jsonschema
 import pytest
 import yaml
 
+import sslabdata
+
 from .support import (
     EXPECTED, INVALID, PREVIOUS_SCHEMA_PATHS, REPO_ROOT, SCHEMA_PATH, VALID, export,
     item,
@@ -454,8 +456,11 @@ KEYS = {"works": "bib_id", "people": "id", "projects": "id", "collaborators": "n
 
 def select(data):
     """The part of the output the snapshot owns, in the order SNAPSHOT lists."""
+    # The generator's version is the installed package's, which every
+    # release changes; test_full_output checks it against sslabdata itself.
+    generator = {k: v for k, v in data["generator"].items() if k != "version"}
     chosen = {"schema_version": data["schema_version"],
-              "generator": data["generator"], "lab": data["lab"]}
+              "generator": generator, "lab": data["lab"]}
     for section, wanted in SNAPSHOT.items():
         chosen[section] = [item(data, section, KEYS[section], value) for value in wanted]
     return chosen
@@ -499,3 +504,4 @@ def test_full_output(valid_output):
         expected = yaml.safe_load(f)
     differences = diff_paths(expected, chosen)
     assert not differences, "\n".join(differences[:40])
+    assert valid_output["generator"]["version"] == sslabdata.__version__
