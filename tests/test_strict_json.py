@@ -123,6 +123,7 @@ def strict_run(folder, *mode):
     ("people_missing_name", "PEOPLE-FIELD-MISSING"),      # fatal
     ("undefined_project", "RESOLVE-PROJECT-UNKNOWN"),     # validation error
     ("year_not_number", "BIB-YEAR-INVALID"),              # warning
+    ("link_scheme_unsupported", "LINK-SCHEME-UNSUPPORTED"),  # warning
     ("ambiguous_alias", "RESOLVE-AMBIGUOUS-NAME"),        # warning, lab members
 ])
 def test_strict_fails_every_mode_on_each_error_class(tmp_path, folder, code):

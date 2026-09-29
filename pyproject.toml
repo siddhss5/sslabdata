@@ -72,6 +72,8 @@ packages = ["sslabdata", "sslabdata.parsers", "sslabdata.schema"]
 
 [tool.setuptools.package-data]
 "sslabdata.schema" = ["v5/output.schema.json", "input/v1/*.schema.json"]
+# The starting point `sslabdata init` copies.
+"sslabdata" = ["templates/init/*.yaml", "templates/init/bib/*.bib"]
 
 [tool.mypy]
 files = ["sslabdata"]

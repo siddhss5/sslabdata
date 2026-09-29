@@ -10,7 +10,8 @@ inspect with `tar tzf` and `unzip -l`.
     unzip -l /tmp/dist/sslabdata-*.whl
 
 Tests are not distributed (clone the repository for them). The current output
-schema and the input schemas are wheel data, read through importlib.resources.
+schema and the input schemas are wheel data, read through importlib.resources,
+and so are the files `sslabdata init` copies.
 """
 
 import os
@@ -30,6 +31,10 @@ SCHEMA = f"{CURRENT.name}/output.schema.json"
 INPUT = max((REPO_ROOT / "schema" / "input").glob("v*"), key=lambda p: int(p.name[1:]))
 INPUT_SCHEMAS = [f"input/{INPUT.name}/{name}.schema.json"
                  for name in ("lab", "people", "projects", "collaborators")]
+# Every file under sslabdata/templates/, which `sslabdata init` copies.
+TEMPLATES = sorted(p.relative_to(REPO_ROOT).as_posix()
+                   for p in (REPO_ROOT / "sslabdata" / "templates").rglob("*")
+                   if p.is_file() and "__pycache__" not in p.parts)
 
 
 def test_distributions_carry_the_public_resources(tmp_path, monkeypatch):
@@ -48,6 +53,7 @@ def test_distributions_carry_the_public_resources(tmp_path, monkeypatch):
         wheel_files = set(zf.namelist())
         packaged = {name: zf.read(f"sslabdata/schema/{name}")
                     for name in [SCHEMA, *INPUT_SCHEMAS]}
+        templates = {name: zf.read(name) for name in TEMPLATES}
 
     modules = {p.relative_to(REPO_ROOT).as_posix()
                for p in (REPO_ROOT / "sslabdata").rglob("*.py")}
@@ -58,5 +64,8 @@ def test_distributions_carry_the_public_resources(tmp_path, monkeypatch):
     # One canonical copy of each schema: the packaged copy is the repository file.
     for name, data in packaged.items():
         assert data == (REPO_ROOT / "schema" / name).read_bytes(), name
+    assert TEMPLATES and set(TEMPLATES) <= sdist_files
+    for name, data in templates.items():
+        assert data == (REPO_ROOT / name).read_bytes(), name
     for files in (sdist_files, wheel_files):
         assert not any("tests" in Path(f).parts for f in files)
