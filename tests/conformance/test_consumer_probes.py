@@ -415,6 +415,11 @@ def reached(pub, field, fields):
                      if r.get("origin") == "input"), None)
     if field == "year":
         return str(pub["year"])
+    if field == "award":
+        # The awards joined back as the field lists them; a demo award has no
+        # year prefix, so each takes the work's year.
+        assert all(a["year"] == pub["year"] for a in pub["awards"]), pub["awards"]
+        return " and ".join(a["name"] for a in pub["awards"])
     return pub[field]
 
 
