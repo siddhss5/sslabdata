@@ -85,7 +85,7 @@ bib_files:
   - name: "conference.bib"
     category: "Conference Papers"
 
-pdf_base_url: "https://mylab.example.org/pdfs"
+pdf_base_url: "https://mylab.example.org/pdfs"  # optional; leave out to guess no PDF links
 people_file: "data/people.yaml"       # optional
 projects_file: "data/projects.yaml"   # optional
 collaborators_file: "data/collaborators.yaml"  # optional

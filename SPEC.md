@@ -586,7 +586,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
 | `person.aliases` | Read for matching by `sslabdata.resolver.match()`, never emitted — `Person.to_dict()` has no `aliases` key. |
 | `collaborators_file` entries | A list of `{name, aliases}` read by `sslabdata.loaders.load_collaborators()`. Read only to decide which unresolved authorships share one `collaborators` grouping (§5); never emitted as such and never a source of `person_id`. |
-| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked (`sslabdata.config.is_absolute_path()`, §5). |
+| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link, and leaving it out turns that guess off (§5). `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked (`sslabdata.config.is_absolute_path()`, §5). |
 | Any BibTeX field named nowhere in this table or heading 1 — `keywords`, `annote`, `language` and the rest | Not interpreted by sslabdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). |
 
 The fields named in that table and in heading 1 are the complete set sslabdata
@@ -933,7 +933,13 @@ or `missing` and a remote one yields `unchecked`; an entry's own `pdf` is
 `unchecked` whatever the base. `verification` is `{status}` and records no
 time. Three states replace a null: "no base configured" is no link at all for an entry without a `pdf`
 field, "the file is not there" is `missing`, and "nobody has looked" is
-`unchecked`. Verifying a remote link is #20.
+`unchecked`. Nothing in sslabdata checks a remote link, since it makes no
+network calls.
+
+**`pdf_base_url` is the switch for guessed PDF links.** It is read for
+nothing else, so a `lab.yaml` without it guesses no PDF link, and a work gets
+one only from its own `pdf` field. There is no separate key to turn guessing
+off.
 
 A link does **not** name the identifier it was built from. That is redundant
 with its kind and its origin, and it would be a cross-record constraint JSON
