@@ -9,8 +9,10 @@ MIT License - see LICENSE file for details.
 import argparse
 import json
 import os
+import shlex
 import sys
 from dataclasses import replace
+from importlib.resources import files
 from pathlib import Path
 
 import yaml
@@ -20,7 +22,7 @@ from .assembler import assemble_result, unresolved_name_diagnostics
 from .diagnostics import (
     ERROR, Diagnostic, diagnostic, in_report_order, record, severity,
 )
-from .exporters import export_to_yaml, export_to_json, serialize
+from .exporters import _write, export_to_yaml, export_to_json, serialize
 
 CONFIG_NOT_FOUND = "CONFIG-NOT-FOUND"
 CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
@@ -32,9 +34,29 @@ CONFIG_READ_ERRORS = (OSError, UnicodeDecodeError, yaml.YAMLError)
 
 OUTPUT_WRITE_FAILED = "OUTPUT-WRITE-FAILED"
 
+INIT_FILE_EXISTS = "INIT-FILE-EXISTS"
+INIT_PATH_WRONG_KIND = "INIT-PATH-WRONG-KIND"
+INIT_PATH_OUTSIDE_DIR = "INIT-PATH-OUTSIDE-DIR"
+INIT_WRITE_FAILED = "INIT-WRITE-FAILED"
+
+# The files `init` writes, relative to its directory, in the order it writes
+# them. Each is package data under sslabdata/templates/init/.
+INIT_FILES = ("lab.yaml", "bib/publications.bib", "people.yaml",
+              "projects.yaml", "collaborators.yaml")
+
 
 def main(argv=None):
-    """Main CLI entry point. ``argv`` defaults to ``sys.argv[1:]``."""
+    """Main CLI entry point. ``argv`` defaults to ``sys.argv[1:]``.
+
+    ``init`` as the first argument is the one subcommand. Any other command
+    line is parsed as it always was: the flag form takes no positional
+    argument, so no command line it accepted begins with ``init``.
+    """
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["init"]:
+        init(argv[1:])
+        return
+
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -96,6 +118,9 @@ Examples:
 
   # Fail on every coded diagnostic that can be an error, as JSON records
   sslabdata --config lab.yaml --validate --strict --format json
+
+  # Start a new lab: write a lab.yaml and sample inputs into mylab/
+  sslabdata init mylab
         """
     )
 
@@ -127,6 +152,118 @@ Examples:
              'authors who matched no lab member and redefined @string macros'
     )
     return parser
+
+
+def build_init_parser() -> argparse.ArgumentParser:
+    """The ``init`` subcommand's options and help."""
+    parser = argparse.ArgumentParser(
+        prog='sslabdata init',
+        description='Write a minimal, valid starting point: lab.yaml, '
+                    'bib/publications.bib, people.yaml, projects.yaml and '
+                    'collaborators.yaml, each holding one fictional record.',
+    )
+    parser.add_argument(
+        'dir', nargs='?', default='.', metavar='DIR',
+        help='Directory to write into, created if missing '
+             '(default: the current directory)'
+    )
+    parser.add_argument(
+        '--force', action='store_true',
+        help='Overwrite the files init writes if they exist; nothing else '
+             'is touched'
+    )
+    return parser
+
+
+def init(argv) -> None:
+    """``sslabdata init [DIR] [--force]``: copy the starting point into DIR.
+
+    Every problem is found before anything is written, so a refused run
+    writes nothing. Exits 1 on a coded diagnostic, 2 on a usage error.
+    """
+    args = build_init_parser().parse_args(argv)
+    target = Path(args.dir)
+
+    def fail(code: str, path, message: str) -> None:
+        print(diagnostic(code, str(path), None, None, message), file=sys.stderr)
+
+    if os.path.lexists(target) and not target.is_dir():
+        fail(INIT_PATH_WRONG_KIND, target, "is not a directory")
+        sys.exit(1)
+
+    root = Path(os.path.realpath(target))
+    problems = 0
+    for name in INIT_FILES:
+        dest = target / name
+        parent = dest.parent
+        if os.path.lexists(parent) and not parent.is_dir():
+            fail(INIT_PATH_WRONG_KIND, parent, "is not a directory")
+        elif not Path(os.path.realpath(parent)).is_relative_to(root):
+            # A symlinked subdirectory would put the file outside DIR.
+            fail(INIT_PATH_OUTSIDE_DIR, dest,
+                 f"resolves outside {str(target)!r}")
+        elif not os.path.lexists(dest):
+            continue
+        elif os.path.isdir(dest) or not (dest.is_file()
+                                         or os.path.islink(dest)):
+            # Not overwritten even with --force: a directory, or a file
+            # that is not a regular one. A symlink is replaced itself, and
+            # what it points to is left alone.
+            fail(INIT_PATH_WRONG_KIND, dest, "is not a regular file")
+        elif not args.force:
+            fail(INIT_FILE_EXISTS, dest,
+                 "already exists; --force overwrites it")
+        else:
+            continue
+        problems += 1
+    if problems:
+        sys.exit(1)
+
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        fail(INIT_WRITE_FAILED, target,
+             f"the directory could not be created: {e.strerror or e}")
+        sys.exit(1)
+    for name in INIT_FILES:
+        dest = target / name
+        source = files("sslabdata") / "templates" / "init"
+        for part in name.split("/"):
+            source = source / part
+        text = source.read_text(encoding="utf-8")
+        try:
+            write_new_file(dest, text, overwrite=args.force)
+        except OSError as e:
+            fail(INIT_WRITE_FAILED, dest,
+                 f"the file could not be written: {e.strerror or e}")
+            sys.exit(1)
+        print(f"Wrote {dest}")
+
+    here = root == Path(os.path.realpath(os.getcwd()))
+    command = "sslabdata --config lab.yaml --validate --strict"
+    print("\nNext, check it:")
+    print(f"  {command}" if here else f"  cd {shlex.quote(args.dir)} && {command}")
+
+
+def write_new_file(dest: Path, text: str, overwrite: bool) -> None:
+    """Write ``text`` to ``dest``, whole or not at all.
+
+    With ``overwrite``, the file replaces any at ``dest`` atomically, and a
+    failed write leaves the old one as it was. Without it, ``dest`` is
+    created only if nothing is there, even if something appeared since it
+    was checked, and a failed write removes what it created.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if overwrite:
+        _write(str(dest), text)
+        return
+    f = open(dest, "x", encoding="utf-8")
+    try:
+        with f:
+            f.write(text)
+    except BaseException:
+        dest.unlink(missing_ok=True)
+        raise
 
 
 def load(path: str, as_json: bool):

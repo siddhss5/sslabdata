@@ -1,0 +1,10 @@
+# CASE links.scheme_unsupported_pdf_base_url
+# Fictional invalid input for tests/COVERAGE.md.
+# The base starts with a space and has a tab inside its scheme; a browser
+# drops both before it reads the URL, so this is a javascript: link.
+bib_dir: "."
+bib_files:
+  - name: "links.bib"
+    category: "Papers"
+people_file: "people.yaml"
+pdf_base_url: " java\tscript:void(0)/"

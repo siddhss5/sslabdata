@@ -1,0 +1,7 @@
+# CASE links.scheme_unsupported
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "links.bib"
+    category: "Papers"
+people_file: "people.yaml"

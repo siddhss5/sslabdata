@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/lab.schema.json
+#
+# The configuration sslabdata runs with. The lab, its people and its work are
+# fictional: replace them with your own. Paths are relative to the directory
+# sslabdata runs from, so run it from this one:
+#   sslabdata --config lab.yaml --validate --strict
+
+# The lab header, copied into the document as written.
+lab:
+  name: "Example Lab"
+  description: "A fictional lab to start from."
+  institution: "Example University"
+  department: "Department of Computer Science"
+  website: "https://example.org"
+
+# Required: the directory holding the .bib files.
+bib_dir: "bib"
+
+# Each .bib file under bib_dir, and the category its works are listed under.
+bib_files:
+  - name: "publications.bib"
+    category: "Publications"
+
+# Optional: lab members, projects, and external co-authors whose spellings
+# are grouped together. Leave a key out to go without that file.
+people_file: "people.yaml"
+projects_file: "projects.yaml"
+collaborators_file: "collaborators.yaml"

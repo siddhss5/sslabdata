@@ -336,6 +336,72 @@ links.doi_resolver_only:
     - work: doi-present
       expect: {identifiers.doi: [10.5555/corpus.0003], links.doi.0.url: "https://doi.org/10.5555/corpus.0003"}
 
+# A link whose scheme is not http, https or mailto is reported once, at the
+# field it came from and naming its kind, and is still emitted as written.
+# Supported schemes in any case, relative paths (a protocol-relative one
+# among them) and the links built from identifiers are not reported.
+links.scheme_unsupported:
+  dir: link_scheme_unsupported
+  exit: 0
+  diagnostics:
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: scheme-javascript, field: url, values: [url, "javascript:alert(1)"]}
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: scheme-mixed-case, field: url, values: [url, "JavaScript:alert(1)"]}
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: scheme-video-host, field: url, values: [video, "javascript://youtube.com/%0aalert(1)"]}
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: scheme-malformed-host, field: url, values: [url, "javascript://[x"]}
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: scheme-data-video, field: video, values: [video, "data:text/html;base64,PHNjcmlwdD4="]}
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: scheme-vbscript-pdf, field: pdf, values: [pdf, "vbscript:msgbox(1)"]}
+  kept: [scheme-javascript, scheme-mixed-case, scheme-video-host, scheme-malformed-host, scheme-data-video, scheme-vbscript-pdf, scheme-supported, scheme-mailto, scheme-relative]
+  emits:
+    - work: scheme-javascript
+      expect: {links.url.0.url: "javascript:alert(1)", links.url.0.origin: input}
+    - work: scheme-video-host
+      expect: {links.video.0.url: "javascript://youtube.com/%0aalert(1)"}
+    - work: scheme-data-video
+      expect: {links.video.0.url: "data:text/html;base64,PHNjcmlwdD4="}
+    - work: scheme-vbscript-pdf
+      expect: {links.pdf.0.url: "vbscript:msgbox(1)"}
+    - work: scheme-relative
+      expect: {links.url.0.url: "//cdn.example.org/relative", links.video.0.url: videos/relative.mp4, links.pdf.0.url: /papers/relative.pdf}
+
+# The PDF link pdf_base_url builds is reported at the work, with no field, as
+# no field of the entry wrote it. The base's leading space and the tab inside
+# its scheme do not hide the scheme.
+links.scheme_unsupported_pdf_base_url:
+  dir: link_scheme_pdf_base_url
+  exit: 0
+  diagnostics:
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: base-derived, values: [pdf, pdf_base_url]}
+  kept: [base-derived, base-replaced]
+  emits:
+    - work: base-derived
+      expect: {links.pdf.0.url: " java\tscript:void(0)/base-derived.pdf", links.pdf.0.origin: derived}
+    - work: base-replaced
+      expect: {links.pdf.0.url: "https://example.org/base-replaced.pdf"}
+
+# A Windows drive, read as config.py reads one, is a path and not a scheme,
+# whether a slash, a backslash or nothing follows the colon. A javascript:
+# link beside it is still reported.
+links.scheme_drive_path:
+  dir: link_scheme_drive_path
+  exit: 0
+  diagnostics:
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: drive-script, field: pdf, values: [pdf, "javascript:alert(1)"]}
+  kept: [drive-derived, drive-relative, drive-script]
+  emits:
+    - work: drive-derived
+      expect: {links.pdf.0.url: "C:/papers/drive-derived.pdf"}
+    - work: drive-relative
+      expect: {links.pdf.0.url: "c:papers/drive-relative.pdf"}
+
+links.scheme_drive_path_backslash:
+  dir: link_scheme_drive_backslash
+  exit: 0
+  diagnostics: []
+  kept: [drive-backslash]
+  emits:
+    - work: drive-backslash
+      expect: {links.pdf.0.url: "C:\\papers/drive-backslash.pdf"}
+
 # --- Projects, people and identity -------------------------------------------
 
 # "and others" before the end of a name list is reported and dropped; at the

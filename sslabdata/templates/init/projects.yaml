@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/projects.schema.json
+#
+# Projects. A work joins one through a `project = {<id>}` field in its
+# BibTeX entry. This project is fictional.
+
+- id: "homebot"                 # required: unique; what a work's project names
+  title: "Household Robots"     # required
+  description: "Robots that tidy up and put things away."
+  website: "https://example.org/projects/homebot"
+  status: "active"              # active (the default) or completed

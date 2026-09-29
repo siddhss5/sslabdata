@@ -1,0 +1,77 @@
+% CASE links.scheme_unsupported
+% Links whose scheme is not http, https or mailto, and links beside them whose
+% scheme is. Each unsupported one is reported once, and every link is emitted.
+
+@misc{scheme-javascript,
+  title  = {A Script URL},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {javascript:alert(1)}
+}
+
+@misc{scheme-mixed-case,
+  title  = {A Script URL in Mixed Case},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {JavaScript:alert(1)}
+}
+
+% The host is a video host, so the link's kind is video though its field is url.
+@misc{scheme-video-host,
+  title  = {A Script URL on a Video Host},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {javascript://youtube.com/%0aalert(1)}
+}
+
+% A host the URL parser rejects: the scheme before it is still read.
+@misc{scheme-malformed-host,
+  title  = {A Script URL With a Malformed Host},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {javascript://[x}
+}
+
+@misc{scheme-data-video,
+  title  = {A Data URL as a Video},
+  author = {Adams, Alice},
+  year   = {2024},
+  video  = {data:text/html;base64,PHNjcmlwdD4=}
+}
+
+@misc{scheme-vbscript-pdf,
+  title  = {A VBScript URL as a PDF},
+  author = {Adams, Alice},
+  year   = {2024},
+  pdf    = {vbscript:msgbox(1)}
+}
+
+% Supported schemes, in either case, and the links built from identifiers.
+@misc{scheme-supported,
+  title  = {Supported Schemes},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {HTTPS://example.org/supported},
+  video  = {http://example.org/video},
+  pdf    = {https://example.org/supported.pdf},
+  doi    = {10.5555/corpus.0085},
+  eprint = {2401.00085}
+}
+
+@misc{scheme-mailto,
+  title  = {A Mail Link},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {mailto:alice@example.org}
+}
+
+% No scheme: relative paths, one of them protocol-relative, which takes the
+% scheme of the page that links it.
+@misc{scheme-relative,
+  title  = {Relative Links},
+  author = {Adams, Alice},
+  year   = {2024},
+  url    = {//cdn.example.org/relative},
+  video  = {videos/relative.mp4},
+  pdf    = {/papers/relative.pdf}
+}
