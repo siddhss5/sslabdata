@@ -29,8 +29,8 @@ Pointer into `schema/v5/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
 statement is cited by its enclosing function.
 
-Nothing yet checks that these references resolve; #63 proposes the test that
-would.
+`tests/test_spec_references.py` checks that every one of these references
+resolves; its docstring says which spans count as references.
 
 ---
 
