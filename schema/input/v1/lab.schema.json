@@ -50,7 +50,7 @@
       }
     },
     "pdf_base_url": {
-      "description": "A work with no pdf field gets this URL plus its citation key as its pdf link.",
+      "description": "A work with no pdf field gets this URL plus its citation key as its pdf link. Leave it out to guess no pdf links.",
       "type": ["string", "null"]
     },
     "people_file": {
