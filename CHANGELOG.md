@@ -6,10 +6,40 @@ described here and not there.
 
 Two version numbers move independently
 ([`SPEC.md` §6](SPEC.md#6-version-policy)): the document's `schema_version`,
-whose releases are the git tags `schema-v4` and `schema-v5`, and the package
-version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
+whose releases are the git tags `schema-v4` and `schema-v5`, with
+`schema-v6` to come, and the package version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
+
+## Package 4.0.0 (not yet released)
+
+It emits `schema_version` 6, whose one change is paper awards (see
+`schema_version` 6 below).
+
+**Upgrading from 3.1.0.** A consumer must accept `schema_version` 6 before it
+reads a document from this release: the work object is closed, so one that
+validates against schema v5 rejects every work, which now carries `awards`.
+Validate against `schema/v6/output.schema.json`, which the wheel installs as
+`sslabdata/schema/v6/output.schema.json` in place of v5; v5 stays at its
+tagged URL. A consumer that needs the v5 document pins package 3.1.0.
+
+- **Paper awards.** A BibTeX `award` field lists a work's awards, separated
+  by `and` as `author` names are, with braces protecting an `and` inside a
+  name. An award may start with the year it was given, `2026: Test of Time
+  Award`; without one it takes the work's year. Each work emits `awards`, a
+  list of `{name, year}`, `[]` when it has none. `note` is not read for
+  awards and is emitted as before, so a `.bib` that keeps its awards in
+  `note` gives `awards: []` until they are moved to `award` (#209).
+- **Two new warnings**, which `--strict` makes errors: `BIB-AWARD-EMPTY` for
+  an empty `award` field, an empty award in the list, or a year with no name
+  after it, each dropped; and `BIB-AWARD-YEAR-MALFORMED` for a prefix that
+  reads as a year and is not four ASCII digits, a colon and a space, such as
+  `26:` or `2026 …`, which is kept in the name (#209).
+- **Python API.** `Award` is exported, and `Work.awards` holds a list of
+  them, declared last so that a positional `Work(...)` binds its other
+  fields as before.
+- The demo keeps its two awards in `award` rather than `note`, and the
+  `.bib` file `sslabdata init` writes gives its work one award.
 
 ## Package 3.1.0 (tag `v3.1.0`, 2026-09-29)
 
@@ -145,6 +175,24 @@ differently:
 - **Python API.** The elements of `AssemblyResult.diagnostics` and
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
+
+## `schema_version` 6 (tag `schema-v6`, not yet created)
+
+One change, and nothing else in the document moves (#209):
+
+1. **A work carries `awards`.** It lists the awards the work received, each
+   `{name, year}`, read from the entry's `award` field; `[]` when there are
+   none. `name` is plain text, converted from LaTeX. `year` is the year the
+   award was given, which need not be the work's: the year a `YYYY:` prefix
+   wrote, else the work's `year`, else `null`. The new `$defs/award` is
+   closed, and `awards` is required on every work.
+
+Adding a property to the closed work object is breaking
+([`SPEC.md` §6](SPEC.md#6-version-policy)), so a consumer validating against
+v5 rejects a v6 document. `person` and the input schemas are unchanged: the
+awards are a paper's, and an award a person holds is not in the document. A
+consumer that needs the v5 document pins `schema_version` 5 and the schema at
+`schema/v5/output.schema.json`.
 
 ## `schema_version` 5 (tag `schema-v5`, 2026-09-25)
 
