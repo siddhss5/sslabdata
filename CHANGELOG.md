@@ -11,6 +11,17 @@ version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
 
+## Package 3.1.0 (not yet released)
+
+It emits `schema_version` 5, as 3.0.0 does.
+
+- **A doubled spaced marker comes off.** `Brown\textsuperscript
+  {*}\textsuperscript {*}, Bob` sets `equal_contribution` and reads `Bob
+  Brown`, where it read `Bob Brown * *` with its stars split between the
+  particle and the surname. A single spaced marker between a particle and
+  the surname, `van\textsuperscript {*} Berg`, is joined the same way. Only
+  `\textsuperscript` claims a `{*}` argument, as before (#53).
+
 ## Package 3.0.0 (tag `v3.0.0`, 2026-09-28)
 
 The first package release since `v2.0.0`, and the first on PyPI. It emits
