@@ -73,8 +73,9 @@ projects and collaborators files: every special character (`% & # _ $ ~ ^ \
 zero-width characters, empty and whitespace-only values, malformed years,
 DOI and URL shapes, `eprint` with `archivePrefix` and `eprinttype`, author
 lists with `and others` anywhere, `{literal}` names, `Jr.` and von parts,
-repeated citation keys, `lab` values YAML types JSON cannot carry, and
-repeated YAML keys. About a third of the cases draw every configuration
+repeated citation keys, `award` lists with `and` in any case, empty awards,
+braces around an `and`, year prefixes well formed and not, and LaTeX in the
+names, `lab` values YAML types JSON cannot carry, and repeated YAML keys. About a third of the cases draw every configuration
 value from that range. The rest keep the configuration well formed, so that
 the run writes a document and the `.bib` values can be checked in it.
 
@@ -84,7 +85,7 @@ invariants:
 
 1. No run raises an uncaught exception.
 2. A run that exits 0 writes a document that validates against
-   `schema/v5/output.schema.json`, and the YAML and JSON documents hold the
+   `schema/v6/output.schema.json`, and the YAML and JSON documents hold the
    same data.
 3. A run that exits 1 reports at least one coded error.
 4. `--validate` exits 0 only where `--output` in the same format writes.
@@ -106,7 +107,9 @@ invariants:
 6. No input is silently read as something else. A year that is not an
    unsigned run of ASCII digits is never a number. An `eprint` is filed
    under the repository its entry names, and arXiv only when it names none.
-   `others` is never an author. An empty `*_file` path, a repeated YAML key
+   `others` is never an author. An award takes the year its `YYYY:` prefix
+   wrote, or else the work's; a prefix that is not a year stays in the name
+   and is reported, and so is an empty award. An empty `*_file` path, a repeated YAML key
    and a path that is a directory are each reported. LaTeX conversion does
    not add `<`, `>`, `[` or `]` that the source did not have.
 
@@ -231,6 +234,7 @@ preserved in the copyable `bibtex` output field.
 | `fields.url` | `url` | A link of kind `video` for a known video host, otherwise `url`, with `origin: input` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.project` | `project = {homebot}` | Becomes `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.unread` | `keywords`, which sslabdata emits no property for | Not dropped: it stays in the `bibtex` field | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.award` | `award = {Best Paper Award}` | The `awards` property, and no other: `note` is not read for awards, and the field is in the `bibtex` record as written (section *Awards*) | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 
 ## Fields the demo carries, and the property each reaches
 Every field of every demo entry is read from the `.bib` files and looked up
@@ -357,6 +361,26 @@ the source text are not markup and must survive unchanged.
 | `latex.definition_commands` | `\newcommand zqx Tidy Robots`, `\newcommand \url{…} Letters`, `\newcommand \href{…}{site} and \def\x{y} z`, and an accent before `\url{…}` | `LATEX-COMMAND-UNKNOWN` for `\newcommand`, `\def` and `\x`, and the text after each kept: `zqx Tidy Robots`, `https://x.org/x Letters`, `site (https://x.org/y) and y z`. The accented URL is `LATEX-CONVERSION-FAILED`, kept as written, and no conversion marker reaches the document | `tests/corpus/invalid/definition_commands/define.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `text.control_characters` | U+0002, U+0001 and U+007F raw in a title, and `"\x01"` and `"\a"` escapes in a person's `name` and in `lab.description` | Warning `TEXT-CONTROL-CHARACTER` at each value, naming the characters; they are removed and nothing else is: the title reads `Alpha Beta 0 Gamma Delta` with no `LATEX-CONVERSION-FAILED`, and the name resolves the author | `tests/corpus/invalid/control_characters/control.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `text.nfc_equivalent` | Two entries with the same authors and title, one with every accent decomposed (`C` + U+0327) and one precomposed (`Ç`), a decomposed citation key, a person's `name` and a `lab` key and value written decomposed, a title `Sen{` + U+0303 + `}or` that LaTeX decomposes, `Wren, Q̇.` and `Wren, Q̇.Q̇.` (`Q` + U+0307, no precomposed form) beside `Wren, Quade` and `Wren, Quade Quill`, and an author `Pak, 한결` in Hangul syllables | Read as one text, with no diagnostic of its own: both authorships resolve the member and group each collaborator under one key and one spelling, `Vale, Ç.` is an initial either way (`ID-GROUPING-INITIALS-AMBIGUOUS` beside `Vale, Çelik`), as are `Q̇.` and `Q̇.Q̇.`, the converted title is `Señor`, and every string, key and name, the Hangul author's collaborator key included, is emitted NFC | `tests/corpus/invalid/nfc_equivalent_text/nfc.bib` | `test_invalid_corpus.py::test_outcome` | pass |
+
+## Awards
+A work's awards come from its `award` field, never from `note`. Awards are
+separated as `author` names are, by `and` at brace depth 0 with whitespace
+on both sides, in any case. An award may start with the year it was given,
+written `YYYY:` and a space; without one it takes the work's `year`.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `awards.single` | `award = {Best Paper Award}` on a work of 2021 | One award, `{name: Best Paper Award, year: 2021}` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `awards.none` | An entry with no `award` field | `awards: []`, and no diagnostic | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `awards.several` | Three awards separated by `and` and `AND`, one across a line break | Three awards, in the order written, each with the work's year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `awards.braced_and` | `{Best Systems and Software Paper Award} and Best Demo Award` | Two awards: the braces keep the first `and` inside one name | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `awards.year_prefix` | `2026: … Test of Time Award and Best Paper Award` on a work of 2013 | The first award has year 2026 and no prefix in its name; the second has the work's 2013; the work's own year is unchanged | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `awards.latex` | `2023: Prix C{\^o}t{\'e} and \textbf{Best Paper Award}, \emph{Robots} Track` | Each name converted from LaTeX as `title` is, after its prefix is read: `Prix Côté` (2023) and `Best Paper Award, Robots Track` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `awards.no_year` | A work with no `year`, and one award with a prefix and one without | The award without a prefix has `year: null`; the one with a prefix has its own year; `BIB-YEAR-MISSING` as for any work with no year | `tests/corpus/invalid/award_malformed/lab.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
+| `awards.empty` | An `award` field of whitespace alone; an empty award between two (`and and`), after the last (`… and`), and written as `{}` | Each empty award, and the empty field, is dropped and reported as `BIB-AWARD-EMPTY`, naming its place in the list; the other awards are kept | `tests/corpus/invalid/award_malformed/lab.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
+| `awards.year_without_name` | `2026:` with nothing after it, and `2026: {}` | Dropped and reported as `BIB-AWARD-EMPTY`, naming the award as written | `tests/corpus/invalid/award_malformed/lab.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
+| `awards.year_malformed` | `26: …`, `2026 …`, `2026:…` and full-width `２０２６: …` | Not a year prefix: each is reported as `BIB-AWARD-YEAR-MALFORMED`, kept in the name as written, and the award takes the work's year | `tests/corpus/invalid/award_malformed/lab.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
+| `awards.year_braced` | `{2026}: A Year in the Name` | Braces protect the text: no prefix is read and nothing is reported; the name is `2026: A Year in the Name` with the work's year | `tests/corpus/invalid/award_malformed/lab.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 
 ## Links
 
@@ -488,7 +512,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `cli.unresolved` | `--unresolved` | Lists exactly the author names that did not resolve | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved` | pass |
 | `cli.unresolved_none` | `--unresolved` when every author resolves | Lists nobody | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved_none` | pass |
 | `cli.help` | `--help` | Names every flag | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_help` | pass |
-| `cli.init` | `sslabdata init new-lab` into a directory that does not exist, and `sslabdata init` into the current one | Writes `lab.yaml`, `bib/publications.bib`, `people.yaml`, `projects.yaml` and `collaborators.yaml`; the next command it prints, `--validate --strict`, exits 0; `--output` writes a document that matches schema v5; each YAML file matches its input schema | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_writes_a_lab_that_passes_strict_validation`, `test_init.py::test_init_defaults_to_the_current_directory` | pass |
+| `cli.init` | `sslabdata init new-lab` into a directory that does not exist, and `sslabdata init` into the current one | Writes `lab.yaml`, `bib/publications.bib`, `people.yaml`, `projects.yaml` and `collaborators.yaml`; the next command it prints, `--validate --strict`, exits 0; `--output` writes a document that matches schema v6; each YAML file matches its input schema | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_writes_a_lab_that_passes_strict_validation`, `test_init.py::test_init_defaults_to_the_current_directory` | pass |
 | `cli.init.refuses_overwrite` | `init` where `people.yaml` and `bib/publications.bib` already exist | `INIT-FILE-EXISTS` naming each, exit 1, and the tree byte for byte as it was | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_never_overwrites_without_force` | pass |
 | `cli.init.force` | The same with `--force` | Exactly the files `init` writes are replaced; a file of the user's beside them is untouched | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_never_overwrites_without_force` | pass |
 | `cli.init.wrong_kind` | `DIR` that is a file; `people.yaml` that is a directory, with `--force` | `INIT-PATH-WRONG-KIND` at that path, exit 1, nothing changed | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_refuses_what_is_not_a_file_or_directory` | pass |
@@ -522,7 +546,7 @@ The JSON Schemas in [`schema/input/v1/`](../schema/input/v1/), read through
 ## Output fields
 Every field of the generated `lab.yml` / `lab.json`, and the checks on the file
 as a whole. The structure is defined by
-[`schema/v5/output.schema.json`](../schema/v5/output.schema.json).
+[`schema/v6/output.schema.json`](../schema/v6/output.schema.json).
 
 Every closed object declares every property it can carry, and a value that
 does not apply is `null` rather than absent. The open maps — `lab`, `links`,
@@ -531,7 +555,7 @@ because emitting nulls over an unbounded key set says nothing.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `output.schema_version` | Any run | The output carries `schema_version` 5 | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.schema_version` | Any run | The output carries `schema_version` 6 | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.generator` | Any run | `generator` names the compiler, its package version and the schema version, and carries no timestamp | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.lab` | A `lab:` section in the config | Copied through to `lab`, which is always emitted — `{}` when there is no header, so a consumer can tell that from a header with nothing in it | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
@@ -546,6 +570,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.work.entry_type` | The `@type` of the entry | `entry_type`, lower-cased | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.abstract` | `abstract` | `abstract`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.note` | `note` | `note`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.awards` | `award` | `awards`, a list of `{name, year}` in the order the field wrote them; `[]` when the entry writes none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.identifiers` | `doi`, `eprint`, `isbn`, `issn` | `identifiers`, an open map from scheme to a list of identifiers; `{}` when the entry carries none | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.links` | `url`, `pdf_base_url`, and the identifiers sslabdata builds links from | `links`, an open map from kind to a list of `{url, label, origin, verification}` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.link.verification` | Any link | `verification` is `{status}` and nothing else: a build never fetches and records no time | `tests/corpus/valid/links.bib` | `test_output_format.py::test_a_link_verification_is_only_its_status` | pass |
@@ -591,7 +616,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text, and no string in the corpus or the demo holds `<http`, an autolink or a Markdown link the input did not write | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
 | `output.derived_is_empty` | The corpus and the demo | Every `derived` bag is `{}`, so the region cannot quietly fill | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_every_derived_bag_is_empty` | pass |
 | `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields and an authorship carrying two contributor references or none | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
-| `output.versioned_schema` | The published schemas | v5 lives at its own path, and v3 and v4 stay reachable byte for byte, still saying 3 and 4 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |
+| `output.versioned_schema` | The published schemas | v6 lives at its own path, and v3, v4 and v5 stay reachable byte for byte, still saying 3, 4 and 5 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |
 | `output.demo_schema` | The Example Lab demo output | Validates against the same schema, in both formats | `examples/demo/lab.yaml` | `test_output_format.py::test_demo_matches_schema` | pass |
 | `output.yaml_json_same` | The same run exported twice | The YAML and JSON exports hold the same data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_yaml_and_json_hold_the_same_data` | pass |
 | `output.full` | The valid corpus entries no open issue owns | Match `tests/corpus/expected/valid.yaml`, compared as parsed data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_full_output` | pass |

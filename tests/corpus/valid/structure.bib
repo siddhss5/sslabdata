@@ -160,3 +160,60 @@
   note   = {50% faster, a&b, $O(n \log n)$ with {nested {braces}}},
   year   = {2020}
 }
+
+% A work's awards, from its `award` field. Every other entry in the corpus
+% writes none, and has `awards: []`.
+% CASE fields.award
+% CASE awards.single
+% CASE awards.none
+% CASE output.work.awards
+@inproceedings{award-single,
+  title     = {A Paper With One Award},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2021},
+  award     = {Best Paper Award}
+}
+
+% Separated as `author` names are: `and` in any case, with whitespace, line
+% breaks included, on both sides.
+% CASE awards.several
+@inproceedings{award-several,
+  title     = {A Paper With Three Awards},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2021},
+  award     = {Best Paper Award and Best Student Paper Award
+               AND People's Choice Award}
+}
+
+% Braces keep an `and` inside one name.
+% CASE awards.braced_and
+@inproceedings{award-braced-and,
+  title     = {A Paper With a Braced Award},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2021},
+  award     = {{Best Systems and Software Paper Award} and Best Demo Award}
+}
+
+% A `YYYY:` prefix is the year the award was given, which need not be the
+% paper's; an award without one takes the paper's year.
+% CASE awards.year_prefix
+@inproceedings{award-year-prefix,
+  title     = {A Paper Given an Award Years Later},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2013},
+  award     = {2026: Fictional Conference Test of Time Award and Best Paper Award}
+}
+
+% The name is converted from LaTeX, as `title` is, after the prefix is read.
+% CASE awards.latex
+@inproceedings{award-latex,
+  title     = {A Paper With an Award Written in LaTeX},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022},
+  award     = {2023: Prix C{\^o}t{\'e} and \textbf{Best Paper Award}, \emph{Robots} Track}
+}

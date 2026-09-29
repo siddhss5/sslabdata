@@ -117,11 +117,11 @@ jobs:
         assert site in where.parents, f"{where} is not in {site}"
 
         schema = json.loads(files("sslabdata.schema")
-                            .joinpath("v5/output.schema.json")
+                            .joinpath("v6/output.schema.json")
                             .read_text(encoding="utf-8"))
         document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
         jsonschema.validate(document, schema)
-        print(f"{sys.argv[1]} matches schema v5 from {where.parent}")
+        print(f"{sys.argv[1]} matches schema v6 from {where.parent}")
         EOF
 
     # A new lab, outside the checkout: init copies the starting point from

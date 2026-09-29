@@ -58,9 +58,9 @@ class TestExportToJson:
         with open(out, 'r') as f:
             loaded = json.load(f)
         assert loaded == {
-            "schema_version": 5,
+            "schema_version": 6,
             "generator": {"name": "sslabdata", "version": sslabdata.__version__,
-                          "schema_version": 5},
+                          "schema_version": 6},
             "lab": {}, "works": [], "people": [], "projects": [],
             "collaborators": [],
         }

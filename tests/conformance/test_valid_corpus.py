@@ -652,6 +652,30 @@ STRUCTURE = [
     case("fields.project", "proj-single", "project_ids", ["homebot"]),
     # A field sslabdata emits no property for is still not dropped.
     case("fields.unread", "proj-keywords", "bibtex", Contains("keywords")),
+    case("fields.award", "award-single", "awards",
+         [{"name": "Best Paper Award", "year": 2021}]),
+    # The field reaches `awards` alone: `note` is not read for awards, and
+    # no other property carries the field.
+    case("fields.award", "award-single", "note", None),
+    case("fields.award", "award-single", "bibtex",
+         Contains('award = "Best Paper Award"')),
+    case("awards.single", "award-single", "awards",
+         [{"name": "Best Paper Award", "year": 2021}]),
+    case("awards.none", "type-article", "awards", []),
+    case("awards.several", "award-several", "awards",
+         [{"name": "Best Paper Award", "year": 2021},
+          {"name": "Best Student Paper Award", "year": 2021},
+          {"name": "People's Choice Award", "year": 2021}]),
+    case("awards.braced_and", "award-braced-and", "awards",
+         [{"name": "Best Systems and Software Paper Award", "year": 2021},
+          {"name": "Best Demo Award", "year": 2021}]),
+    case("awards.year_prefix", "award-year-prefix", "awards",
+         [{"name": "Fictional Conference Test of Time Award", "year": 2026},
+          {"name": "Best Paper Award", "year": 2013}]),
+    case("awards.year_prefix", "award-year-prefix", "year", 2013),
+    case("awards.latex", "award-latex", "awards",
+         [{"name": "Prix Côté", "year": 2023},
+          {"name": "Best Paper Award, Robots Track", "year": 2022}]),
 ]
 
 
@@ -736,9 +760,9 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 5),
+    case("output.schema_version", "", "", "", "schema_version", 6),
     case("output.generator", "", "", "", "generator.name", "sslabdata"),
-    case("output.generator", "", "", "", "generator.schema_version", 5),
+    case("output.generator", "", "", "", "generator.schema_version", 6),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.work.bib_id", "works", "bib_id", "type-article", "bib_id",
          "type-article"),
@@ -793,6 +817,10 @@ OUTPUT_FIELDS = [
          Contains("$O(n)$")),
     case("output.work.note", "works", "bib_id", "tex-note-href", "note",
          Contains("our site")),
+    case("output.work.awards", "works", "bib_id", "award-year-prefix", "awards",
+         [{"name": "Fictional Conference Test of Time Award", "year": 2026},
+          {"name": "Best Paper Award", "year": 2013}]),
+    case("output.work.awards", "works", "bib_id", "type-article", "awards", []),
     case("output.work.identifiers", "works", "bib_id", "link-doi-bare", "identifiers",
          {"doi": ["10.5555/corpus.0001"]}),
     # An open map carries only the keys that have values: no identifier is

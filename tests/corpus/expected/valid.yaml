@@ -4,10 +4,10 @@
 # file says which they are and why the rest is left out. Regenerate with
 #   SSLABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 # and review the diff before committing.
-schema_version: 5
+schema_version: 6
 generator:
   name: sslabdata
-  schema_version: 5
+  schema_version: 6
 lab:
   name: Corpus Lab
   description: A fictional lab used only by the sslabdata conformance tests.
@@ -55,6 +55,7 @@ works:
   entry_type: inproceedings
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     pdf:
@@ -122,6 +123,7 @@ works:
   entry_type: article
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     pdf:
@@ -176,6 +178,7 @@ works:
   entry_type: phdthesis
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     pdf:
@@ -229,6 +232,7 @@ works:
   entry_type: article
   abstract: null
   note: null
+  awards: []
   identifiers:
     doi:
     - 10.5555/corpus.0001
@@ -290,6 +294,7 @@ works:
   entry_type: inproceedings
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     video:
@@ -350,6 +355,7 @@ works:
   entry_type: inproceedings
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     pdf:
@@ -417,6 +423,7 @@ works:
   entry_type: inproceedings
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     pdf:
@@ -487,6 +494,7 @@ works:
   entry_type: article
   abstract: null
   note: null
+  awards: []
   identifiers: {}
   links:
     pdf:

@@ -21,6 +21,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 import pybtex.errors
+from pybtex.bibtex.utils import split_tex_string
 from pybtex.database import BibliographyData, Entry, Person
 from pybtex.exceptions import PybtexError
 from pybtex.database.output.bibtex import Writer as BibTeXWriter
@@ -34,7 +35,7 @@ from ..config import (
     CONTROL_CHARACTER, control_message, nfc, without_control_characters,
 )
 from ..diagnostics import Diagnostic, diagnostic
-from ..models import Author, Contributor, Link, Venue, Work
+from ..models import Author, Award, Contributor, Link, Venue, Work
 
 
 # The fields converted from LaTeX to plain text (SPEC.md §2). The repository
@@ -1085,6 +1086,86 @@ def extract_note(entry: dict) -> Optional[str]:
     return note
 
 
+# The award list is split as BibTeX splits `author` (SPEC.md §5): on `and`, in
+# any case, with whitespace on both sides, outside braces. The whitespace
+# before it is part of the separator and the whitespace after it is not, so
+# `and and` is two separators with an empty award between them. The value is
+# padded with a space at each end before it is split, so an `and` that opens
+# or closes the list separates an empty award too.
+AWARD_SEPARATOR = r"[ \t\r\n][Aa][Nn][Dd](?=[ \t\r\n])"
+
+# The year an award was given, written before it: four ASCII digits, a colon
+# and whitespace. The whitespace is not needed when nothing follows, so
+# `2026:` alone is a year with no name rather than a malformed prefix.
+AWARD_YEAR = re.compile(r"([0-9]{4}):(?:\s+|$)")
+
+# What an author may have meant as a year and did not write as one: digits of
+# any kind and a colon, or four digits and a space with no colon between them.
+AWARD_YEAR_LIKE = re.compile(r"\d+\s*:|\d{4}\s")
+
+AWARD_EMPTY = "BIB-AWARD-EMPTY"
+AWARD_YEAR_MALFORMED = "BIB-AWARD-YEAR-MALFORMED"
+
+
+def split_awards(value: str) -> List[str]:
+    """One `award` field value split into its awards, each as written and
+    trimmed, with an empty string for each empty award.
+
+    pybtex's own brace-aware splitter does the work, so braces protect an
+    `and` exactly as they do in a name list.
+    """
+    return split_tex_string(f" {value} ", AWARD_SEPARATOR)
+
+
+def parse_awards(entry: dict, work_year: Optional[int], source: str, report,
+                 on_unknown) -> List[Award]:
+    """The work's awards, from its `award` field, in the order written
+    (SPEC.md §5).
+
+    Each award may start with the year it was given, `YYYY:`, read before
+    its name is converted from LaTeX; without one it takes ``work_year``. An
+    empty award is dropped and reported, and so is a year with no name after
+    it. A prefix that is not a year is reported and kept in the name.
+    """
+    raw = entry.get("award")
+    if raw is None:
+        return []
+    key = entry.get("ID")
+    if not raw.strip():
+        report(diagnostic(AWARD_EMPTY, source, key, "award",
+                          "the award field names no award; the work has none"))
+        return []
+    items = split_awards(raw)
+    awards: List[Award] = []
+    for position, item in enumerate(items, 1):
+        where = f"award {position} of {len(items)}"
+        year = work_year
+        text = item
+        prefix = AWARD_YEAR.match(item)
+        malformed = None if prefix else AWARD_YEAR_LIKE.match(item)
+        if prefix:
+            year = int(prefix.group(1))
+            text = item[prefix.end():]
+        elif malformed:
+            report(diagnostic(
+                AWARD_YEAR_MALFORMED, source, key, "award",
+                f"{where}, '{item}', starts with "
+                f"'{malformed.group().strip()}', which is not a year "
+                "prefix: that is four digits 0-9, a colon and a space. It is "
+                "kept as part of the name, and the award takes the work's "
+                "year"))
+        name = _convert(text, on_unknown).strip()
+        if not name:
+            written = f", '{item}', has a year and no name" if prefix else \
+                " is empty"
+            report(diagnostic(AWARD_EMPTY, source, key, "award",
+                              f"{where}{written}; it is dropped, and the "
+                              "other awards are kept"))
+            continue
+        awards.append(Award(name=name, year=year))
+    return awards
+
+
 def parse_project_ids(entry: dict) -> List[str]:
     """Parse the project field from a BibTeX entry."""
     project_field = entry.get("project", "").strip()
@@ -1165,7 +1246,7 @@ def entry_to_work(
     check_entry_type(fields, source, report)
     check_others(entry, bib_id, source, report)
 
-    return Work(
+    work = Work(
         bib_id=bib_id,
         title=fields.get("title", ""),
         authors=parse_author_list(entry, unknown_in("author")),
@@ -1182,11 +1263,17 @@ def entry_to_work(
                           source=source, report=report),
         project_ids=parse_project_ids(fields),
         bibtex=format_bibtex(bib_id, entry, source, report),
-        # Empty, as its default is; named so that the mapping below is
-        # type-checked against the flat fields alone.
+        # Empty, as their defaults are; named so that the mapping below is
+        # type-checked against the flat fields alone. The awards are read
+        # below, once the work's year is.
         derived={},
+        awards=[],
         **{name: fields.get(name) for name in FLAT_FIELDS},
     )
+    # An award without a year of its own takes the work's.
+    work.awards = parse_awards(fields, work.year, source, report,
+                               unknown_in("award"))
+    return work
 
 
 def _encoding_error(path: str, error: UnicodeDecodeError) -> Diagnostic:

@@ -7,7 +7,7 @@ them.
 This file states the parts of that contract a JSON Schema cannot express:
 what the strings in the document are, what order the lists are in, what an
 absent key means, which fields are computed, when the version changes, and
-how a repeated `@string` macro resolves. `schema/v5/output.schema.json`
+how a repeated `@string` macro resolves. `schema/v6/output.schema.json`
 states the rest.
 
 Everything here is normative unless it carries a `Target` note. A `Target`
@@ -16,8 +16,8 @@ names the issue that will make it true. Until that issue lands, the rule is
 the intent and the note is the fact. What changed at each release, and what
 it replaced, is in [`CHANGELOG.md`](CHANGELOG.md), not here.
 
-- Applies to: `schema_version` 5 (`sslabdata.models.SCHEMA_VERSION`), package
-  version 3.0.0 (`sslabdata.__version__`).
+- Applies to: `schema_version` 6 (`sslabdata.models.SCHEMA_VERSION`), package
+  version 4.0.0 (`sslabdata.__version__`).
 
 ### How this file cites the code
 
@@ -25,7 +25,7 @@ Every rule below is grounded in a named part of the code rather than a line
 number, because line numbers rot silently: a function such as
 `sslabdata.parsers.bibtex.parse_all_works()`, a method such as
 `Person.to_dict()`, a module-level constant such as `TEXT_FIELDS`, a JSON
-Pointer into `schema/v5/output.schema.json` such as `/$defs/person/required`, or
+Pointer into `schema/v6/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
 statement is cited by its enclosing function.
 
@@ -201,7 +201,7 @@ without depending on English wording. Codes obey three rules:
    | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-KEY-REPEATED`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `CONFIG-PATH-WRONG-KIND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `RECORD-KEY-REPEATED`, `OUTPUT-WRITE-FAILED`, `INIT-FILE-EXISTS`, `INIT-PATH-WRONG-KIND`, `INIT-PATH-OUTSIDE-DIR`, `INIT-WRITE-FAILED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-BRACE-MISMATCH`, `BIB-COMMENTED-COMMAND-READ`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `LINK-SCHEME-UNSUPPORTED`, `TEXT-CONTROL-CHARACTER`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-AWARD-EMPTY`, `BIB-AWARD-YEAR-MALFORMED`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-BRACE-MISMATCH`, `BIB-COMMENTED-COMMAND-READ`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `LINK-SCHEME-UNSUPPORTED`, `TEXT-CONTROL-CHARACTER`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
@@ -249,6 +249,8 @@ Codes in use:
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not an unsigned run of the ASCII digits `0`–`9` (`sslabdata.parsers.bibtex.YEAR_DIGITS`), such as `in press`, or `-5`, `+2020`, `2_020` and full-width `２０２０`, which Python's `int()` would read as numbers. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
 | `BIB-DOI-INVALID` | An entry's `doi` is a DOI resolver URL with nothing after it, such as `https://doi.org/` (`sslabdata.parsers.bibtex.DOI_RESOLVERS`), so it names no DOI. Located at `<file>:<key>:doi`, naming the value. The work gets no DOI identifier and no link of kind `doi`, rather than an empty one; the entry is kept. A `doi` that is empty or blank is read as absent, and is not reported. A warning. |
+| `BIB-AWARD-EMPTY` | An entry's `award` field names no award: the field is empty or whitespace alone, or one of its awards is empty — two `and`s with nothing between them, an `and` that opens or closes the list, or a name that is empty once converted from LaTeX, such as `{}` — or is a year prefix with no name after it, such as `2026:` (`sslabdata.parsers.bibtex.parse_awards()`). Located at `<file>:<key>:award`; the prose names the award's place in the list, and the award as written when it has a year. The empty award is dropped and the others are kept, so an empty field gives `awards: []`. A warning. |
+| `BIB-AWARD-YEAR-MALFORMED` | An award in an entry's `award` field starts with what reads as a year but is not the prefix `YYYY:` — four ASCII digits, a colon and whitespace (`sslabdata.parsers.bibtex.AWARD_YEAR`): digits of any kind and a colon, such as `26: …`, `2026:…` with no space, or full-width `２０２６: …`, or four digits and a space with no colon, `2026 …` (`AWARD_YEAR_LIKE`). Located at `<file>:<key>:award`, naming the award as written and the part that is not a prefix. No year is read from it: **the text is kept as part of the name**, and the award takes the work's `year`. A prefix inside braces, `{2026}: …`, is text the author protected and is not reported. A warning. |
 | `LINK-SCHEME-UNSUPPORTED` | A link in `work.links` whose URL scheme is not `http`, `https` or `mailto` (`sslabdata.parsers.bibtex.LINK_SCHEMES`), such as `javascript:`, `data:` or `vbscript:`, which a renderer escaping the document (§2) should refuse to turn into a link. The scheme is the one Python's URL parser reads (`urllib.parse.urlsplit()`, in `sslabdata.parsers.bibtex.url_scheme()`) once surrounding whitespace is off, compared without regard to case; the parser drops a tab or line break anywhere in the URL first, as a browser does, so `java<tab>script:` is `javascript`. A URL with no scheme is a relative path and is not reported; that includes a protocol-relative `//host/path`, which takes the scheme of the page that links it. A scheme of one letter is a Windows drive, read by Windows rules as `sslabdata.config` reads one (`PureWindowsPath`), and not a scheme: `C:/papers`, `C:\papers` and the drive-relative `c:papers` are local paths and are not reported. No registered scheme is one letter long. Every link is checked, whether the entry wrote it (`url`, `video`, `pdf`) or sslabdata built it (`doi`, `arxiv`, and `pdf` from `pdf_base_url`). Located at `<file>:<key>:<field>`, the field the link came from, or at `<file>:<key>:` for the PDF link `pdf_base_url` builds, which no field of the entry wrote; the prose names the link's kind, which for `url` can be `video`, and the URL. Once per link. A person's `website` and `photo`, a project's `website` and `image`, and everything under `lab` are fields, not links, and are not checked. **The link is emitted unchanged**: this code only reports it. A warning. |
 | `BIB-OTHERS-NOT-LAST` | An `author` or `editor` list has `and others` somewhere other than at its end, the one place BibTeX reads it as "et al.". It names nobody there either, so it is dropped as a terminal one is, and the names around it are kept in their order, with `position` counting only them. Located at `<file>:<key>:author` or `:editor`, once per list however many times it occurs. A terminal `and others` is not reported. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
@@ -359,7 +361,7 @@ What each mode puts in the array:
 
 **The Python API is convenience only.** Public: the names in `sslabdata.__all__`
 — `assemble`, `AssemblyResult`, `AssemblyError`, the models `LabData`,
-`Work`, `Author`, `Contributor`, `Venue`, `Link`, `Person`, `Project`,
+`Work`, `Award`, `Author`, `Contributor`, `Venue`, `Link`, `Person`, `Project`,
 `Collaborator`, the config loader `LabDataConfig` with `BibFile`, and the exporters
 `export_to_yaml` and `export_to_json`, and the exception
 `ConfigurationError`.
@@ -521,7 +523,8 @@ the URL, and in math it is escaped to `\&` or `\%`. Exactly the fields in
 `publisher`, `address`, `organization`, `archivePrefix` and `eprinttype` —
 applied in `entry_fields()`. Name
 parts are converted the same way, in `person_name_parts()`, for authors and
-editors alike.
+editors alike, and so is each award's name, once `award` is split into its
+awards and each award's year prefix is read (`parse_awards()`).
 
 Being converted is not the same as being emitted. Of these fields, `title`,
 `abstract`, `note`, `type`, `series`, `publisher`, `address` and
@@ -581,6 +584,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | `pdf` | Becomes the work's one link of kind `pdf`, with `origin: input`, in place of the one `pdf_base_url` would give (`build_links()`). Empty or whitespace-only is read as absent. |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
 | `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `person.work_ids`, from a project's people and from `collaborators`. |
+| `award` | Parsed into the `awards` list (`parse_awards()`), and emitted nowhere else: `note` is never read for awards, and an award in `note` stays there as text. The field is split into awards as BibTeX splits `author` into names: on `and`, in any case, with whitespace on both sides, outside braces, which are counted as BibTeX counts them, so `{Systems and Software Award}` is one award. An `and` that opens or closes the list, or follows another, separates an empty award, which is dropped and reported (`BIB-AWARD-EMPTY`). Each award may then start with the year it was given, four ASCII digits, a colon and whitespace, `2026: Test of Time Award` (`AWARD_YEAR`), read before the name is converted from LaTeX under heading 1 and trimmed; it is that award's `year`, which need not be the work's. An award without one takes the work's `year`, or `null` when the work has none. A prefix that reads as a year and is not one, `26:` or `2026 …`, is kept in the name and reported (`BIB-AWARD-YEAR-MALFORMED`). |
 | `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none, or with `BIB-YEAR-INVALID` when it is not written in the digits `0`–`9` alone. It drives the works order (§3). |
 | `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
@@ -657,6 +661,7 @@ accident.
 | `works` | `year` **descending**, with works that have no year **last**. Ties keep *read order* (below). The sort is the final statement of `sslabdata.parsers.bibtex.parse_all_works()`. |
 | `work.authors` | The order the `author` field wrote them (`sslabdata.parsers.bibtex.parse_author_list()`). A terminal `and others` is BibTeX's "et al." and is dropped rather than emitted as an author; one anywhere else is dropped too, and reported as `BIB-OTHERS-NOT-LAST`. `position` is that order, 1-based, and counts only the names that reach the document. |
 | `work.editors` | The order the `editor` field wrote them, read the same way (`parse_editor_list()`). |
+| `work.awards` | The order the `award` field wrote them, with each empty award dropped (`parse_awards()`). |
 | `work.project_ids` | The order the `project` field wrote them, comma-separated, whitespace trimmed, empty entries dropped (`sslabdata.parsers.bibtex.parse_project_ids()`). |
 | `people` | The order of `people_file`. sslabdata does not sort people (`sslabdata.loaders.load_people()`, called by `sslabdata.assembler.assemble()`). |
 | `projects` | The order of `projects_file`, likewise (`sslabdata.loaders.load_projects()`). |
@@ -752,7 +757,7 @@ unconditionally, and by `LabData.to_dict()`, which always emits `lab`.
 itself and each entity type as **closed**: `/additionalProperties` and each
 of `/$defs/authorship`, `/$defs/editorship`, `/$defs/work`, `/$defs/person`,
 `/$defs/project`, `/$defs/collaborator`, `/$defs/venue`, `/$defs/link`,
-`/$defs/resolution`, and the `source` and `generator` objects, set
+`/$defs/resolution`, `/$defs/award`, and the `source` and `generator` objects, set
 `additionalProperties: false`. Within those, a property that is not declared
 cannot appear, and "absent" always means a declared property with no value.
 
@@ -783,6 +788,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. A *relative* directory is fine and is passed through as written: `sub/journal.bib` is a name under `bib_dir`; one that leaves `bib_dir` is rejected under `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`. The guarantee is kept by rejecting the input rather than by rewriting it, which would quietly discard that directory, and is enforced under `CONFIG-BIB-FILE-ABSOLUTE` (§1, *`sslabdata.ConfigurationError`*). |
 | `work.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. Of it and `bib_id`, it is the only one that is case-folded. |
 | `work.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`sslabdata.parsers.bibtex.extract_note()`). |
+| `work.awards` | Input — the BibTeX `award` field, split into awards, each `{name, year}`: `name` converted from LaTeX, and `year` the year the award was given, from its `YYYY:` prefix, else the work's `year`, else `null` (`sslabdata.parsers.bibtex.parse_awards()`, §2). `[]` when the entry writes none. These are a work's awards only; an award a person holds, such as a fellowship, is not in the document. |
 | `work.year` | Input — the BibTeX `year`, as an integer; `null` when the entry supplied none, with a diagnostic (`entry_year()`). |
 | `work.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`sslabdata.config.BibFile`, read by `parse_all_works()`). |
 | `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`sslabdata.parsers.bibtex.build_venue()`). See below. |
@@ -1114,13 +1120,14 @@ meaning and guarantees, and each of them is a bump.
 has been published is never edited. Version `N`'s schema stays reachable, byte
 for byte, at its own path after version `N+1` ships, so a consumer pinned to
 `N` keeps a stable target. `schema/v3/output.schema.json`,
-`schema/v4/output.schema.json` and `schema/v5/output.schema.json` are those
-paths, and `tests/COVERAGE.md` row `output.versioned_schema` asserts that the
-older two are unchanged byte for byte and still say `3` and `4`.
+`schema/v4/output.schema.json`, `schema/v5/output.schema.json` and
+`schema/v6/output.schema.json` are those paths, and `tests/COVERAGE.md` row
+`output.versioned_schema` asserts that the older three are unchanged byte for
+byte and still say `3`, `4` and `5`.
 
-**The `$id` is a pinned tag URL.** v5's `$id` is
-`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v5/schema/v5/output.schema.json`.
-The rule that makes it a contract rather than a guess: **the `schema-v5` tag
+**The `$id` is a pinned tag URL.** v6's `$id` is
+`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v6/schema/v6/output.schema.json`.
+The rule that makes it a contract rather than a guess: **the `schema-v6` tag
 is created when this version ships and is never moved.** A branch URL such as
 `blob/main` is not usable — it serves an HTML page rather than the schema, so
 no consumer can ever have resolved v3's `$id` — and this repository publishes
@@ -1135,8 +1142,8 @@ rule.
 descriptions inside those files, name the repository `labdata`, and the files
 are left byte for byte as published rather than rewritten. v4's raw `$id`
 resolves, because GitHub redirects `labdata` to `sslabdata`. v3's `blob/main`
-`$id` does not resolve, as above. v5's `$id`, title and descriptions say
-`sslabdata`.
+`$id` does not resolve, as above. The `$id`s, titles and descriptions of v5
+and v6 say `sslabdata`.
 
 **The input schemas are versioned apart from the document.**
 `schema/input/v1/` holds a JSON Schema for each input file: `lab.schema.json`,
@@ -1243,7 +1250,7 @@ So each rejected type is rejected for a stated reason, and each has a home:
 | Teaching and courses | A prose page in your site repository, or the institution's course catalogue. |
 | Press and media coverage | A typed link on the work it covers: `links` is an open map from kind to links, so #27 adds the kind without a version bump. |
 | Galleries, photos and videos | Your site repository; a video already reaches the document as a link of kind `video`. |
-| Awards and honours | An attribute of the work, today `work.note`; #27 moves it out of `note`. |
+| Awards and honours | A paper's awards are an attribute of the work, `work.awards`, read from its `award` field (§5). An award a person holds, such as a fellowship or an endowed chair, belongs in your site repository. |
 | Funding and grants | Your site repository. Nothing in the document depends on it. |
 | Software and datasets | Not a separate collection — they are kinds of *work*, added by #31. |
 | Alumni | Not a collection — a `status` on a person (`sslabdata.models.Person.status`). |
@@ -1260,7 +1267,7 @@ vocabularies, not over arbitrary content.
 
 ## 9. What this file is not
 
-It does not list the document's fields; `schema/v5/output.schema.json` does.
+It does not list the document's fields; `schema/v6/output.schema.json` does.
 It does not describe renderers such as
 [sslabdata-site](https://github.com/siddhss5/sslabdata-site), which are
 downstream consumers in their own repositories. It does not describe the input formats `lab.yaml`,

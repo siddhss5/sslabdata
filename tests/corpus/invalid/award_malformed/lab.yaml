@@ -1,0 +1,11 @@
+# CASE awards.no_year
+# CASE awards.empty
+# CASE awards.year_without_name
+# CASE awards.year_malformed
+# CASE awards.year_braced
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "awards.bib"
+    category: "Papers"
+people_file: "people.yaml"
