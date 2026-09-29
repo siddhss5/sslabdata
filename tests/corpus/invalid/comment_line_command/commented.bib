@@ -1,0 +1,17 @@
+% CASE structure.comment_line_command
+% BibTeX has no `%` comment outside an entry, so a well-formed command on a
+% `%` line is read. Each one is reported, so that a user who meant to comment
+% it out is told it was read. The @string on line 8 redefines jfr and is used,
+% the entry on line 10 is a work, and this prose, which mentions @article
+% without being one, is not reported.
+@string{jfr = "Journal of Fictional Robots"}
+% @string{jfr = "Journal of Commented Robots"}
+% @preamble{"\newcommand{\noopsort}[1]{}"}
+% @article{commented-out, title = {A Commented-Out Title}, author = {Adams, Alice}, journal = jfr, year = 2024}
+
+@article{after-comment,
+  title   = {A Fictional Title},
+  author  = {Adams, Alice},
+  journal = jfr,
+  year    = {2024}
+}

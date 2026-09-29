@@ -160,6 +160,26 @@ structure.comment_mentions_unclosed_group:
   diagnostics: []
   kept: [after-prose]
 
+# A well-formed command on a `%` line is read, as BibTeX reads it, and each
+# one is reported where it is: an entry at its key, and an @string or
+# @preamble at the file, with its line. The @string read that way is a
+# definition like any other, so it redefines jfr, and the last value is used.
+# Prose on a `%` line is not a command, and says nothing.
+structure.comment_line_command:
+  dir: comment_line_command
+  exit: 0
+  diagnostics:
+    - {code: BIB-COMMENTED-COMMAND-READ, severity: warning, file: ./commented.bib, values: [jfr, line 8]}
+    - {code: BIB-COMMENTED-COMMAND-READ, severity: warning, file: ./commented.bib, values: [preamble, line 9]}
+    - {code: BIB-COMMENTED-COMMAND-READ, severity: warning, file: ./commented.bib, key: commented-out, values: [line 10]}
+    - {code: BIB-STRING-REDEFINED, severity: warning, file: ./commented.bib, values: [jfr, ./commented.bib:8]}
+  kept: [commented-out, after-comment]
+  emits:
+    - work: commented-out
+      expect: {title: A Commented-Out Title, venue.name: Journal of Commented Robots}
+    - work: after-comment
+      expect: {venue.name: Journal of Commented Robots}
+
 # The macro is read as empty, so the entry has no booktitle either.
 strings.undefined:
   dir: undefined_string

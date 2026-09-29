@@ -67,6 +67,7 @@ LATEX_CONVERSION_FAILED = "LATEX-CONVERSION-FAILED"
 WRITE_BACK_FAILED = "BIB-WRITE-BACK-FAILED"
 ENCODING_INVALID = "BIB-ENCODING-INVALID"
 LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
+COMMENTED_COMMAND_READ = "BIB-COMMENTED-COMMAND-READ"
 
 # Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
@@ -255,6 +256,10 @@ class _Parser(PybtexParser):
         # (entry key, field name, message) for every entry whose braces
         # read it differently from how it was written (`BRACE_MISMATCH`).
         self.brace_mismatches: List[Tuple[str, Optional[str], str]] = []
+        # (offset of its `@`, command, entry key) for every entry or
+        # @preamble read from a `%` line (`COMMENTED_COMMAND_READ`); the key
+        # is None for a @preamble.
+        self.commented_commands: List[Tuple[int, str, Optional[str]]] = []
 
     def handle_error(self, error):
         """Keep a syntax error with where it happened; relay anything else."""
@@ -313,6 +318,10 @@ class _Parser(PybtexParser):
         read = 0
         for command, arguments in commands:
             kind = command.lower()
+            if kind != "string" and _on_comment_line(text, commands.command_start):
+                self.commented_commands.append((
+                    commands.command_start, command,
+                    None if kind == "preamble" else arguments[0]))
             if kind == "preamble":
                 self.process_preamble(*arguments)
             elif kind != "string":
@@ -375,12 +384,38 @@ def _on_comment_line(text: str, position: Optional[int]) -> bool:
     a command, so prose on a `%` line that mentions `@article` fails to parse.
     That failure is not reported: the prose was never meant as BibTeX. Only
     the report is suppressed. A well-formed command on such a line is read,
-    as the library reads it.
+    as the library reads it, and reported (`COMMENTED_COMMAND_READ`).
     """
     if position is None:
         return False
     line_start = text.rfind("\n", 0, position) + 1
     return text[line_start:position].lstrip().startswith("%")
+
+
+def _commented_commands(path: str, text: str,
+                        parser: "_Parser") -> List[Diagnostic]:
+    """One `COMMENTED_COMMAND_READ` for each command read from a `%` line, in
+    source order: an entry located at its key, and an @string or @preamble
+    at the file. An @string counts as `STRING_REDEFINED` counts it, when the
+    parser read its definition in full."""
+    found: List[Tuple[int, str, Optional[str], Optional[str]]] = [
+        (start, command, key, None)
+        for start, command, key in parser.commented_commands]
+    found += [(start, "string", None, name)
+              for name, start in parser.string_definitions
+              if _on_comment_line(text, start)]
+    lines = []
+    for start, command, key, name in sorted(found, key=lambda item: item[0]):
+        line = text.count("\n", 0, start) + 1
+        what = (f"the @string defining '{name}'" if name is not None
+                else f"the @{command}")
+        lines.append(diagnostic(
+            COMMENTED_COMMAND_READ, path, key, None,
+            f"{what} at line {line} is on a line that starts with '%', which "
+            "BibTeX does not read as a comment outside an entry, so it is "
+            "read; to leave it out, delete its '@' or put it in an "
+            "@comment{...} group"))
+    return lines
 
 
 def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
@@ -435,6 +470,7 @@ def parse_bibtex_file(
     for key, field_name, message in parser.brace_mismatches:
         diagnostics.append(diagnostic(BRACE_MISMATCH, path, key, field_name,
                                       f"{message}; check its braces"))
+    diagnostics.extend(_commented_commands(path, text, parser))
     for error, key, field_name, start in parser.syntax_errors:
         if key is None and _on_comment_line(text, start):
             continue

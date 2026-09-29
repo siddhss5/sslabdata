@@ -21,6 +21,12 @@ It emits `schema_version` 5, as 3.0.0 does.
   particle and the surname. A single spaced marker between a particle and
   the surname, `van\textsuperscript {*} Berg`, is joined the same way. Only
   `\textsuperscript` claims a `{*}` argument, as before (#53).
+- **A command read from a `%` line is reported.** A well-formed `@article`,
+  `@string` or `@preamble` on a line that starts with `%` between entries is
+  still read, as BibTeX reads it, and now warns
+  `BIB-COMMENTED-COMMAND-READ` with its line, so a user who meant to comment
+  an entry out is told it was read. Under `--strict` the warning is an error.
+  Prose on a `%` line still says nothing (#78).
 - JSON Schemas for the input files, `lab.yaml`, `people.yaml`, `projects.yaml`
   and `collaborators.yaml`, at `schema/input/v1/`, versioned apart from the
   document ([`SPEC.md` §6](SPEC.md#6-version-policy)). The wheel installs them

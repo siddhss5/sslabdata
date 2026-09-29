@@ -1,0 +1,7 @@
+# CASE structure.comment_line_command
+# Fictional input for tests/COVERAGE.md: well-formed commands on `%` lines,
+# which are read and each reported.
+bib_dir: "."
+bib_files:
+  - name: "commented.bib"
+    category: "Papers"
