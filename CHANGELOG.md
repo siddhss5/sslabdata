@@ -11,7 +11,7 @@ whose releases are the git tags `schema-v4` and `schema-v5`, with
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
 
-## Package 4.0.0 (not yet released)
+## Package 4.0.0 (tag `v4.0.0`, 2026-09-29)
 
 It emits `schema_version` 6, whose one change is paper awards (see
 `schema_version` 6 below).
@@ -176,7 +176,7 @@ differently:
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
 
-## `schema_version` 6 (tag `schema-v6`, not yet created)
+## `schema_version` 6 (tag `schema-v6`, 2026-09-29)
 
 One change, and nothing else in the document moves (#209):
 
