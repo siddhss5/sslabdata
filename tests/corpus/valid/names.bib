@@ -188,6 +188,24 @@
   year      = {2022}
 }
 
+% The same spaced marker with the given name first. BibTeX puts the surname
+% and the marker's first part in the given name, and the rest in the particle
+% and the surname, so the star would be left as a surname of its own. The
+% parts are joined back into one marker, across the given name as well, and
+% the name reads as it would with the marker unspaced; a single spaced marker
+% is joined the same way. Text after the second argument makes it no marker,
+% and Erin Evans is left unmarked.
+% CASE names.equal_contribution_doubled_given_first
+@inproceedings{name-equal-doubled-given-first,
+  title     = {A Spaced Marker After a Given Name},
+  author    = {Bob Brown\textsuperscript {*}\textsuperscript {*} and
+               Alex Kim\textsuperscript {*} and
+               Erin Evans\textsuperscript {*}\textsuperscript {*}x and
+               Alice Adams},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
 % A star, caret, dollar or backslash with a backslash in front of it is escaped
 % text, not a marker: nobody is marked, and the name parts keep their own
 % boundaries. What the escaped spelling itself becomes is the ordinary LaTeX

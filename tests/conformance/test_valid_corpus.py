@@ -201,6 +201,30 @@ EQUAL_CONTRIBUTION = [
          "authors.0.family", "Brown"),
     case("names.equal_contribution_doubled", "name-equal-doubled",
          "authors.1.given", "Alex"),
+    # The same with the given name first, doubled and single: the marker's
+    # parts are joined across the given name, the particle and the surname,
+    # and the name reads as it would with the marker unspaced.
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.*.equal_contribution", [True, True, False, False]),
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.*.person_id", ["bbrown", "akim", None, "aadams"]),
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.0.name", "Bob Brown"),
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.0.given", "Bob"),
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.0.von", None),
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.0.family", "Brown"),
+    case("names.equal_contribution_doubled_given_first",
+         "name-equal-doubled-given-first",
+         "authors.1.name", "Alex Kim"),
     # An escaped star, caret, dollar or backslash is text: nobody is marked,
     # and the name parts keep their own boundaries. What each spelling becomes
     # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
@@ -304,7 +328,8 @@ def test_every_readable_name_agrees_with_its_parts(valid_output):
 
 
 MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized", "name-equal-stacked",
-                                       "name-equal-doubled"}
+                                       "name-equal-doubled",
+                                       "name-equal-doubled-given-first"}
 
 
 # Covers names.equal_contribution_marker
@@ -320,9 +345,9 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
               for a in w["authors"] if a["equal_contribution"]}
     assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
     # Four parts marked in each of the four form entries, three of the five
-    # authors of name-equal-normalized, four of name-equal-stacked and two of
-    # name-equal-doubled.
-    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3 + 4 + 2, sorted(marked)
+    # authors of name-equal-normalized, four of name-equal-stacked, and two
+    # each of name-equal-doubled and name-equal-doubled-given-first.
+    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3 + 4 + 2 + 2, sorted(marked)
     assert [name for _, name in marked if "*" in name] == []
 
 
