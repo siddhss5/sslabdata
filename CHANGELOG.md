@@ -33,6 +33,12 @@ It emits `schema_version` 5, as 3.0.0 does.
   `BIB-COMMENTED-COMMAND-READ` with its line, so a user who meant to comment
   an entry out is told it was read. Under `--strict` the warning is an error.
   Prose on a `%` line still says nothing (#78).
+- **A spaced marker after a given name comes off.** `Bob
+  Brown\textsuperscript {*}\textsuperscript {*}` reads `Bob Brown`, where it
+  read `Bob Brown *` with a star as its surname, and `Bob
+  Brown\textsuperscript {*}`, spaced once, sets `equal_contribution` and reads
+  `Bob Brown`, where it read `Bob Brown *` unmarked. Only
+  `\textsuperscript` claims a `{*}` argument, as before (#199).
 - JSON Schemas for the input files, `lab.yaml`, `people.yaml`, `projects.yaml`
   and `collaborators.yaml`, at `schema/input/v1/`, versioned apart from the
   document ([`SPEC.md` §6](SPEC.md#6-version-policy)). The wheel installs them

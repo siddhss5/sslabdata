@@ -611,6 +611,24 @@ def _with_marker_joined(parts: List[str]) -> List[str]:
     return joined
 
 
+def _crosses_given_name(given: List[str], rest: List[str],
+                        person: Person) -> bool:
+    """True when a spaced marker runs from the given name into the rest.
+
+    Written with the given name first, ``Bob Brown\\textsuperscript {*}``
+    puts the surname and the command in the given name, and the argument in
+    the surname. Only a name that reads the same when its words are written
+    in that order, with no comma, can have been written so: in the
+    ``Family, Given`` form the given name comes after the surname, and no
+    marker runs from one into the other.
+    """
+    if (_with_marker_joined(given + rest)
+            == _with_marker_joined(given) + _with_marker_joined(rest)):
+        return False
+    return (_name_part_groups(Person(" ".join(given + rest)))
+            == _name_part_groups(person))
+
+
 def _joined_groups(person: Person) -> List[List[str]]:
     """`_name_part_groups()`, with each split marker joined.
 
@@ -623,6 +641,11 @@ def _joined_groups(person: Person) -> List[List[str]]:
     split again, so every other name keeps pybtex's own split.
     """
     given, von, family, suffix = _name_part_groups(person)
+    if _crosses_given_name(given, von + family, person):
+        # Written with the given name first, joined and read again without a
+        # comma, as it would have been read with the marker unspaced.
+        again = Person(" ".join(_with_marker_joined(given + von + family)))
+        given, von, family, suffix = _name_part_groups(again)
     von_family = _with_marker_joined(von + family)
     split = _with_marker_joined(von) + _with_marker_joined(family)
     if von_family == split:
