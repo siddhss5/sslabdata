@@ -467,6 +467,7 @@ class Generator:
         if self.ra.random() < 0.3:
             # Never last, as the other text fields are not: a brace the
             # value closes too early then shows in the field after it.
+            # Until #211, a mismatch that ends the last field is not reported.
             fs.insert(self.ra.randint(0, len(fs) - 1), self.award_field())
         return Entry(etype, key, fs)
 

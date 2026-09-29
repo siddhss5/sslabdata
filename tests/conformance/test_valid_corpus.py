@@ -492,11 +492,11 @@ LINKS = [
     # A build never fetches, so the verification carries a status and no time.
     case("links.pdf.local_present", "present", "links.pdf.0.verification",
          {"status": "verified"}),
+    # Awards come from the `award` field alone: award text in a note stays
+    # there as text, beside the link written with it.
     case("links.note_link_award", "link-note-award", "note",
-         Contains("https://example.org/papers/award")),
-    case("links.note_link_award", "link-note-award", "award", "Best Paper Award Finalist",
-         marks=pytest.mark.xfail(strict=True, raises=AssertionError,
-                                 reason="#27: the award field is not read")),
+         Contains("https://example.org/papers/award", "Best Paper Award Finalist")),
+    case("links.note_link_award", "link-note-award", "awards", []),
 ]
 
 

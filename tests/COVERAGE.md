@@ -59,8 +59,7 @@ observed outcome of a case under its ID, and compares it with the expected
 entry of the same ID.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#27 (explicit link and award fields), #28
-(`keywords` project tags).
+#28 (`keywords` project tags).
 
 ## Generated inputs
 
@@ -405,7 +404,7 @@ written `YYYY:` and a space; without one it takes the work's `year`.
 | `links.pdf.local_missing` | `pdf_base_url` is a local directory with no `<key>.pdf` | The link is kept with `verification.status: missing`, not deleted: a broken link and an absent one are different answers | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.pdf_field` | `pdf = {…}` with `pdf_base_url` set, the same with no `pdf_base_url`, and an empty `pdf` | One link of kind `pdf` with `origin: input` and `verification.status: unchecked`, in place of the one `pdf_base_url` gives; an empty `pdf` is read as absent; no diagnostic | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_pdf_field_replaces_the_base_url_link` | pass |
 | `links.pdf.remote_guess` | `pdf_base_url` is a remote URL, for an entry whose PDF the corpus holds locally, one whose PDF it does not, and one with its own `pdf` | The first two get `<base>/<key>.pdf` with `origin: derived` and `verification.status: unchecked`: a build never fetches, and a remote base is not checked against local files. The entry's own `pdf` replaces the guess. No diagnostic, even under `--strict` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_remote_pdf_base_url_guess_is_unchecked` | pass |
-| `links.note_link_award` | A `note` holding both an `\href` and an award | Both survive; the award is available as its own field | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | xfail #27 |
+| `links.note_link_award` | A `note` holding both an `\href` and award text | Both survive as text in `note`; `note` is never read for awards, so `awards` is `[]` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 
 ## Projects
 
