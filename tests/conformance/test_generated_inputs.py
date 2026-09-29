@@ -8,7 +8,7 @@ and checks what must hold for every input:
 
 1. no run raises an uncaught exception;
 2. a run that exits 0 writes a document that validates against
-   `schema/v5/output.schema.json`, and the YAML and JSON documents hold the
+   `schema/v6/output.schema.json`, and the YAML and JSON documents hold the
    same data;
 3. a run that exits 1 reports at least one coded diagnostic;
 4. `--validate` exits 0 only where `--output` in the same format writes;
@@ -17,9 +17,12 @@ and checks what must hold for every input:
    work's `bibtex`, which also carries each field value as written;
 6. no input is silently read as something else: a year that is not an
    unsigned run of ASCII digits is not a number, an `eprint` is filed under
-   the repository its entry names, `and others` is not an author, an empty
-   file path, a repeated YAML key or a path that is a directory is reported,
-   and LaTeX conversion does not invent markup (`<`, `>`, `[`, `]`).
+   the repository its entry names, `and others` is not an author, an award
+   takes the year its `YYYY:` prefix wrote or else the work's, a prefix that
+   is not a year stays in the award's name and is reported, an empty award is
+   reported, an empty file path, a repeated YAML key or a path that is a
+   directory is reported, and LaTeX conversion does not invent markup (`<`,
+   `>`, `[`, `]`).
 
 "Reported" means a coded diagnostic at the place: the key and field for a
 work, the configuration key or the file. A run is deterministic, so the
@@ -100,6 +103,15 @@ class Sentinel:
     braced argument it is (`\\texttt`), or `text`."""
     word: str
     form: str
+
+
+@dataclass
+class Award(Sentinel):
+    """One award of an `award` field, with the year prefix written before it:
+    `year` for a prefix that is one, `malformed` for one that reads as a year
+    and is not, `none` for no prefix, or text braces protect."""
+    kind: str = "none"
+    prefix: str = ""
 
 
 def bare_words(p: Sentinel) -> list:
@@ -282,6 +294,18 @@ REPOSITORIES = {"arXiv": "arxiv", "{arXiv}": "arxiv", "ARXIV": "arxiv",
                 "hal": "hal", "HAL": "hal", "pubmed": "pubmed", "": None,
                 "  ": None}
 
+# What an award may start with, and what sslabdata must read it as: the year
+# prefix is four ASCII digits, a colon and whitespace (SPEC.md section 5).
+AWARD_PREFIXES = [
+    ("", "none"), ("", "none"), ("2026: ", "year"), ("1999:\n", "year"),
+    ("0042:  ", "year"), ("26: ", "malformed"), ("2026 ", "malformed"),
+    ("2026:", "malformed"), ("2026 : ", "malformed"), ("20261: ", "malformed"),
+    ("\uff12\uff10\uff12\uff16: ", "malformed"), ("{2026}: ", "none"),
+]
+# The separators between awards, and the awards that are empty.
+AWARD_JOINERS = [" and ", " AND ", "\nand ", " And\t"]
+EMPTY_AWARDS = ["", " ", "{}"]
+
 NAME_FORMS = [
     ("plain", "Ann {S}"), ("comma", "{S}, Ann"), ("jr", "{S}, Jr., Ann"),
     ("von", "Ann van der {S}"), ("von-comma", "van {S}, Ann"),
@@ -302,6 +326,8 @@ class Generator:
         self.hostile = self.r.random() < 0.3
         self.used = set()
         self.names = []    # plain author names, for people and collaborators
+        # Awards are drawn from their own stream (`award_field`).
+        self.ra = random.Random(f"{SEED}:{index}:award")
 
     def word(self, capital=False) -> str:
         while True:
@@ -438,7 +464,40 @@ class Generator:
             fs.append(copy.deepcopy(r.choice(fs)))
         if r.random() < 0.05:
             fs[0], fs[-1] = fs[-1], fs[0]
+        if self.ra.random() < 0.3:
+            # Never last, as the other text fields are not: a brace the
+            # value closes too early then shows in the field after it.
+            # Until #211, a mismatch that ends the last field is not reported.
+            fs.insert(self.ra.randint(0, len(fs) - 1), self.award_field())
         return Entry(etype, key, fs)
+
+    def award_field(self) -> Field:
+        """An `award` field, drawn from a stream of its own so that adding it
+        leaves every other generated value as it was."""
+        r, self.r = self.r, self.ra
+        try:
+            items = [self.award() for _ in range(self.r.randint(1, 3))]
+            return Field("award", items, joiner=self.r.choice(AWARD_JOINERS))
+        finally:
+            self.r = r
+
+    def award(self):
+        r = self.r
+        if r.random() < 0.1:
+            return r.choice(EMPTY_AWARDS)
+        prefix, kind = r.choice(AWARD_PREFIXES)
+        sentinel = (self.in_command() if r.random() < 0.3
+                    else Sentinel(self.word(), "award"))
+        # A prefix with no space after it is followed by the name at once,
+        # so that whitespace cannot turn it into a year prefix.
+        pieces = [] if prefix == "2026:" else [
+            r.choice(SNIPPETS[g]) for g in r.choices(
+                list(SNIPPETS), [GROUP_WEIGHTS.get(g, 1) for g in SNIPPETS],
+                k=r.randint(0, 2))]
+        text = " ".join(pieces + [sentinel.word])
+        if r.random() < 0.2:
+            text = f"{{{text} and {self.word()}}}"
+        return Award(prefix + text, sentinel.form, kind, prefix)
 
     # YAML ---------------------------------------------------------------------
 
@@ -831,7 +890,7 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
         for p in f.parts:
             if not isinstance(p, Sentinel):
                 continue
-            names = name in ("author", "editor")
+            names = name in ("author", "editor", "award")
             argument = p.form.startswith("\\")
             evidence = [p.form] if names or argument else pieces
             for word in bare_words(p):
@@ -854,7 +913,7 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
             if source and source not in " ".join(bibtex.split()):
                 fail(f"5 bibtex rewrites {_specials(source)}",
                      f"{e.key}.{name}: {source!r}"[:400])
-        if name in TEXT_FIELDS and places:
+        if (name in TEXT_FIELDS or name == "award") and places:
             source = value_text(f)
             # Math is left as TeX with a bare `%` or `&` escaped (SPEC.md), so
             # a URL is checked only in a value with no bare `$`.
@@ -883,6 +942,16 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
         if year is None and not excused("year"):
             fail("6 year dropped without a diagnostic", f"{e.key}: {raw!r}")
 
+    # An award's year is the one its prefix wrote, or the work's; a prefix
+    # that is not a year stays in the name and is reported; an empty award is
+    # reported. An unbalanced brace moves where the awards end, so such an
+    # entry is left to the text checks above.
+    awards = by_name.get("award")
+    if awards and "award" not in repeated and not excused("award", LOSS_EXPLAINED) \
+            and all(value_text(f).count("{") == value_text(f).count("}")
+                    for f in e.fields):
+        _check_awards(e.key, awards[0], w, excused, fail)
+
     # An eprint is filed under the repository its entry names, arXiv by default.
     eprint = by_name.get("eprint")
     if eprint and len(eprint) == 1 and value_text(eprint[0]).strip() \
@@ -909,6 +978,36 @@ def _check_work(e: Entry, w: dict, excused, fail) -> None:
             fail(f"6 {role} named 'others'", e.key)
 
 
+def _check_awards(key, f: Field, w: dict, excused, report) -> None:
+    """The award invariants of section 6, for one entry's `award` field."""
+    def fail(cls, detail):
+        report(cls, f"{key}: {value_text(f)!r}: {detail}"[:400])
+
+    reported = {code: excused("award", {code})
+                for code in ("BIB-AWARD-EMPTY", "BIB-AWARD-YEAR-MALFORMED")}
+    if any(not isinstance(p, Award) for p in f.parts) and not reported["BIB-AWARD-EMPTY"]:
+        fail("6 empty award not reported", "no BIB-AWARD-EMPTY")
+    for p in f.parts:
+        if not isinstance(p, Award) or drops(p.form):
+            continue
+        word = bare_words(p)[0]
+        found = [a for a in w.get("awards", []) if word in a.get("name", "")]
+        if len(found) != 1:
+            continue  # a lost word is the text check's to report
+        name, year = found[0]["name"], found[0]["year"]
+        if p.kind == "year":
+            if year != int(p.prefix[:4]) or name.startswith(p.prefix[:5]):
+                fail("6 award year prefix not read", f"{name!r}, {year!r}")
+        elif year != w.get("year"):
+            fail(f"6 award with a {p.kind} prefix does not take the work's year",
+                 f"{name!r}, {year!r}")
+        if p.kind == "malformed":
+            if p.prefix.split(":")[0].strip() not in name:
+                fail("6 malformed award prefix dropped from the name", repr(name))
+            if not reported["BIB-AWARD-YEAR-MALFORMED"]:
+                fail("6 malformed award prefix not reported", repr(name))
+
+
 def _places(name, w, by_name):
     """The values a field reaches in the document, or None where it has no
     one place to check (a container field another one outranks)."""
@@ -928,6 +1027,8 @@ def _places(name, w, by_name):
                 for link in links if link.get("origin") == "input"]
     if name == "doi":
         return w.get("identifiers", {}).get("doi", [])
+    if name == "award":
+        return [a.get("name") for a in w.get("awards", [])]
     if name == "eprint":
         return [v for vs in w.get("identifiers", {}).values() for v in vs]
     return None
@@ -936,6 +1037,8 @@ def _places(name, w, by_name):
 def _group(name):
     if name in ("author", "editor"):
         return "name"
+    if name == "award":
+        return "award"
     if name in TEXT_FIELDS:
         return "text field"
     return name if name in ("url", "doi", "eprint") else "raw field"

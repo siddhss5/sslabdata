@@ -114,7 +114,7 @@ def test_demo_matches_schema(validator, demo_exports):
 
 # Covers output.schema
 def test_every_document_sslabdata_writes_matches_the_schema(validator, tmp_path):
-    """Whatever input a run accepts, the document it writes is schema v5.
+    """Whatever input a run accepts, the document it writes is schema v6.
 
     Runs `sslabdata --format json --output` over the valid corpus, the demo
     and every invalid-corpus case. A case that exits non-zero writes nothing
@@ -125,7 +125,7 @@ def test_every_document_sslabdata_writes_matches_the_schema(validator, tmp_path)
 
     and read DIR/test_every_document*/schema-conformance.json (case -> exit
     status and schema errors) and the `<case>/lab.json` beside it, which can
-    be validated against schema/v5/output.schema.json by any JSON Schema tool.
+    be validated against schema/v6/output.schema.json by any JSON Schema tool.
     """
     cases = {"valid": (VALID, "lab.yaml"), "demo": (REPO_ROOT, DEMO_CONFIG)}
     cases.update({f"invalid/{d.name}": (d, "lab.yaml")
@@ -186,26 +186,27 @@ def test_schema_rejects_an_authorship_with_two_references_or_none(validator,
 PREVIOUS_SCHEMA_SHA256 = {
     3: "97f85113822cffb47d36b415716563b50bfe4bf2bc30e892e4cc45b9e377aa92",
     4: "58baac01027d2f6b1a6451e395d6569bcb4318041ee204649aee8029adda24ba",
+    5: "148c3303b9db8fc8427f8d7f3f4a3ebb44242941c23ab825727f1ba1ebbe6fb2",
 }
 
-# The v5 `$id`, stated here as the literal a consumer would resolve. It is
+# The v6 `$id`, stated here as the literal a consumer would resolve. It is
 # served from a tag created when this version ships and never moved (SPEC.md
 # section 6), so changing this string is a contract change and has to be a
 # deliberate edit in two places.
-SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v5"
-             "/schema/v5/output.schema.json")
+SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v6"
+             "/schema/v6/output.schema.json")
 
 
 # Covers output.versioned_schema
 def test_the_previous_schema_stays_reachable_unchanged(validator):
-    """v3 and v4 are each at their own path, byte for byte, and v5 is at a
-    third.
+    """v3, v4 and v5 are each at their own path, byte for byte, and v6 is at
+    a fourth.
 
     A consumer pinned to an earlier version keeps a stable target only if
     nothing in the file moves, so the assertion is on the digest rather than
     on any property of the parsed document.
     """
-    assert validator.schema["properties"]["schema_version"]["const"] == 5
+    assert validator.schema["properties"]["schema_version"]["const"] == 6
     for version, path in PREVIOUS_SCHEMA_PATHS.items():
         raw = path.read_bytes()
         assert hashlib.sha256(raw).hexdigest() == PREVIOUS_SCHEMA_SHA256[version]
@@ -228,7 +229,7 @@ def test_the_published_id_is_the_string_consumers_resolve(validator):
     """
     schema_id = validator.schema["$id"]
     assert schema_id == SCHEMA_ID
-    assert "/schema-v5/" in schema_id, schema_id
+    assert "/schema-v6/" in schema_id, schema_id
     assert "/main/" not in schema_id and "/blob/" not in schema_id, schema_id
 
 

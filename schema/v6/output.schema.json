@@ -1,0 +1,481 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v6/schema/v6/output.schema.json",
+  "title": "sslabdata output",
+  "description": "The lab.yml / lab.json file written by `sslabdata --output`. YAML and JSON exports hold the same data. Published schemas are immutable: this one is served from the `schema-v6` tag, which is created when this version ships and is never moved.",
+  "type": "object",
+  "required": [
+    "schema_version", "generator", "lab", "works", "people", "projects",
+    "collaborators"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Version of this output format. Bumped when a change could break a consumer.",
+      "const": 6
+    },
+    "generator": {
+      "description": "What compiled this document. It carries no timestamp: a build timestamp would make every run differ, and git records when.",
+      "type": "object",
+      "required": ["name", "version", "schema_version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": {
+          "description": "The sslabdata package version. Independent of schema_version; neither can be derived from the other.",
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": { "const": 6 }
+      }
+    },
+    "lab": {
+      "description": "The lab section of lab.yaml, copied through unchanged and always emitted, so an empty header is distinguishable from no header. The properties below are declared for documentation only: this object stays open, and a consumer must probe for the keys it wants rather than expect a fixed set.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "institution": { "type": "string" },
+        "department": { "type": "string" },
+        "website": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "logo": { "type": "string" },
+        "links": { "type": "object" }
+      }
+    },
+    "works": {
+      "description": "Everything the lab produced that carries a citation key. Ordered by year descending, works with no year last; ties keep read order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/work" }
+    },
+    "people": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/person" }
+    },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "collaborators": {
+      "description": "A derived grouping over the authorships that resolved to nobody in people.yaml. Not a list of people: see /$defs/collaborator.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/collaborator" }
+    }
+  },
+  "$defs": {
+    "optionalString": { "type": ["string", "null"] },
+    "idList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "derived": {
+      "description": "Reserved for sslabdata. Every key inside it is sslabdata's; consumers tolerate keys they do not know and must not write their own. A key graduating out of it into a named property is still a major change. It is not a general extension mechanism.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "venue": {
+      "description": "Where a work appeared. The one place sslabdata normalises across entry types, collapsing `journal`, `booktitle`, `school` and `institution` to one name plus a kind.",
+      "type": "object",
+      "required": ["kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "An open string, deliberately not an enum so that new work types need no version bump. Documented values: `journal`, `conference`, `book`, `institution`, `repository`, `other`.",
+          "type": "string",
+          "minLength": 1
+        },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "link": {
+      "description": "One URL a work can be reached at. A link that fails verification is kept and labelled, never deleted, so a consumer can tell a broken link from an absent one.",
+      "type": "object",
+      "required": ["url", "label", "origin", "verification"],
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "minLength": 1 },
+        "label": { "$ref": "#/$defs/optionalString" },
+        "origin": {
+          "description": "Where the link came from. An open string; documented values are `input` (the entry's own field), `sidecar`, `enrichment`, `inferred` and `derived` (sslabdata built it). Only `input` means the entry supplied it.",
+          "type": "string",
+          "minLength": 1
+        },
+        "verification": {
+          "type": "object",
+          "required": ["status"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "description": "`unchecked` when nothing has looked, `verified` when a local filesystem check or a committed cache found it, `missing` when one looked and it was not there. A build never fetches.",
+              "enum": ["unchecked", "verified", "missing"]
+            }
+          }
+        }
+      }
+    },
+    "linkMap": {
+      "description": "An open map from link kind to a list of links, so that two code repositories or two videos can both be carried. Documented kinds: `pdf`, `doi`, `arxiv`, `url`, `video`. Unordered; consumers filter.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/link" }
+      }
+    },
+    "identifierMap": {
+      "description": "An open map from identifier scheme to a unique list of identifiers, for example {\"doi\": [\"10.5555/...\"], \"arxiv\": [\"2501.01234\"]}. Schemes are documented, not enumerated. A list because ISBN and ISSN genuinely repeat. Unordered; consumers filter.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      }
+    },
+    "resolution": {
+      "description": "Whether this contributor was matched to a person, and how. Both are open strings: #24 adds `ambiguous` to the status and #25 fills the method with an override or an ORCID, and neither is breaking.",
+      "type": "object",
+      "required": ["status", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "description": "Documented values: `resolved`, `unresolved`.",
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "description": "Documented values: `exact`, `fuzzy`, or null when nothing matched.",
+          "$ref": "#/$defs/optionalString"
+        }
+      }
+    },
+    "nameParts": {
+      "description": "The name properties every contributor record carries: the readable form, the parts BibTeX split it into, its position in the list, the person it resolved to, and how. Referenced in place, so each record below still declares every key it allows -- `additionalProperties: false` sees only its own `properties`.",
+      "type": "object",
+      "required": [
+        "name", "position", "person_id", "given", "von", "family", "suffix",
+        "literal", "resolution", "derived"
+      ],
+      "properties": {
+        "name": {
+          "description": "The structured parts joined in reading order. A readable form of the input name, not a citation form: it does not abbreviate, expand or normalise.",
+          "type": "string",
+          "minLength": 1
+        },
+        "position": {
+          "description": "1-based position in this work's list. With the work's bib_id it addresses the record.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "person_id": {
+          "description": "The id of the matching person in people.yaml, or null. It means nothing else.",
+          "type": ["string", "null"]
+        },
+        "given": {
+          "description": "Given and middle names, as the entry supplied them: an entry writing `Brown, B.` yields `B.`, which is correct rather than a gap. Null for a name written as one brace-protected unit.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "von": {
+          "description": "Surname particles such as `van den`. Null when the name has none.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "family": {
+          "description": "The surname, without particles or suffix. Null for a name written as one brace-protected unit.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "suffix": {
+          "description": "A lineage suffix such as `Jr.`. Null when the name has none.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "literal": {
+          "description": "A name written as one brace-protected unit, such as `{Example Robotics Consortium}`. Null for a parsed name, where the four parts above apply instead. Brace protection means `do not parse this`, so it does not assert that the name is an organisation.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "derived": { "$ref": "#/$defs/derived" }
+      }
+    },
+    "authorship": {
+      "description": "One authorship of a work, addressed by (work.bib_id, position). The authorship is the primary contributor record, so two people who write their names identically are never merged at this level. It references exactly one contributor: `person_id` for a person in people.yaml, `collaborator_key` for the grouping an unresolved authorship fell into.",
+      "$ref": "#/$defs/nameParts",
+      "type": "object",
+      "required": ["collaborator_key", "equal_contribution"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "position": { "type": "integer" },
+        "person_id": { "type": ["string", "null"] },
+        "given": { "$ref": "#/$defs/optionalString" },
+        "von": { "$ref": "#/$defs/optionalString" },
+        "family": { "$ref": "#/$defs/optionalString" },
+        "suffix": { "$ref": "#/$defs/optionalString" },
+        "literal": { "$ref": "#/$defs/optionalString" },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "derived": { "$ref": "#/$defs/derived" },
+        "collaborator_key": {
+          "description": "The key of the collaborator grouping this authorship fell into, or null when it resolved to a person.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "equal_contribution": {
+          "description": "True when the BibTeX entry marked this author with a `*`. The marker itself is not part of the name.",
+          "type": "boolean"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "person_id": { "type": "string", "minLength": 1 },
+            "collaborator_key": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "person_id": { "type": "null" },
+            "collaborator_key": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "editorship": {
+      "description": "One editor of a work. Editing a volume is not an authorship: an editor is excluded from person.work_ids, from a project's people and from collaborators, so one that matched nobody is simply `person_id: null` and references no grouping.",
+      "$ref": "#/$defs/nameParts",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "position": { "type": "integer" },
+        "person_id": { "type": ["string", "null"] },
+        "given": { "$ref": "#/$defs/optionalString" },
+        "von": { "$ref": "#/$defs/optionalString" },
+        "family": { "$ref": "#/$defs/optionalString" },
+        "suffix": { "$ref": "#/$defs/optionalString" },
+        "literal": { "$ref": "#/$defs/optionalString" },
+        "resolution": { "$ref": "#/$defs/resolution" },
+        "derived": { "$ref": "#/$defs/derived" }
+      }
+    },
+    "award": {
+      "description": "One award a work received.",
+      "type": "object",
+      "required": ["name", "year"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The award's name, as plain text.",
+          "type": "string",
+          "minLength": 1
+        },
+        "year": {
+          "description": "The year the award was given, which need not be the work's: the year its `YYYY:` prefix wrote, else the work's `year`, else null.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "work": {
+      "type": "object",
+      "required": [
+        "bib_id", "source", "title", "authors", "editors", "year", "venue",
+        "volume", "number", "pages", "series", "edition", "publisher",
+        "address", "organization", "chapter", "month", "howpublished", "type",
+        "category", "entry_type", "abstract", "note", "awards", "identifiers",
+        "links", "project_ids", "bibtex", "derived"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bib_id": {
+          "description": "The BibTeX citation key, as written.",
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "description": "Where this work was read from. Per-field provenance stays out of the document; #30 uses `derived`.",
+          "type": "object",
+          "required": ["file", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "description": "The configured `bib_files[].name`, never an absolute path.",
+              "type": "string"
+            },
+            "key": {
+              "description": "The citation key as written, which is `bib_id` again.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "title": { "type": "string" },
+        "authors": { "type": "array", "items": { "$ref": "#/$defs/authorship" } },
+        "editors": { "type": "array", "items": { "$ref": "#/$defs/editorship" } },
+        "year": {
+          "description": "Null when the entry supplied none, which is reported as a diagnostic. A work with no year sorts last.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "venue": {
+          "description": "The container this work appeared in, or null when the entry names none.",
+          "oneOf": [{ "$ref": "#/$defs/venue" }, { "type": "null" }]
+        },
+        "volume": { "$ref": "#/$defs/optionalString" },
+        "number": {
+          "description": "BibTeX's `number`, with BibTeX's meaning: an issue number for an article and a report number for a technical report. Reinterpreting it is not sslabdata's job; `venue.kind` gives a consumer the branch it needs.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "pages": { "$ref": "#/$defs/optionalString" },
+        "series": { "$ref": "#/$defs/optionalString" },
+        "edition": { "$ref": "#/$defs/optionalString" },
+        "publisher": { "$ref": "#/$defs/optionalString" },
+        "address": { "$ref": "#/$defs/optionalString" },
+        "organization": { "$ref": "#/$defs/optionalString" },
+        "chapter": { "$ref": "#/$defs/optionalString" },
+        "month": { "$ref": "#/$defs/optionalString" },
+        "howpublished": { "$ref": "#/$defs/optionalString" },
+        "type": {
+          "description": "BibTeX's `type` field: a report's own label, or a section label for a chapter. Not the entry type, which is `entry_type`.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "category": {
+          "description": "The category of the bib_files entry the file was listed under, not anything in the .bib file.",
+          "type": "string"
+        },
+        "entry_type": {
+          "description": "The BibTeX entry type, lower-cased.",
+          "type": "string",
+          "minLength": 1
+        },
+        "abstract": { "$ref": "#/$defs/optionalString" },
+        "note": { "$ref": "#/$defs/optionalString" },
+        "awards": {
+          "description": "The awards this work received, in the order the entry's `award` field wrote them; `[]` when it names none. Awards held by a person are not here.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/award" }
+        },
+        "identifiers": { "$ref": "#/$defs/identifierMap" },
+        "links": { "$ref": "#/$defs/linkMap" },
+        "project_ids": { "$ref": "#/$defs/idList" },
+        "bibtex": {
+          "description": "The entry re-serialized as BibTeX, for a reader to copy, and null when it could not be written back out. It is a re-serialization of the entry's data and explicitly not a source of properties.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "derived": { "$ref": "#/$defs/derived" }
+      }
+    },
+    "person": {
+      "type": "object",
+      "required": [
+        "id", "name", "role", "status", "photo", "email", "website",
+        "co_advisor", "start_year", "end_year", "degree", "thesis_title",
+        "current_position", "work_ids", "derived"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "$ref": "#/$defs/optionalString" },
+        "status": { "type": "string" },
+        "photo": { "$ref": "#/$defs/optionalString" },
+        "email": { "$ref": "#/$defs/optionalString" },
+        "website": { "$ref": "#/$defs/optionalString" },
+        "co_advisor": { "$ref": "#/$defs/optionalString" },
+        "start_year": { "type": ["integer", "null"] },
+        "end_year": { "type": ["integer", "null"] },
+        "degree": { "$ref": "#/$defs/optionalString" },
+        "thesis_title": { "$ref": "#/$defs/optionalString" },
+        "current_position": { "$ref": "#/$defs/optionalString" },
+        "work_ids": {
+          "description": "The works this person authored. Editors are not authorships and are not listed.",
+          "$ref": "#/$defs/idList"
+        },
+        "derived": { "$ref": "#/$defs/derived" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "id", "title", "description", "website", "image", "status",
+        "work_ids", "people_ids", "derived"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "$ref": "#/$defs/optionalString" },
+        "website": { "$ref": "#/$defs/optionalString" },
+        "image": {
+          "description": "A URL or a site path, the same kind of value as a person's `photo`. Plain text: deciding which URLs are safe to render is the renderer's job.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "status": { "type": "string" },
+        "work_ids": { "$ref": "#/$defs/idList" },
+        "people_ids": { "$ref": "#/$defs/idList" },
+        "derived": { "$ref": "#/$defs/derived" }
+      }
+    },
+    "collaborator": {
+      "description": "A grouping over unresolved authorships, not an identity. A consumer that distrusts the grouping can ignore it and work from `authorships` instead; that property is what makes the grouping safe to publish.",
+      "type": "object",
+      "required": [
+        "key", "grouped_by", "name_kind", "name", "given", "von", "family",
+        "suffix", "literal", "name_variants", "authorships", "work_ids",
+        "last_year", "derived"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "A lookup key, explicitly not an assertion about a human: a readable slug of the normalised name plus an always-present short digest, so adding an unrelated collaborator can never change an existing key.",
+          "type": "string",
+          "minLength": 1
+        },
+        "grouped_by": {
+          "description": "The policy that built the key. An open string; `normalized_name`, or `declared` for a grouping the collaborators file declares.",
+          "type": "string",
+          "minLength": 1
+        },
+        "name_kind": {
+          "description": "`personal` or `literal`. Not `person`/`organization`: brace protection in BibTeX means `do not parse this`, which covers organisations but also mononyms, so the document must not assert corporate-ness.",
+          "enum": ["personal", "literal"]
+        },
+        "name": {
+          "description": "The readable form of the first spelling this key grouped, in document order.",
+          "type": "string",
+          "minLength": 1
+        },
+        "given": { "$ref": "#/$defs/optionalString" },
+        "von": { "$ref": "#/$defs/optionalString" },
+        "family": { "$ref": "#/$defs/optionalString" },
+        "suffix": { "$ref": "#/$defs/optionalString" },
+        "literal": { "$ref": "#/$defs/optionalString" },
+        "name_variants": {
+          "description": "The distinct source spellings that normalised to this key, ascending.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "authorships": {
+          "description": "The occurrences this key grouped, in document order.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["work_id", "position"],
+            "additionalProperties": false,
+            "properties": {
+              "work_id": { "type": "string", "minLength": 1 },
+              "position": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "minItems": 1
+        },
+        "work_ids": {
+          "description": "The distinct works this key grouped, in document order. One work listing two authorships under this key appears once; `authorships` lists both.",
+          "$ref": "#/$defs/idList"
+        },
+        "last_year": {
+          "description": "The greatest year of any work contributing an occurrence, or null when none of them has one.",
+          "type": ["integer", "null"]
+        },
+        "derived": { "$ref": "#/$defs/derived" }
+      }
+    }
+  }
+}

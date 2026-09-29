@@ -18,9 +18,9 @@ from typing import Dict, List, Optional
 from .config import json_lab, reject_absolute_name
 
 
-# The document's schema version (schema/v5/output.schema.json). When it
+# The document's schema version (schema/v6/output.schema.json). When it
 # changes is SPEC.md §6.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 GENERATOR_NAME = "sslabdata"
 
@@ -54,6 +54,17 @@ class Link:
             'origin': self.origin,
             'verification': {'status': self.status},
         }
+
+
+@dataclass
+class Award:
+    """One award a work received: its name, and the year it was given, which
+    need not be the work's (SPEC.md §5)."""
+    name: str
+    year: Optional[int] = None
+
+    def to_dict(self) -> dict:
+        return {'name': self.name, 'year': self.year}
 
 
 @dataclass
@@ -152,6 +163,10 @@ class Work:
     bibtex: Optional[str] = None
     derived: Dict[str, object] = field(default_factory=dict)
 
+    # Declared last so it takes no other field's position in a positional
+    # call; to_dict() emits it beside `note`.
+    awards: List[Award] = field(default_factory=list)
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization.
 
@@ -184,6 +199,7 @@ class Work:
             'entry_type': self.entry_type,
             'abstract': self.abstract,
             'note': self.note,
+            'awards': [award.to_dict() for award in self.awards],
             'identifiers': {scheme: list(values)
                             for scheme, values in self.identifiers.items()},
             'links': {kind: [link.to_dict() for link in links]

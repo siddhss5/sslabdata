@@ -83,6 +83,57 @@ structure.missing_year:
     - {code: BIB-YEAR-MISSING, severity: warning, file: ./noyear.bib, key: no-year, field: year}
   kept: [no-year]
 
+# An award that cannot be read as written: an empty field or award is
+# dropped, a year with no name after it is dropped, and a prefix that is not
+# four ASCII digits, a colon and a space stays in the name while the award
+# takes the work's year. Every award that can be read is kept beside it.
+# Also covers awards.no_year, awards.empty, awards.year_without_name and
+# awards.year_braced, all in one fixture.
+awards.year_malformed:
+  dir: award_malformed
+  exit: 0
+  diagnostics:
+    - {code: BIB-YEAR-MISSING, severity: warning, file: ./awards.bib, key: award-no-year, field: year}
+    - {code: BIB-AWARD-EMPTY, severity: warning, file: ./awards.bib, key: award-empty-field, field: award}
+    - {code: BIB-AWARD-EMPTY, severity: warning, file: ./awards.bib, key: award-empty-between, field: award, values: [award 2 of 3]}
+    - {code: BIB-AWARD-EMPTY, severity: warning, file: ./awards.bib, key: award-empty-trailing, field: award, values: [award 2 of 2]}
+    - {code: BIB-AWARD-EMPTY, severity: warning, file: ./awards.bib, key: award-empty-group, field: award, values: [award 1 of 2]}
+    - {code: BIB-AWARD-EMPTY, severity: warning, file: ./awards.bib, key: award-year-alone, field: award, values: [award 2 of 2, "2026:"]}
+    - {code: BIB-AWARD-EMPTY, severity: warning, file: ./awards.bib, key: award-year-empty-name, field: award, values: [award 1 of 1, "2026: {}"]}
+    - {code: BIB-AWARD-YEAR-MALFORMED, severity: warning, file: ./awards.bib, key: award-year-short, field: award, values: ["26:"]}
+    - {code: BIB-AWARD-YEAR-MALFORMED, severity: warning, file: ./awards.bib, key: award-year-no-colon, field: award, values: ["2026 Best Paper Award"]}
+    - {code: BIB-AWARD-YEAR-MALFORMED, severity: warning, file: ./awards.bib, key: award-year-no-space, field: award, values: ["2026:Best"]}
+    - {code: BIB-AWARD-YEAR-MALFORMED, severity: warning, file: ./awards.bib, key: award-year-fullwidth, field: award, values: ["２０２６:"]}
+  kept: [award-no-year, award-empty-field, award-empty-between, award-empty-trailing,
+         award-empty-group, award-year-alone, award-year-empty-name, award-year-short,
+         award-year-no-colon, award-year-no-space, award-year-fullwidth, award-year-braced]
+  emits:
+    - work: award-no-year
+      expect: {year: null, awards: [{name: Best Paper Award, year: null},
+                                    {name: Test of Time Award, year: 2026}]}
+    - work: award-empty-field
+      expect: {awards: []}
+    - work: award-empty-between
+      expect: {awards: [{name: Best Paper Award, year: 2020}, {name: Best Demo Award, year: 2020}]}
+    - work: award-empty-trailing
+      expect: {awards: [{name: Best Poster Award, year: 2020}]}
+    - work: award-empty-group
+      expect: {awards: [{name: Best Talk Award, year: 2020}]}
+    - work: award-year-alone
+      expect: {awards: [{name: Best Paper Award, year: 2020}]}
+    - work: award-year-empty-name
+      expect: {awards: []}
+    - work: award-year-short
+      expect: {awards: [{name: "26: Best Paper Award", year: 2020}]}
+    - work: award-year-no-colon
+      expect: {awards: [{name: 2026 Best Paper Award, year: 2020}]}
+    - work: award-year-no-space
+      expect: {awards: [{name: Best Demo Award, year: 2020}, {name: "2026:Best Paper Award", year: 2020}]}
+    - work: award-year-fullwidth
+      expect: {awards: [{name: "２０２６: Best Paper Award", year: 2020}]}
+    - work: award-year-braced
+      expect: {awards: [{name: "2026: A Year in the Name", year: 2020}]}
+
 structure.crossref:
   dir: crossref_entry
   exit: 1

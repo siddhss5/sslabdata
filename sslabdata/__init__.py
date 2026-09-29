@@ -12,7 +12,7 @@ MIT License - see LICENSE file for details.
 
 from .config import ConfigurationError, LabDataConfig, BibFile
 from .models import (
-    LabData, Work, Author, Contributor, Venue, Link, Person, Project,
+    LabData, Work, Award, Author, Contributor, Venue, Link, Person, Project,
     Collaborator,
 )
 from .assembler import assemble, AssemblyError, AssemblyResult
@@ -24,6 +24,7 @@ __all__ = [
     "ConfigurationError",
     "LabData",
     "Work",
+    "Award",
     "Author",
     "Contributor",
     "Venue",

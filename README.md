@@ -24,10 +24,11 @@ sslabdata --config lab.yaml --output lab.yml
   order the lists are in, which fields are derived, when the version changes.
 - [`CHANGELOG.md`](https://github.com/siddhss5/sslabdata/blob/main/CHANGELOG.md) — what changed at each release, and what it
   replaced.
-- [`schema/v5/output.schema.json`](https://github.com/siddhss5/sslabdata/blob/main/schema/v5/output.schema.json) — the
+- [`schema/v6/output.schema.json`](https://github.com/siddhss5/sslabdata/blob/main/schema/v6/output.schema.json) — the
   document's JSON Schema. Published versions are immutable and live at their
-  own paths; [`schema/v3/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v3/output.schema.json) and
-  [`schema/v4/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v4/output.schema.json) are still there.
+  own paths; [`schema/v3/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v3/output.schema.json),
+  [`schema/v4/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v4/output.schema.json) and
+  [`schema/v5/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v5/output.schema.json) are still there.
 - [`tests/COVERAGE.md`](https://github.com/siddhss5/sslabdata/blob/main/tests/COVERAGE.md) — every input case sslabdata
   supports, and every case it does not, with the fixture and test for each.
 
@@ -150,6 +151,7 @@ nothing else:
 | `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` (or `eprinttype`) | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them. An `eprint`'s scheme is the repository `archivePrefix` or `eprinttype` named, lower-cased, so that field needs no property of its own — and an `eprint` in a repository other than arXiv gets no arXiv link |
 | `abstract` | `abstract` |
 | `note` | `note` |
+| `award` | `awards`, a list of `{name, year}` (see below). `note` is never read for awards |
 | `url` | A link of kind `video` when its host is YouTube or Vimeo (or a subdomain of either), otherwise of kind `url` |
 | `video` | A link of kind `video`, whatever its host, so `url` can hold the work's website |
 | `pdf` | The work's one link of kind `pdf`. An entry without it gets `pdf_base_url` plus its citation key, when `pdf_base_url` is set |
@@ -159,6 +161,26 @@ nothing else:
 The entry is also re-serialized into a `bibtex` field, so fields sslabdata does
 not interpret are still carried. It is a re-serialization, not a copy
 ([`SPEC.md` §5](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#5-input-versus-derived)).
+
+### Awards
+
+A paper's awards go in its `award` field. Several are separated by `and`, as
+the names in `author` are, and braces keep an `and` inside one name. An award
+may start with the year it was given, as `YYYY:` and a space, when that is not
+the paper's year:
+
+```bibtex
+award = {2026: Test of Time Award and {Best Systems and Software Paper Award}}
+```
+
+Each award becomes `{name, year}` in the work's `awards`, in the order
+written, with its name converted from LaTeX as `title` is. An award without a
+year takes the work's `year`, or `null` when the work has none. `awards` is
+`[]` for a work with no `award` field. An empty award, or a prefix that looks
+like a year and is not four digits, a colon and a space, is reported
+(`BIB-AWARD-EMPTY`, `BIB-AWARD-YEAR-MALFORMED`); a malformed prefix stays in
+the name. Awards a person holds, such as fellowships, are not part of the
+document.
 
 ### The `project` tag
 
@@ -173,6 +195,7 @@ project:
   year      = {2024},
   eprint    = {2406.99812},
   archivePrefix = {arXiv},
+  award     = {Best Paper Award},
   project   = {homebot}
 }
 ```
@@ -317,7 +340,7 @@ pip install jsonschema
 python -c "
 import json, yaml, jsonschema
 from importlib.resources import files
-schema = json.loads(files('sslabdata.schema').joinpath('v5/output.schema.json').read_text())
+schema = json.loads(files('sslabdata.schema').joinpath('v6/output.schema.json').read_text())
 jsonschema.Draft202012Validator(schema).validate(yaml.safe_load(open('lab.yml')))
 print('valid')
 "

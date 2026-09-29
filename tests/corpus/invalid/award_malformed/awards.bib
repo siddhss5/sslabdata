@@ -1,0 +1,109 @@
+% Award fields that cannot be read as written. Each award that can be read is
+% kept; each that cannot is reported.
+
+% CASE awards.no_year
+% With no year of its own, an award takes the work's, which here is null.
+@inproceedings{award-no-year,
+  title     = {A Paper With No Year},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  award     = {Best Paper Award and 2026: Test of Time Award}
+}
+
+% CASE awards.empty
+% A field that names no award, and an empty award between two, after the
+% last, and written as an empty group.
+@inproceedings{award-empty-field,
+  title     = {An Empty Award Field},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {  }
+}
+
+@inproceedings{award-empty-between,
+  title     = {An Empty Award Between Two},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {Best Paper Award and and Best Demo Award}
+}
+
+@inproceedings{award-empty-trailing,
+  title     = {An Award List Ending in And},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {Best Poster Award and}
+}
+
+@inproceedings{award-empty-group,
+  title     = {An Award Written as an Empty Group},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {{} and Best Talk Award}
+}
+
+% CASE awards.year_without_name
+% A year prefix with nothing after it, or nothing but an empty group.
+@inproceedings{award-year-alone,
+  title     = {An Award That Is Only a Year},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {Best Paper Award and 2026:}
+}
+
+@inproceedings{award-year-empty-name,
+  title     = {An Award With a Year and an Empty Name},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {2026: {}}
+}
+
+% CASE awards.year_malformed
+% Four ASCII digits, a colon and a space, and nothing else, is a year prefix.
+% Each of these is kept in the name, and the award takes the work's year.
+@inproceedings{award-year-short,
+  title     = {An Award With a Two-Digit Year},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {26: Best Paper Award}
+}
+
+@inproceedings{award-year-no-colon,
+  title     = {An Award With a Year and No Colon},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {2026 Best Paper Award}
+}
+
+@inproceedings{award-year-no-space,
+  title     = {An Award With a Year and No Space},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {Best Demo Award and 2026:Best Paper Award}
+}
+
+@inproceedings{award-year-fullwidth,
+  title     = {An Award With a Full-Width Year},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {２０２６: Best Paper Award}
+}
+
+% CASE awards.year_braced
+% Braces protect text that would read as a prefix, and nothing is reported.
+@inproceedings{award-year-braced,
+  title     = {An Award Whose Name Starts With a Year},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2020},
+  award     = {{2026}: A Year in the Name}
+}
