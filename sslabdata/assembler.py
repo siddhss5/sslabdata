@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from .config import (
-    LabDataConfig, reject_absolute_name, reject_name_outside_bib_dir,
+    LabDataConfig, reject_absolute_name, reject_empty_pdf_base_url,
+    reject_name_outside_bib_dir,
 )
 from .diagnostics import (
     ERROR, Diagnostic, diagnostic, in_report_order, severity,
@@ -359,6 +360,7 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
     for bib_file in config.bib_files:
         reject_name_outside_bib_dir(getattr(bib_file, 'name', None),
                                     config.bib_dir)
+    reject_empty_pdf_base_url(config.pdf_base_url)
 
     found: List[Diagnostic] = []
     source = config.path or 'lab.yaml'

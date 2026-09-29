@@ -1,0 +1,9 @@
+# CASE config.pdf_base_url.empty
+# Fictional invalid input for tests/COVERAGE.md.
+# An empty pdf_base_url names no base. Leaving the key out means no PDF link
+# is guessed; an empty value is more likely a mistake.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+pdf_base_url: ""
