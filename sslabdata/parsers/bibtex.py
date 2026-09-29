@@ -16,7 +16,7 @@ MIT License - see LICENSE file for details.
 """
 
 import re
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
@@ -909,12 +909,19 @@ def url_scheme(url: str) -> str:
     browser does, so `java<tab>script:` is `javascript`. It rejects some
     malformed hosts, such as `javascript://[x`, but only after the scheme is
     read, and a scheme ends at the first colon: that prefix alone is read then.
+
+    A one-letter scheme is a Windows drive, as `sslabdata.config` reads one
+    (`PureWindowsPath`), whether `/`, `\\` or nothing follows its colon: no
+    registered scheme is one letter long, and `C:/papers` is a local path.
     """
     text = url.strip()
     try:
-        return urlsplit(text).scheme
+        scheme = urlsplit(text).scheme
     except ValueError:
-        return urlsplit(text[:text.find(":") + 1]).scheme
+        scheme = urlsplit(text[:text.find(":") + 1]).scheme
+    if len(scheme) == 1 and PureWindowsPath(text).drive:
+        return ""
+    return scheme
 
 
 def build_links(entry: dict, bib_id: str, identifiers: Dict[str, List[str]],

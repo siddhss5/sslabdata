@@ -378,6 +378,30 @@ links.scheme_unsupported_pdf_base_url:
     - work: base-replaced
       expect: {links.pdf.0.url: "https://example.org/base-replaced.pdf"}
 
+# A Windows drive, read as config.py reads one, is a path and not a scheme,
+# whether a slash, a backslash or nothing follows the colon. A javascript:
+# link beside it is still reported.
+links.scheme_drive_path:
+  dir: link_scheme_drive_path
+  exit: 0
+  diagnostics:
+    - {code: LINK-SCHEME-UNSUPPORTED, severity: warning, file: ./links.bib, key: drive-script, field: pdf, values: [pdf, "javascript:alert(1)"]}
+  kept: [drive-derived, drive-relative, drive-script]
+  emits:
+    - work: drive-derived
+      expect: {links.pdf.0.url: "C:/papers/drive-derived.pdf"}
+    - work: drive-relative
+      expect: {links.pdf.0.url: "c:papers/drive-relative.pdf"}
+
+links.scheme_drive_path_backslash:
+  dir: link_scheme_drive_backslash
+  exit: 0
+  diagnostics: []
+  kept: [drive-backslash]
+  emits:
+    - work: drive-backslash
+      expect: {links.pdf.0.url: "C:\\papers/drive-backslash.pdf"}
+
 # --- Projects, people and identity -------------------------------------------
 
 # "and others" before the end of a name list is reported and dropped; at the
