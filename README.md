@@ -223,6 +223,30 @@ reported under `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and left to the member.
 person's `photo`, and is `null` when absent. It is carried as plain text:
 deciding which URLs are safe to render is the renderer's job.
 
+### Checking inputs in an editor
+
+Each input file has a JSON Schema in
+[`schema/input/v1/`](https://github.com/siddhss5/sslabdata/tree/main/schema/input/v1):
+`lab.schema.json`, `people.schema.json`, `projects.schema.json` and
+`collaborators.schema.json`. The wheel installs them under
+`sslabdata/schema/input/v1/`. An editor can use them to check and complete
+the files as you write; `--validate` stays the check, and also reports what
+a schema cannot see, such as a repeated id or a missing file. With the YAML
+language server (the VS Code YAML extension, among others), name the schema
+in a comment at the top of the file:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/people.schema.json
+- id: "aadams"
+  name: "Alice Adams"
+  role: "professor"
+```
+
+The URL is the schema's `$id`, served from the `input-schema-v1` tag, which is
+never moved ([`SPEC.md` §6](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#6-version-policy)).
+Use `lab.schema.json`, `projects.schema.json` or `collaborators.schema.json`
+in the same way for the other files.
+
 ## How author matching works
 
 sslabdata matches the structured parts of each BibTeX author name (given, von,
@@ -344,7 +368,10 @@ Trusted Publishing; no token is stored anywhere. The version is written in
 2. **Release.** Set both versions to `3.0.0`, date the CHANGELOG heading,
    merge, and push the tag `v3.0.0`. The PyPI job waits in the `release`
    environment for a reviewer's approval, then publishes the files the run
-   checked and creates the GitHub Release with them.
+   checked and creates the GitHub Release with them. A release that ships a
+   new schema version also pushes that version's tag, `schema-vN` or
+   `input-schema-vN`, at the same commit, since the schema's `$id` points
+   there.
 3. **Approve** from the Actions page, or from the command line:
 
    ```bash
