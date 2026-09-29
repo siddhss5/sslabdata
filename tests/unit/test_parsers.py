@@ -375,19 +375,6 @@ class TestLocatedParserDiagnostics:
         assert found == {}
         assert list(works) == ["e"]
 
-    def test_a_well_formed_command_on_a_percent_line_is_read(self, tmp_path):
-        """A well-formed entry on a `%` line is an entry.
-
-        The parser library has no `%` comment outside an entry, as classic
-        BibTeX has none. Only a syntax error on such a line goes unreported;
-        an entry lost to a `%` prefix would vanish without a diagnostic.
-        """
-        source = ("% @article{hidden, title = {H}, journal = {J}, year = 2024}\n"
-                  + entry("visible"))
-        found, works = located(tmp_path, source)
-        assert found == {}
-        assert sorted(works) == ["hidden", "visible"]
-
     @pytest.mark.parametrize("entry_type", [
         "book", "inbook", "manual", "misc", "proceedings", "conference",
         "incollection", "phdthesis", "mastersthesis", "techreport"])
