@@ -171,6 +171,23 @@
   year      = {2022}
 }
 
+% A spaced marker written twice. BibTeX splits it into three name parts, and
+% reads the middle one, {*}\textsuperscript, as a lower-case word, so on a
+% surname the first two parts land in the particle and the last in the
+% surname. The three are joined back into one marker wherever they landed.
+% Text after the second argument makes it no marker, and Erin Evans is left
+% unmarked.
+% CASE names.equal_contribution_doubled
+@inproceedings{name-equal-doubled,
+  title     = {A Spaced Marker Written Twice},
+  author    = {Brown\textsuperscript {*}\textsuperscript {*}, Bob and
+               Kim, Alex\textsuperscript {*}\textsuperscript {*} and
+               Evans\textsuperscript {*}\textsuperscript {*}x, Erin and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
 % A star, caret, dollar or backslash with a backslash in front of it is escaped
 % text, not a marker: nobody is marked, and the name parts keep their own
 % boundaries. What the escaped spelling itself becomes is the ordinary LaTeX

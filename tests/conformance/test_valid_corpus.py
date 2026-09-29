@@ -184,6 +184,23 @@ EQUAL_CONTRIBUTION = [
          "authors.*.person_id", ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
     case("names.equal_contribution_normalized", "name-equal-stacked",
          "authors.*.equal_contribution", [True, True, True, True, False]),
+    # A spaced marker written twice, on a surname, where BibTeX puts its parts
+    # in the particle and the surname, and on a given name: joined back into
+    # one marker and taken off, so the name's parts are what they would be
+    # without it. With text after its second argument it is no marker, and
+    # the name is not marked.
+    case("names.equal_contribution_doubled", "name-equal-doubled",
+         "authors.*.equal_contribution", [True, True, False, False]),
+    case("names.equal_contribution_doubled", "name-equal-doubled",
+         "authors.*.person_id", ["bbrown", "akim", None, "aadams"]),
+    case("names.equal_contribution_doubled", "name-equal-doubled",
+         "authors.0.name", "Bob Brown"),
+    case("names.equal_contribution_doubled", "name-equal-doubled",
+         "authors.0.von", None),
+    case("names.equal_contribution_doubled", "name-equal-doubled",
+         "authors.0.family", "Brown"),
+    case("names.equal_contribution_doubled", "name-equal-doubled",
+         "authors.1.given", "Alex"),
     # An escaped star, caret, dollar or backslash is text: nobody is marked,
     # and the name parts keep their own boundaries. What each spelling becomes
     # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
@@ -286,7 +303,8 @@ def test_every_readable_name_agrees_with_its_parts(valid_output):
     assert checked > 40, checked
 
 
-MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized", "name-equal-stacked"}
+MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized", "name-equal-stacked",
+                                       "name-equal-doubled"}
 
 
 # Covers names.equal_contribution_marker
@@ -302,8 +320,9 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
               for a in w["authors"] if a["equal_contribution"]}
     assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
     # Four parts marked in each of the four form entries, three of the five
-    # authors of name-equal-normalized, and four of name-equal-stacked.
-    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3 + 4, sorted(marked)
+    # authors of name-equal-normalized, four of name-equal-stacked and two of
+    # name-equal-doubled.
+    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3 + 4 + 2, sorted(marked)
     assert [name for _, name in marked if "*" in name] == []
 
 

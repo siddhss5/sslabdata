@@ -100,6 +100,12 @@ EQUAL_CONTRIBUTION = re.compile(rf"{_ANY_MARKER}\s*$")
 # after `{*}` is left to the stripping below, as it is for an unspaced marker.
 _MARKER_COMMAND = re.compile(r"(?<!\\)\\textsuperscript\s*$")
 _MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
+# The same command written twice, spaced each time, arrives as three parts or
+# more: every part between the first and the last is an argument followed by
+# the command again, which waits for the next part. The run is joined only when
+# a part that is an argument and nothing more ends it.
+_MARKER_ARGUMENT_THEN_COMMAND = re.compile(
+    rf"\{{\*\}}(?:{_ANY_MARKER})*(?<!\\)\\textsuperscript")
 
 
 # The command name pybtex is about to read, when that name is `comment`.
@@ -541,22 +547,59 @@ def _name_part_groups(person: Person) -> List[List[str]]:
             list(person.lineage_names)]
 
 
+def _marker_end(parts: List[str], start: int) -> int:
+    """Where the marker that ``parts[start]`` begins ends: one past the part
+    holding its last argument, or ``start + 1`` when no argument follows."""
+    if _MARKER_COMMAND.search(parts[start]):
+        for end in range(start + 1, len(parts)):
+            if _MARKER_ARGUMENT.fullmatch(parts[end]):
+                return end + 1
+            if not _MARKER_ARGUMENT_THEN_COMMAND.fullmatch(parts[end]):
+                break
+    return start + 1
+
+
 def _with_marker_joined(parts: List[str]) -> List[str]:
-    """One group of name parts, with a marker split across two of them joined."""
+    """One group of name parts, with a marker split across several joined."""
     joined: List[str] = []
-    for part in parts:
-        if (joined and _MARKER_ARGUMENT.fullmatch(part)
-                and _MARKER_COMMAND.search(joined[-1])):
-            joined[-1] += part
-        else:
-            joined.append(part)
+    start = 0
+    while start < len(parts):
+        end = _marker_end(parts, start)
+        joined.append("".join(parts[start:end]))
+        start = end
     return joined
+
+
+def _joined_groups(person: Person) -> List[List[str]]:
+    """`_name_part_groups()`, with each split marker joined.
+
+    A doubled marker can also be split across the particle and the surname:
+    BibTeX reads its middle part, ``{*}\\textsuperscript``, as a lower-case
+    word, so ``Brown\\textsuperscript {*}\\textsuperscript {*}, Bob`` puts all
+    but the last ``{*}`` in the particle. Joined, it is one word again, and
+    the particle and surname are split once more, by pybtex, as they would be
+    had it been written unspaced. Only a marker that crosses that boundary is
+    split again, so every other name keeps pybtex's own split.
+    """
+    given, von, family, suffix = _name_part_groups(person)
+    von_family = _with_marker_joined(von + family)
+    split = _with_marker_joined(von) + _with_marker_joined(family)
+    if von_family == split:
+        von_family_groups = [_with_marker_joined(von),
+                             _with_marker_joined(family)]
+    else:
+        # The trailing comma makes pybtex read the words as the particle and
+        # surname alone, with no given name to split off.
+        again = Person(" ".join(von_family) + ",")
+        von_family_groups = [list(again.prelast_names),
+                             list(again.last_names)]
+    return ([_with_marker_joined(given)] + von_family_groups
+            + [_with_marker_joined(suffix)])
 
 
 def _name_parts(person: Person) -> List[str]:
     """Every part of a pybtex name, as written, with split markers joined."""
-    return [part for group in _name_part_groups(person)
-            for part in _with_marker_joined(group)]
+    return [part for group in _joined_groups(person) for part in group]
 
 
 def _without_marker(part: str) -> str:
@@ -611,17 +654,18 @@ def person_name_parts(person: Person, on_unknown) -> Dict[str, Optional[str]]:
     """
     def text(parts) -> Optional[str]:
         joined = " ".join(_convert(_without_marker(part), on_unknown)
-                          for part in _with_marker_joined(parts)).strip()
+                          for part in parts).strip()
         return joined or None
 
+    given, von, family, suffix = _joined_groups(person)
     if _is_literal(person):
         return {"given": None, "von": None, "family": None, "suffix": None,
-                "literal": text(person.last_names)}
+                "literal": text(family)}
     return {
-        "given": text(person.first_names + person.middle_names),
-        "von": text(person.prelast_names),
-        "family": text(person.last_names),
-        "suffix": text(person.lineage_names),
+        "given": text(given),
+        "von": text(von),
+        "family": text(family),
+        "suffix": text(suffix),
         "literal": None,
     }
 
