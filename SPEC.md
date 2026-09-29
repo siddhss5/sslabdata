@@ -29,8 +29,8 @@ Pointer into `schema/v5/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
 statement is cited by its enclosing function.
 
-Nothing yet checks that these references resolve; #63 proposes the test that
-would.
+`tests/test_spec_references.py` checks that every one of these references
+resolves; its docstring says which spans count as references.
 
 ---
 
@@ -757,7 +757,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `work.links` | **Derived** — a map from kind to link records, built from the entry's `url`, `video` and `pdf`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
 | `work.project_ids` | Input — the `project` field, split on commas (`parse_project_ids()`). |
 | `work.bibtex` | **Derived** — the entry re-serialized as BibTeX, or `null` when that failed (`format_bibtex()`). See below. |
-| `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`person_name_parts()`). An entry writing `Brown, B.` yields `given: "B."`, and that is correct, not a gap. |
+| `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`person_name_parts()`). A spaced marker that BibTeX split between the particle and the surname is joined again, and those two parts are split as BibTeX splits the name with the marker unspaced (`_joined_groups()`). An entry writing `Brown, B.` yields `given: "B."`, and that is correct, not a gap. |
 | `author.name` | **Derived** — the parts joined in reading order (`readable_name()`). *A readable form of the input name, not a citation form*: it does not abbreviate, expand or normalise. |
 | `author.position` | **Derived** — where the authorship sits in its work's list, 1-based, counting only the names that reach the document. |
 | `author.person_id` | **Derived** — the resolver's match against `people_file` (`sslabdata.resolver.resolve_authors()`): on the structured full name, then — only for a name that is itself abbreviated — on a declared alias, and never when the name fits more than one person or only nearly matches. See *How a name is matched* below. |
@@ -1096,6 +1096,19 @@ are left byte for byte as published rather than rewritten. v4's raw `$id`
 resolves, because GitHub redirects `labdata` to `sslabdata`. v3's `blob/main`
 `$id` does not resolve, as above. v5's `$id`, title and descriptions say
 `sslabdata`.
+
+**The input schemas are versioned apart from the document.**
+`schema/input/v1/` holds a JSON Schema for each input file: `lab.schema.json`,
+`people.schema.json`, `projects.schema.json` and `collaborators.schema.json`.
+They describe what the loaders accept; the loaders stay the authority, and
+the diagnostic codes above report what a schema cannot see. The input format
+and the document change for different reasons, so the input schemas carry
+their own version rather than `schema_version`. They follow the same rules:
+a published input schema is never edited, any change to one is a new
+version at a new path, and its `$id` is a pinned tag URL,
+`https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/<file>.schema.json`,
+whose `input-schema-v1` tag is created when this version ships and is never
+moved.
 
 **Version history.** What each `schema_version` changed is in
 [`CHANGELOG.md`](CHANGELOG.md).

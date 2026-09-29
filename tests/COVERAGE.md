@@ -274,6 +274,7 @@ field of the output.
 | `names.equal_contribution` | Each of `$^{*}$`, `^{*}`, `\textsuperscript{*}` and a trailing `*`, written in turn on the given name, the surname, the particle and the suffix — sixteen combinations | The marker is taken off that part: the readable name and the structured parts read as they would without it, and the name resolves to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.equal_contribution_marker` | The same sixteen combinations, and every other author name in the corpus | `equal_contribution` is true for each of the sixteen marked authors and false for every other author in the valid corpus | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.equal_contribution_normalized` | `Brown$^{*}$*` (the marker twice), `Kim{$^{*}$}` (in a brace group of its own), `Green\textsuperscript {*}` (a space before the argument, which BibTeX splits into two name parts, also written with a second marker after it) and `Davis{*}` (a brace group holding only a star) | The first three come off whole: nothing is left in the name and those authors are marked and resolve. The last is another command's argument rather than a marker, so it stays in the name and marks nobody | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
+| `names.equal_contribution_doubled` | `Brown\textsuperscript {*}\textsuperscript {*}, Bob`, whose three parts BibTeX puts in the particle and the surname, `Kim, Alex\textsuperscript {*}\textsuperscript {*}` on a given name, and `Evans\textsuperscript {*}\textsuperscript {*}x, Erin` | The first two are marked and resolve, the first reading `Bob Brown` with family `Brown` and no particle, and the second with given name `Alex`. The third, with text after the second argument, is not marked | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.equal_contribution_escaped` | `Brown\*`, `Davis\^{*}`, `Green\$^{*}$` and `Evans\\textsuperscript {*}` — a star, caret, dollar or backslash written with a backslash in front of it | Not a marker: `equal_contribution` stays false for all four, and the name parts keep their own boundaries. What each escaped spelling becomes is the ordinary LaTeX conversion's doing — the star survives in `Davis\^{*}` and `Green\$^{*}$` and is consumed with `\*` in `Brown\*` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.same_initial_alex` | `Kim, Alex`, who declares the alias `A. Kim` | Resolves to `akim` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.same_initial_alan` | `Kim, Alan`, who declares no alias | Resolves to `alankim`, not to the other Kim | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
@@ -499,6 +500,15 @@ a message does not break them.
 | `diag.mode_required` | No mode flag | Names the flags that would be valid | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_mode_required` | pass |
 | `diag.format_invalid` | `--format xml` | Names the bad value and the valid ones | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |
 
+## Input schemas
+The JSON Schemas in [`schema/input/v1/`](../schema/input/v1/), read through
+`importlib.resources` as an installed user reads them.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `input.schema_valid` | Every input file of the valid corpus, the demo, `examples/config.yaml` and `tests/fixtures` | Each validates against its schema | `schema/input/v1/lab.schema.json` | `test_input_schemas.py::test_valid_inputs_validate` | pass |
+| `input.schema_invalid` | Every input file of the invalid corpus | The schema finds an error at the place of each type or shape problem the loaders report there, and a file with none validates; every other code is listed, with why no schema checks it | `schema/input/v1/people.schema.json` | `test_input_schemas.py::test_invalid_corpus_agrees_with_the_loaders`, `test_input_schemas.py::test_every_code_at_an_input_file_is_classified` | pass |
+
 ## Output fields
 Every field of the generated `lab.yml` / `lab.json`, and the checks on the file
 as a whole. The structure is defined by
@@ -592,3 +602,11 @@ declares the alias.
 | `probe.identity_one_person` | `Patel, Priya` on two works and `Patel, P.` on a third | Exactly one contributor in the `collaborator:` namespace touches any of the three works, and it holds exactly those three | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_joins_one_co_author_written_two_ways` | pass |
 | `probe.identity_distinct_people` | `Patel, Pradeep` on a fourth work | Exactly one contributor in the `collaborator:` namespace holds that work, it holds exactly that work, and it shares no contributor with the three above | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_separates_co_authors_sharing_an_initial` | pass |
 | `probe.identity_authorship` | `Lee, Lin and Lee, Lin`, two different people on one work | The document declares each authorship's `position`, and the graph carries two `authored` edges at those two positions from **one** contributor: one grouping, two addressable authorships | `examples/demo/bib/conference.bib` | `test_consumer_probes.py::test_graph_keeps_two_authorships_written_alike_apart` | pass |
+
+## Specification references
+`SPEC.md` cites the code by name rather than by line. The check below keeps
+those names pointing at something.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `spec.references_resolve` | Every function, method, constant and module `SPEC.md` names, every JSON Pointer into the output schema, and every row key of this table | Each resolves; one that does not fails with the `SPEC.md` line and section that cites it | `SPEC.md` | `test_spec_references.py::test_every_spec_reference_resolves` | pass |

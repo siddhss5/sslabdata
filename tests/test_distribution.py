@@ -10,7 +10,7 @@ inspect with `tar tzf` and `unzip -l`.
     unzip -l /tmp/dist/sslabdata-*.whl
 
 Tests are not distributed (clone the repository for them). The current output
-schema is wheel data, read through importlib.resources.
+schema and the input schemas are wheel data, read through importlib.resources.
 """
 
 import os
@@ -25,6 +25,11 @@ REPO_ROOT = Path(__file__).parent.parent
 # pyproject.toml does not ship fails here instead of shipping a stale schema.
 CURRENT = max((REPO_ROOT / "schema").glob("v*"), key=lambda p: int(p.name[1:]))
 SCHEMA = f"{CURRENT.name}/output.schema.json"
+# The input schemas are versioned on their own, under schema/input/, and the
+# newest version of each is shipped in the same way.
+INPUT = max((REPO_ROOT / "schema" / "input").glob("v*"), key=lambda p: int(p.name[1:]))
+INPUT_SCHEMAS = [f"input/{INPUT.name}/{name}.schema.json"
+                 for name in ("lab", "people", "projects", "collaborators")]
 
 
 def test_distributions_carry_the_public_resources(tmp_path, monkeypatch):
@@ -41,13 +46,17 @@ def test_distributions_carry_the_public_resources(tmp_path, monkeypatch):
     wheel = dist / build_meta.build_wheel(str(dist))
     with zipfile.ZipFile(wheel) as zf:
         wheel_files = set(zf.namelist())
-        packaged_schema = zf.read(f"sslabdata/schema/{SCHEMA}")
+        packaged = {name: zf.read(f"sslabdata/schema/{name}")
+                    for name in [SCHEMA, *INPUT_SCHEMAS]}
 
     modules = {p.relative_to(REPO_ROOT).as_posix()
                for p in (REPO_ROOT / "sslabdata").rglob("*.py")}
-    assert {"README.md", "LICENSE", "SPEC.md", f"schema/{SCHEMA}"} | modules <= sdist_files
-    assert {f"sslabdata/schema/{SCHEMA}"} | modules <= wheel_files
-    # One canonical schema: the packaged copy is the repository file.
-    assert packaged_schema == (REPO_ROOT / "schema" / SCHEMA).read_bytes()
+    schemas = [SCHEMA, *INPUT_SCHEMAS]
+    assert ({"README.md", "LICENSE", "SPEC.md"} | {f"schema/{s}" for s in schemas}
+            | modules <= sdist_files)
+    assert {f"sslabdata/schema/{s}" for s in schemas} | modules <= wheel_files
+    # One canonical copy of each schema: the packaged copy is the repository file.
+    for name, data in packaged.items():
+        assert data == (REPO_ROOT / "schema" / name).read_bytes(), name
     for files in (sdist_files, wheel_files):
         assert not any("tests" in Path(f).parts for f in files)

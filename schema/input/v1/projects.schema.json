@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/projects.schema.json",
+  "title": "sslabdata projects file",
+  "description": "The file lab.yaml names as projects_file: a list of research projects, one record each. It describes what sslabdata's loader accepts; the loader stays the authority, and reports each problem under a code in SPEC.md, Diagnostic codes. A record key not listed here is reported as RECORD-KEY-UNKNOWN and ignored, so it is allowed. What each field becomes in the document is in SPEC.md §5. Published input schemas are immutable: this one is served from the input-schema-v1 tag, which is created when this version ships and is never moved (SPEC.md §6).",
+  "type": ["array", "null"],
+  "items": { "$ref": "#/$defs/project" },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "pattern": "\\S" },
+    "optionalString": { "type": ["string", "null"] },
+    "project": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "The project's id, unique in the file (PROJECTS-ID-DUPLICATE). A work's project field names it.",
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/optionalString" },
+        "website": { "$ref": "#/$defs/optionalString" },
+        "image": {
+          "description": "A URL or a site path, carried as plain text.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "status": {
+          "description": "active when absent (PROJECTS-STATUS-INVALID).",
+          "enum": ["active", "completed"]
+        }
+      }
+    }
+  }
+}
