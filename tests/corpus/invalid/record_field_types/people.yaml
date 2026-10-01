@@ -18,3 +18,4 @@
   role: "student"
   email: {address: "bbrown@example.org"}
   end_year: true
+  bio: ["Bob Brown is fictional."]

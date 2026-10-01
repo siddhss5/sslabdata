@@ -7,7 +7,7 @@ them.
 This file states the parts of that contract a JSON Schema cannot express:
 what the strings in the document are, what order the lists are in, what an
 absent key means, which fields are computed, when the version changes, and
-how a repeated `@string` macro resolves. `schema/v6/output.schema.json`
+how a repeated `@string` macro resolves. `schema/v7/output.schema.json`
 states the rest.
 
 Everything here is normative unless it carries a `Target` note. A `Target`
@@ -16,8 +16,8 @@ names the issue that will make it true. Until that issue lands, the rule is
 the intent and the note is the fact. What changed at each release, and what
 it replaced, is in [`CHANGELOG.md`](CHANGELOG.md), not here.
 
-- Applies to: `schema_version` 6 (`sslabdata.models.SCHEMA_VERSION`), package
-  version 4.0.0 (`sslabdata.__version__`).
+- Applies to: `schema_version` 7 (`sslabdata.models.SCHEMA_VERSION`), package
+  version 5.0.0 (`sslabdata.__version__`).
 
 ### How this file cites the code
 
@@ -25,7 +25,7 @@ Every rule below is grounded in a named part of the code rather than a line
 number, because line numbers rot silently: a function such as
 `sslabdata.parsers.bibtex.parse_all_works()`, a method such as
 `Person.to_dict()`, a module-level constant such as `TEXT_FIELDS`, a JSON
-Pointer into `schema/v6/output.schema.json` such as `/$defs/person/required`, or
+Pointer into `schema/v7/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
 statement is cited by its enclosing function.
 
@@ -275,7 +275,7 @@ Codes in use:
 | `PROJECTS-ID-DUPLICATE` | Two projects declare one `id`. Located at the second. Both are kept. A validation error. |
 | `PROJECTS-STATUS-INVALID` | A project's `status` is present and is not `active` or `completed`. A missing status reads as `active`, and so does one that is not a string. A warning. |
 | `RECORD-KEY-UNKNOWN` | A person, project or collaborator record holds a key sslabdata does not read (`sslabdata.loaders.PERSON_KEYS`, `PROJECT_KEYS`, `COLLABORATOR_KEYS`), such as `hobby` or a misspelt `webiste`. One code for all three files. Located at `<people_file>:<id>:<key>`, `<projects_file>:<id>:<key>` or `<collaborators_file>:<collaborator name>:<key>`, once per key. The key is ignored and never emitted; the record is kept. Only a record that is loaded is checked, so a record missing a required field reports that alone. A warning. |
-| `RECORD-TYPE-INVALID` | An optional field of a person, project or collaborator record has a value of the wrong type, other than the `role` and `status` that have codes of their own. A person's `photo`, `website`, `email`, `co_advisor`, `degree`, `thesis_title` and `current_position`, and a project's `description`, `website` and `image`, are strings; a person's `start_year` and `end_year` are integers, not booleans; a person's or collaborator's `aliases` is a list of non-empty strings. One code for all three files, located at `<file>:<id>:<field>` (a collaborator's name for its id). The value is read as empty, so it is emitted as `null`, and a wrong `aliases` declares none; the record is kept. Only a record that is loaded is checked. A warning. |
+| `RECORD-TYPE-INVALID` | An optional field of a person, project or collaborator record has a value of the wrong type, other than the `role` and `status` that have codes of their own. A person's `photo`, `website`, `email`, `co_advisor`, `degree`, `thesis_title`, `current_position` and `bio`, and a project's `description`, `website` and `image`, are strings; a person's `start_year` and `end_year` are integers, not booleans; a person's or collaborator's `aliases` is a list of non-empty strings. One code for all three files, located at `<file>:<id>:<field>` (a collaborator's name for its id). The value is read as empty, so it is emitted as `null`, and a wrong `aliases` declares none; the record is kept. Only a record that is loaded is checked. A warning. |
 | `RECORD-KEY-REPEATED` | A key is given twice in one mapping of a people, projects or collaborators file, which YAML alone would read as its last value, silently dropping the first. Every YAML file sslabdata reads is read with one loader that finds these (`sslabdata.config.YAMLLoader`). Keys are compared as YAML reads them, so `1` and `0x1` are one key. A merge key (`<<`) is not a repeat: the keys it merges in are overridden by the mapping's own, as YAML merge keys are defined. One code for all three files. Located at `<file>:<id>:<key>` (a collaborator's name for its id), with the path below the record's top level joined by `.` and a list member's index in brackets; the record is named by nothing when the repeated key is its `id` (a collaborator's `name`), and a repeat outside any record is located at `<file>::<path>`. The prose names the key and both lines. Every repeat is reported; the record is not loaded, and the run is fatal, as for a missing field: which value was meant is not sslabdata's to guess. |
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
@@ -541,10 +541,20 @@ converts nor checks them:
 - **The person and project strings supplied in YAML.**
   `sslabdata.loaders.load_people()` and `load_projects()` perform no conversion
   of any kind — they check the types of a record's fields, a person's `role` and that a
-  `status` is one they know, but emit every string as written — so a person's `name`, `role`, `current_position` or
-  `thesis_title`, and a project's `title` or `description`, are copied
+  `status` is one they know, but emit every string as written — so a person's `name`, `role`, `current_position`,
+  `thesis_title` or `bio`, and a project's `title` or `description`, are copied
   straight from `people.yaml` and `projects.yaml`. Not every YAML string is
   emitted — `aliases` and the configuration paths are not; see heading 3.
+  "As written" is the string YAML reads, after control characters are
+  removed and NFC is applied as for every input string (above), and nothing
+  else: an empty or whitespace-only string is emitted as such, not as
+  `null`, and line breaks are kept. That matters most for a person's `bio`,
+  the one of these meant to run over several lines: a literal block scalar
+  (`|`) keeps each line break and the final one, a folded one (`>`) joins
+  lines with a space and keeps a blank line as a line break, and `\n` in a
+  double-quoted string is a line break. It is plain text like the rest — not
+  Markdown and not HTML — and a renderer escapes it, and may read a blank
+  line as a paragraph break.
 - **`work.category`**, which comes from the `category` of the `bib_files`
   entry in `lab.yaml`, not from the `.bib` file
   (`sslabdata.config.LabDataConfig.from_yaml()`, then
@@ -805,7 +815,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `author.resolution` | **Derived** — `status` over `resolved`, `unresolved` and `ambiguous`, and `method` `exact`, or `null` when nothing matched (`resolve_authors()`). Both are open strings; `fuzzy` is never emitted. |
 | `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`sslabdata.parsers.bibtex.marks_equal_contribution()`). |
 | `work.editors[*]` | The same, minus `collaborator_key` and `equal_contribution`. An editor that matched nobody is simply `person_id: null` (`parse_editor_list()`). |
-| `person.*` except the two below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). |
+| `person.*` except the two below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). `bio` is a short biography in plain text with its line breaks as written (§2), and `null` when absent; it is carried and never read: nothing in the document is derived from it, and no `degree`, year or `current_position` is read out of one. |
 | `person.work_ids` | **Derived** — back-links over authorships (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and are not listed. |
 | `project.id`, `title`, `description`, `website`, `image`, `status` | Input — the fields of `projects_file` (`sslabdata.loaders.load_projects()`). `status` is one of `active` and `completed`, and `active` when absent (`PROJECTS-STATUS-INVALID`). `image` is a URL or a site path, the same kind of value as a person's `photo`, carried as plain text: deciding which URLs are safe to render is the renderer's job. |
 | `project.work_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
@@ -1120,14 +1130,14 @@ meaning and guarantees, and each of them is a bump.
 has been published is never edited. Version `N`'s schema stays reachable, byte
 for byte, at its own path after version `N+1` ships, so a consumer pinned to
 `N` keeps a stable target. `schema/v3/output.schema.json`,
-`schema/v4/output.schema.json`, `schema/v5/output.schema.json` and
-`schema/v6/output.schema.json` are those paths, and `tests/COVERAGE.md` row
-`output.versioned_schema` asserts that the older three are unchanged byte for
-byte and still say `3`, `4` and `5`.
+`schema/v4/output.schema.json`, `schema/v5/output.schema.json`,
+`schema/v6/output.schema.json` and `schema/v7/output.schema.json` are those
+paths, and `tests/COVERAGE.md` row `output.versioned_schema` asserts that the
+older four are unchanged byte for byte and still say `3`, `4`, `5` and `6`.
 
-**The `$id` is a pinned tag URL.** v6's `$id` is
-`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v6/schema/v6/output.schema.json`.
-The rule that makes it a contract rather than a guess: **the `schema-v6` tag
+**The `$id` is a pinned tag URL.** v7's `$id` is
+`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v7/schema/v7/output.schema.json`.
+The rule that makes it a contract rather than a guess: **the `schema-v7` tag
 is created when this version ships and is never moved.** A branch URL such as
 `blob/main` is not usable — it serves an HTML page rather than the schema, so
 no consumer can ever have resolved v3's `$id` — and this repository publishes
@@ -1142,11 +1152,11 @@ rule.
 descriptions inside those files, name the repository `labdata`, and the files
 are left byte for byte as published rather than rewritten. v4's raw `$id`
 resolves, because GitHub redirects `labdata` to `sslabdata`. v3's `blob/main`
-`$id` does not resolve, as above. The `$id`s, titles and descriptions of v5
-and v6 say `sslabdata`.
+`$id` does not resolve, as above. The `$id`s, titles and descriptions of v5,
+v6 and v7 say `sslabdata`.
 
 **The input schemas are versioned apart from the document.**
-`schema/input/v1/` holds a JSON Schema for each input file: `lab.schema.json`,
+`schema/input/v2/` holds a JSON Schema for each input file: `lab.schema.json`,
 `people.schema.json`, `projects.schema.json` and `collaborators.schema.json`.
 They describe what the loaders accept; the loaders stay the authority, and
 the diagnostic codes above report what a schema cannot see. The input format
@@ -1154,9 +1164,13 @@ and the document change for different reasons, so the input schemas carry
 their own version rather than `schema_version`. They follow the same rules:
 a published input schema is never edited, any change to one is a new
 version at a new path, and its `$id` is a pinned tag URL,
-`https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/<file>.schema.json`,
-whose `input-schema-v1` tag is created when this version ships and is never
-moved.
+`https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/<file>.schema.json`,
+whose `input-schema-v2` tag is created when this version ships and is never
+moved. A version holds all four files, so a change to one of them versions
+the set: v2 adds a person's `bio` to `people.schema.json`, and its other three
+files differ from v1's only in the tag their `$id`s and descriptions name. `schema/input/v1/`, served
+from the `input-schema-v1` tag, stays byte for byte as published; the wheel
+installs only the current version.
 
 **Version history.** What each `schema_version` changed is in
 [`CHANGELOG.md`](CHANGELOG.md).
@@ -1256,6 +1270,24 @@ So each rejected type is rejected for a stated reason, and each has a home:
 | Alumni | Not a collection — a `status` on a person (`sslabdata.models.Person.status`). |
 | Robots, platforms, facilities | Your site repository; one of 27 surveyed sites had such a page. |
 
+**An attribute of an entity the document already has is not an entity.**
+The evidence above, and the question #60 asks of a candidate — would
+sslabdata do anything with it beyond carrying it — decide which *entities*
+the document has: collections with records of their own, ids, references
+and an order, each of which the compiler has to check and a renderer has to
+understand. A field
+on a person, work or project raises none of that. Its owner is already
+admitted, the field has one value of one type, and the only work it asks
+for is what every input string gets: control characters removed, NFC and
+the text rule (§2). A person already carries attributes sslabdata does
+nothing else with — `photo`, `website`, `thesis_title`, `current_position` —
+and a person's `bio` is one more. Such a field is judged on two questions
+instead: does it belong to that entity rather than to a page of the site,
+and is it the only place the fact can live, so that it does not copy a
+structured field into text that will drift from it. A bio passes both; an
+alumni line such as "PhD 2012, now at Example Robotics" fails the second,
+because `degree`, `end_year` and `current_position` already hold it.
+
 **There is no generic extension mechanism and no `collections` escape hatch.**
 What one would carry is mostly prose, and its one real service — catching
 references that point at nothing — is delivered by #58 without the document
@@ -1267,7 +1299,7 @@ vocabularies, not over arbitrary content.
 
 ## 9. What this file is not
 
-It does not list the document's fields; `schema/v6/output.schema.json` does.
+It does not list the document's fields; `schema/v7/output.schema.json` does.
 It does not describe renderers such as
 [sslabdata-site](https://github.com/siddhss5/sslabdata-site), which are
 downstream consumers in their own repositories. It does not describe the input formats `lab.yaml`,

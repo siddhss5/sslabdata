@@ -8,7 +8,7 @@ and checks what must hold for every input:
 
 1. no run raises an uncaught exception;
 2. a run that exits 0 writes a document that validates against
-   `schema/v6/output.schema.json`, and the YAML and JSON documents hold the
+   `schema/v7/output.schema.json`, and the YAML and JSON documents hold the
    same data;
 3. a run that exits 1 reports at least one coded diagnostic;
 4. `--validate` exits 0 only where `--output` in the same format writes;
@@ -20,7 +20,10 @@ and checks what must hold for every input:
    the repository its entry names, `and others` is not an author, an award
    takes the year its `YYYY:` prefix wrote or else the work's, a prefix that
    is not a year stays in the award's name and is reported, an empty award is
-   reported, an empty file path, a repeated YAML key or a path that is a
+   reported, a person's `bio` keeps every word and line break it was written
+   with, in NFC and with no control character, its control characters are
+   reported, a `bio` that is not a string is reported and emitted as null,
+   an empty file path, a repeated YAML key or a path that is a
    directory is reported, and LaTeX conversion does not invent markup (`<`,
    `>`, `[`, `]`).
 
@@ -231,6 +234,12 @@ SNIPPETS = {
               "**b**", ",", "=", "0"],
 }
 
+# The snippets a generated `bio` is made of: plain text, not BibTeX. The
+# control characters are written as YAML escapes, since a raw one is not YAML.
+BIO_GROUPS = ["bare", "unicode", "space", "other", "known"]
+CONTROLS = ["\x00", "\x01", "\x08", "\x0b", "\x1f"]
+_CONTROL_IN_TEXT = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
 # Sentinel words are also placed inside the braced arguments of LaTeX
 # commands, as `\cmd{word}`, so that text lost with an argument shows.
 #
@@ -326,8 +335,10 @@ class Generator:
         self.hostile = self.r.random() < 0.3
         self.used = set()
         self.names = []    # plain author names, for people and collaborators
-        # Awards are drawn from their own stream (`award_field`).
+        # Awards are drawn from their own stream (`award_field`), and so
+        # are bios (`bio`).
         self.ra = random.Random(f"{SEED}:{index}:award")
+        self.rb = random.Random(f"{SEED}:{index}:bio")
 
     def word(self, capital=False) -> str:
         while True:
@@ -600,8 +611,35 @@ class Generator:
                                         config=True)))
         if self.odd(0.2):
             pairs.append(Pair(r.choice(["webiste", Raw("1"), Raw("true")]), "x"))
+        bio = self.bio()
+        if bio is not None:
+            pairs.append(Pair("bio", bio))
         self.repeat_a_key(pairs)
         return Mapping(pairs)
+
+    def bio(self):
+        """A person's `bio`, or None for none, drawn from a stream of its own
+        so that adding it leaves every other generated value as it was."""
+        r, self.r = self.r, self.rb
+        try:
+            rb = self.r
+            if rb.random() < 0.5:
+                return None
+            if self.odd(0.3):
+                return rb.choice([Raw("5"), Raw("true"), Raw("null"), Seq(["a"]),
+                                  Mapping([Pair("a", "b")])])
+            if rb.random() < 0.1:
+                return rb.choice(["", "  ", "\n"])
+            lines = []
+            for _ in range(rb.randint(1, 3)):
+                pieces = [rb.choice(SNIPPETS[g]) for g in rb.choices(
+                    BIO_GROUPS, k=rb.randint(0, 3))]
+                if rb.random() < 0.2:
+                    pieces.insert(rb.randint(0, len(pieces)), rb.choice(CONTROLS))
+                lines.append(" ".join(pieces + [self.word()]))
+            return rb.choice(["\n", "\n\n", "\r\n", " "]).join(lines)
+        finally:
+            self.r = r
 
     def project(self, pid):
         r = self.r
@@ -840,6 +878,8 @@ def check(case: Case, seen: dict, where: Path) -> list:
                 fail(f"6 repeated YAML key is not reported ({_kind_of(path)})",
                      f"{path}: {key}")
 
+    _check_bios(case, config, doc, records, fail)
+
     counts = {}
     for entries in case.bibs.values():
         for e in entries:
@@ -872,6 +912,55 @@ def check(case: Case, seen: dict, where: Path) -> list:
                 continue
             _check_work(e, got[0], excused, report)
     return found
+
+
+def _check_bios(case: Case, config: dict, doc: dict, records, fail) -> None:
+    """Each emitted person's `bio` against the one its record wrote: every
+    word and line break kept, NFC, no control character, and each thing
+    removed or refused reported at the person's `bio`."""
+    people = case.data.get("people.yaml")
+    if config.get("people_file") != "people.yaml" or not isinstance(people, list):
+        return
+    written = [{yaml_text(p.key): p.value for p in r.pairs} for r in people
+               if len({yaml_text(p.key) for p in r.pairs}) == len(r.pairs)]
+    ids = [w.get('"id"') for w in written]
+    emitted = {}
+    for person in doc.get("people", []):
+        emitted.setdefault(person.get("id"), []).append(person)
+    for w in written:
+        pid = w.get('"id"')
+        if (not isinstance(pid, str) or ids.count(pid) != 1
+                or len(emitted.get(pid, [])) != 1):
+            continue
+        bio, got = w.get('"bio"'), emitted[pid][0].get("bio")
+        reported = {r.get("code") for r in records if r.get("key") == pid
+                    and r.get("field") == "bio"}
+        if bio is None or bio == Raw("null"):
+            if got is not None:
+                fail("6 absent bio is not null", f"{pid}: {got!r}")
+        elif not isinstance(bio, str):
+            if got is not None:
+                fail("6 bio that is not a string is emitted", f"{pid}: {got!r}")
+            if "RECORD-TYPE-INVALID" not in reported:
+                fail("6 bio that is not a string is not reported", pid)
+        elif not isinstance(got, str):
+            fail("5 string bio is not emitted", f"{pid}: {got!r}")
+        else:
+            lost = [word for word in re.findall(r"[Zz]q[a-z]+", bio)
+                    if word not in got]
+            if lost:
+                fail("5 bio text lost", f"{pid}: {lost} of {bio!r} in {got!r}")
+            if got.count("\n") != bio.count("\n"):
+                fail("5 bio line breaks changed", f"{pid}: {bio!r} -> {got!r}")
+            if not unicodedata.is_normalized("NFC", got):
+                fail("5 bio is not NFC", f"{pid}: {got!r}")
+            if _CONTROL_IN_TEXT.search(got):
+                fail("5 bio keeps a control character", f"{pid}: {got!r}")
+            if _CONTROL_IN_TEXT.search(bio):
+                if "TEXT-CONTROL-CHARACTER" not in reported:
+                    fail("6 bio control character is not reported", f"{pid}: {bio!r}")
+            elif unicodedata.is_normalized("NFC", bio) and got != bio:
+                fail("5 bio is not emitted as written", f"{pid}: {bio!r} -> {got!r}")
 
 
 def _check_work(e: Entry, w: dict, excused, fail) -> None:

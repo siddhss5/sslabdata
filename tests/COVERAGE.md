@@ -74,7 +74,9 @@ DOI and URL shapes, `eprint` with `archivePrefix` and `eprinttype`, author
 lists with `and others` anywhere, `{literal}` names, `Jr.` and von parts,
 repeated citation keys, `award` lists with `and` in any case, empty awards,
 braces around an `and`, year prefixes well formed and not, and LaTeX in the
-names, `lab` values YAML types JSON cannot carry, and repeated YAML keys. About a third of the cases draw every configuration
+names, a person's `bio` over several lines with control characters,
+decomposed accents and values that are not strings, `lab` values YAML types
+JSON cannot carry, and repeated YAML keys. About a third of the cases draw every configuration
 value from that range. The rest keep the configuration well formed, so that
 the run writes a document and the `.bib` values can be checked in it.
 
@@ -84,7 +86,7 @@ invariants:
 
 1. No run raises an uncaught exception.
 2. A run that exits 0 writes a document that validates against
-   `schema/v6/output.schema.json`, and the YAML and JSON documents hold the
+   `schema/v7/output.schema.json`, and the YAML and JSON documents hold the
    same data.
 3. A run that exits 1 reports at least one coded error.
 4. `--validate` exits 0 only where `--output` in the same format writes.
@@ -108,7 +110,10 @@ invariants:
    under the repository its entry names, and arXiv only when it names none.
    `others` is never an author. An award takes the year its `YYYY:` prefix
    wrote, or else the work's; a prefix that is not a year stays in the name
-   and is reported, and so is an empty award. An empty `*_file` path, a repeated YAML key
+   and is reported, and so is an empty award. A person's `bio` is emitted
+   with every word and line break it was written with, in NFC and with no
+   control character; its control characters are reported, and so is a
+   `bio` that is not a string, which is emitted as `null`. An empty `*_file` path, a repeated YAML key
    and a path that is a directory are each reported. LaTeX conversion does
    not add `<`, `>`, `[` or `]` that the source did not have.
 
@@ -358,8 +363,8 @@ the source text are not markup and must survive unchanged.
 | `latex.unknown_macro_repeated` | One unknown macro in three fields of two entries | One warning line for the macro, with the count of fields and the first of them as the location | `tests/corpus/invalid/unknown_macro_repeated/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 | `latex.definition_commands` | `\newcommand zqx Tidy Robots`, `\newcommand \url{…} Letters`, `\newcommand \href{…}{site} and \def\x{y} z`, and an accent before `\url{…}` | `LATEX-COMMAND-UNKNOWN` for `\newcommand`, `\def` and `\x`, and the text after each kept: `zqx Tidy Robots`, `https://x.org/x Letters`, `site (https://x.org/y) and y z`. The accented URL is `LATEX-CONVERSION-FAILED`, kept as written, and no conversion marker reaches the document | `tests/corpus/invalid/definition_commands/define.bib` | `test_invalid_corpus.py::test_outcome` | pass |
-| `text.control_characters` | U+0002, U+0001 and U+007F raw in a title, and `"\x01"` and `"\a"` escapes in a person's `name` and in `lab.description` | Warning `TEXT-CONTROL-CHARACTER` at each value, naming the characters; they are removed and nothing else is: the title reads `Alpha Beta 0 Gamma Delta` with no `LATEX-CONVERSION-FAILED`, and the name resolves the author | `tests/corpus/invalid/control_characters/control.bib` | `test_invalid_corpus.py::test_outcome` | pass |
-| `text.nfc_equivalent` | Two entries with the same authors and title, one with every accent decomposed (`C` + U+0327) and one precomposed (`Ç`), a decomposed citation key, a person's `name` and a `lab` key and value written decomposed, a title `Sen{` + U+0303 + `}or` that LaTeX decomposes, `Wren, Q̇.` and `Wren, Q̇.Q̇.` (`Q` + U+0307, no precomposed form) beside `Wren, Quade` and `Wren, Quade Quill`, and an author `Pak, 한결` in Hangul syllables | Read as one text, with no diagnostic of its own: both authorships resolve the member and group each collaborator under one key and one spelling, `Vale, Ç.` is an initial either way (`ID-GROUPING-INITIALS-AMBIGUOUS` beside `Vale, Çelik`), as are `Q̇.` and `Q̇.Q̇.`, the converted title is `Señor`, and every string, key and name, the Hangul author's collaborator key included, is emitted NFC | `tests/corpus/invalid/nfc_equivalent_text/nfc.bib` | `test_invalid_corpus.py::test_outcome` | pass |
+| `text.control_characters` | U+0002, U+0001 and U+007F raw in a title, and `"\x01"` and `"\a"` escapes in a person's `name` and in `lab.description`, and `"\x02"` and `"\x1f"` in a person's `bio` beside a `\n` and a `\t` | Warning `TEXT-CONTROL-CHARACTER` at each value, naming the characters; they are removed and nothing else is: the title reads `Alpha Beta 0 Gamma Delta` with no `LATEX-CONVERSION-FAILED`, the name resolves the author, and the bio keeps its line break and tab | `tests/corpus/invalid/control_characters/control.bib` | `test_invalid_corpus.py::test_outcome` | pass |
+| `text.nfc_equivalent` | Two entries with the same authors and title, one with every accent decomposed (`C` + U+0327) and one precomposed (`Ç`), a decomposed citation key, a person's `name` and `bio` and a `lab` key and value written decomposed, a title `Sen{` + U+0303 + `}or` that LaTeX decomposes, `Wren, Q̇.` and `Wren, Q̇.Q̇.` (`Q` + U+0307, no precomposed form) beside `Wren, Quade` and `Wren, Quade Quill`, and an author `Pak, 한결` in Hangul syllables | Read as one text, with no diagnostic of its own: both authorships resolve the member and group each collaborator under one key and one spelling, `Vale, Ç.` is an initial either way (`ID-GROUPING-INITIALS-AMBIGUOUS` beside `Vale, Çelik`), as are `Q̇.` and `Q̇.Q̇.`, the converted title is `Señor`, and every string, key and name, the Hangul author's collaborator key included, is emitted NFC | `tests/corpus/invalid/nfc_equivalent_text/nfc.bib` | `test_invalid_corpus.py::test_outcome` | pass |
 
 ## Awards
 A work's awards come from its `award` field, never from `note`. Awards are
@@ -426,10 +431,12 @@ written `YYYY:` and a space; without one it takes the work's `year`.
 | `people.duplicate_id` | The same person id twice in `people.yaml` | Error naming the file and the repeated id | `tests/corpus/invalid/duplicate_person_id/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `people.invalid_role` | A `role` that is missing, empty, or not a string | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_role/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `people.invalid_status` | `status: retired`, neither current nor alumni | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_status/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
+| `people.bio_line_breaks` | A `bio` written as a literal block scalar, a folded one and a double-quoted string with `\n` | Each emitted with the line breaks YAML reads, blank lines and a block's final line break included; no diagnostic | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `people.bio_empty` | `bio: ""` and `bio: "   "` | Emitted as written, `""` and `"   "`, with no diagnostic, as an empty `current_position` is; only an absent or null `bio` is `null` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `records.unknown_key` | A key sslabdata does not read in a person (`webiste`), a project (`funding`) and a collaborator (`affiliation`) | Warning `RECORD-KEY-UNKNOWN` for each, naming the file, the record's id (a collaborator's name) and the key; an error under `--strict`; the key is not emitted | `tests/corpus/invalid/record_unknown_key/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `records.key_repeated` | A key given twice in one record: a person's `name`, a project's `status` and another's `id`, a collaborator's `aliases` | Error `RECORD-KEY-REPEATED` for each, naming the file, the record (none when the repeated key is its `id`), the key and both lines; the record is not loaded; fatal, nothing written | `tests/corpus/invalid/record_key_repeated/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `records.merge_key` | A person built with a YAML merge key (`<<: *bob`) that overrides the merged `id` and `name` | Not a repeated key: no diagnostic for it | `tests/corpus/invalid/record_key_repeated/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
-| `records.optional_type_invalid` | Optional person, project and collaborator fields of the wrong type: a number where a string is read, a string where an integer is, aliases that are not a list of non-empty strings, a `status` that is a number | Warning `RECORD-TYPE-INVALID` for each, naming the file, the record and the field; the value is emitted as `null` (a status as its default) and the record is kept | `tests/corpus/invalid/record_field_types/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
+| `records.optional_type_invalid` | Optional person, project and collaborator fields of the wrong type: a number where a string is read, a list as a person's `bio`, a string where an integer is, aliases that are not a list of non-empty strings, a `status` that is a number | Warning `RECORD-TYPE-INVALID` for each, naming the file, the record and the field; the value is emitted as `null` (a status as its default) and the record is kept | `tests/corpus/invalid/record_field_types/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `records.required_type_invalid` | A person whose `id` and `name` are numbers or a list, a project whose `id` is a boolean, a collaborator whose `name` is a number | Error `*-FIELD-MISSING` naming the file, the record and the field, no traceback; fatal, nothing written | `tests/corpus/invalid/record_id_types/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `people.missing_name` | A person with an `id` but no `name` | Error naming the file, the person and the missing field | `tests/corpus/invalid/people_missing_name/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
 | `people.not_a_list` | A mapping where sslabdata expects a list of people | Error naming the file | `tests/corpus/invalid/people_not_a_list/people.yaml` | `test_invalid_corpus.py::test_outcome` | pass |
@@ -511,7 +518,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `cli.unresolved` | `--unresolved` | Lists exactly the author names that did not resolve | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved` | pass |
 | `cli.unresolved_none` | `--unresolved` when every author resolves | Lists nobody | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved_none` | pass |
 | `cli.help` | `--help` | Names every flag | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_help` | pass |
-| `cli.init` | `sslabdata init new-lab` into a directory that does not exist, and `sslabdata init` into the current one | Writes `lab.yaml`, `bib/publications.bib`, `people.yaml`, `projects.yaml` and `collaborators.yaml`; the next command it prints, `--validate --strict`, exits 0; `--output` writes a document that matches schema v6; each YAML file matches its input schema | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_writes_a_lab_that_passes_strict_validation`, `test_init.py::test_init_defaults_to_the_current_directory` | pass |
+| `cli.init` | `sslabdata init new-lab` into a directory that does not exist, and `sslabdata init` into the current one | Writes `lab.yaml`, `bib/publications.bib`, `people.yaml`, `projects.yaml` and `collaborators.yaml`; the next command it prints, `--validate --strict`, exits 0; `--output` writes a document that matches schema v7; each YAML file matches its input schema | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_writes_a_lab_that_passes_strict_validation`, `test_init.py::test_init_defaults_to_the_current_directory` | pass |
 | `cli.init.refuses_overwrite` | `init` where `people.yaml` and `bib/publications.bib` already exist | `INIT-FILE-EXISTS` naming each, exit 1, and the tree byte for byte as it was | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_never_overwrites_without_force` | pass |
 | `cli.init.force` | The same with `--force` | Exactly the files `init` writes are replaced; a file of the user's beside them is untouched | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_never_overwrites_without_force` | pass |
 | `cli.init.wrong_kind` | `DIR` that is a file; `people.yaml` that is a directory, with `--force` | `INIT-PATH-WRONG-KIND` at that path, exit 1, nothing changed | `sslabdata/templates/init/lab.yaml` | `test_init.py::test_init_refuses_what_is_not_a_file_or_directory` | pass |
@@ -534,18 +541,20 @@ a message does not break them.
 | `diag.format_invalid` | `--format xml` | Names the bad value and the valid ones | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |
 
 ## Input schemas
-The JSON Schemas in [`schema/input/v1/`](../schema/input/v1/), read through
-`importlib.resources` as an installed user reads them.
+The JSON Schemas in [`schema/input/v2/`](../schema/input/v2/), read through
+`importlib.resources` as an installed user reads them. The published
+[`schema/input/v1/`](../schema/input/v1/), which the wheel no longer ships, is
+read from the repository.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `input.schema_valid` | Every input file of the valid corpus, the demo, `examples/config.yaml` and `tests/fixtures` | Each validates against its schema | `schema/input/v1/lab.schema.json` | `test_input_schemas.py::test_valid_inputs_validate` | pass |
-| `input.schema_invalid` | Every input file of the invalid corpus | The schema finds an error at the place of each type or shape problem the loaders report there, and a file with none validates; every other code is listed, with why no schema checks it | `schema/input/v1/people.schema.json` | `test_input_schemas.py::test_invalid_corpus_agrees_with_the_loaders`, `test_input_schemas.py::test_every_code_at_an_input_file_is_classified` | pass |
+| `input.schema_valid` | Every input file of the valid corpus, the demo, `examples/config.yaml` and `tests/fixtures` | Each validates against its schema, and against its v1 schema | `schema/input/v2/lab.schema.json` | `test_input_schemas.py::test_valid_inputs_validate` | pass |
+| `input.schema_invalid` | Every input file of the invalid corpus | The schema finds an error at the place of each type or shape problem the loaders report there, and a file with none validates; every other code is listed, with why no schema checks it | `schema/input/v2/people.schema.json` | `test_input_schemas.py::test_invalid_corpus_agrees_with_the_loaders`, `test_input_schemas.py::test_every_code_at_an_input_file_is_classified` | pass |
 
 ## Output fields
 Every field of the generated `lab.yml` / `lab.json`, and the checks on the file
 as a whole. The structure is defined by
-[`schema/v6/output.schema.json`](../schema/v6/output.schema.json).
+[`schema/v7/output.schema.json`](../schema/v7/output.schema.json).
 
 Every closed object declares every property it can carry, and a value that
 does not apply is `null` rather than absent. The open maps — `lab`, `links`,
@@ -554,7 +563,7 @@ because emitting nulls over an unbounded key set says nothing.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `output.schema_version` | Any run | The output carries `schema_version` 6 | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.schema_version` | Any run | The output carries `schema_version` 7 | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.generator` | Any run | `generator` names the compiler, its package version and the schema version, and carries no timestamp | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.lab` | A `lab:` section in the config | Copied through to `lab`, which is always emitted — `{}` when there is no header, so a consumer can tell that from a header with nothing in it | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
@@ -590,6 +599,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.person.degree` | `degree` on an alumnus | `degree`, declared for everyone and null for anyone who has none | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.thesis_title` | `thesis_title` on an alumnus | `thesis_title`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.current_position` | `current_position` on an alumnus | `current_position`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.bio` | `bio` | `bio`, plain text with its line breaks; null when absent or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.work_ids` | Works the person authored | `work_ids`, in works order; editors are not authorships and are not listed | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.project.id` | `id` in `projects.yaml` | `id` | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
@@ -615,7 +625,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text, and no string in the corpus or the demo holds `<http`, an autolink or a Markdown link the input did not write | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
 | `output.derived_is_empty` | The corpus and the demo | Every `derived` bag is `{}`, so the region cannot quietly fill | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_every_derived_bag_is_empty` | pass |
 | `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields and an authorship carrying two contributor references or none | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
-| `output.versioned_schema` | The published schemas | v6 lives at its own path, and v3, v4 and v5 stay reachable byte for byte, still saying 3, 4 and 5 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |
+| `output.versioned_schema` | The published schemas | v7 lives at its own path, and v3, v4, v5 and v6 stay reachable byte for byte, still saying 3, 4, 5 and 6 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |
 | `output.demo_schema` | The Example Lab demo output | Validates against the same schema, in both formats | `examples/demo/lab.yaml` | `test_output_format.py::test_demo_matches_schema` | pass |
 | `output.yaml_json_same` | The same run exported twice | The YAML and JSON exports hold the same data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_yaml_and_json_hold_the_same_data` | pass |
 | `output.full` | The valid corpus entries no open issue owns | Match `tests/corpus/expected/valid.yaml`, compared as parsed data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_full_output` | pass |

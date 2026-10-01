@@ -18,9 +18,9 @@ from typing import Dict, List, Optional
 from .config import json_lab, reject_absolute_name
 
 
-# The document's schema version (schema/v6/output.schema.json). When it
+# The document's schema version (schema/v7/output.schema.json). When it
 # changes is SPEC.md §6.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 GENERATOR_NAME = "sslabdata"
 
@@ -233,6 +233,11 @@ class Person:
     work_ids: List[str] = field(default_factory=list)
     derived: Dict[str, object] = field(default_factory=dict)
 
+    # Plain text with its line breaks as written (SPEC.md §2). Declared last
+    # so it takes no other field's position in a positional call; to_dict()
+    # emits it beside `current_position`.
+    bio: Optional[str] = None
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization; ``aliases`` are read for
         matching and are not emitted."""
@@ -250,6 +255,7 @@ class Person:
             'degree': self.degree,
             'thesis_title': self.thesis_title,
             'current_position': self.current_position,
+            'bio': self.bio,
             'work_ids': list(self.work_ids),
             'derived': dict(self.derived),
         }

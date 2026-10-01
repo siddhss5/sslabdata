@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/collaborators.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/collaborators.schema.json
 #
 # External co-authors, who are not lab members. An entry groups the spellings
 # it lists into one collaborator; it never links to a person. This

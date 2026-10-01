@@ -22,6 +22,10 @@
   start_year: 2015
 
 # CASE output.person.co_advisor
+# CASE output.person.bio
+# CASE people.bio_line_breaks
+# A literal block scalar: every line break is kept, the blank line and the
+# final one included.
 - id: "bbrown"
   name: "Bob Brown"
   aliases: ["B. Brown"]
@@ -29,19 +33,35 @@
   status: "current"
   co_advisor: "Peggy Park"
   start_year: 2021
+  bio: |
+    Bob Brown is a fictional PhD student.
+    He studies shared control.
+
+    He is advised by Alice Adams & Peggy Park.
 
 # The same person written with TeX accents and in UTF-8 in names.bib.
+# CASE people.bio_line_breaks
+# A folded block scalar: YAML joins the first two lines with a space and
+# keeps the blank line as one line break. `<b>` and `*` are text.
 - id: "ccote"
   name: "Carol Côté"
   aliases: ["C. Côté"]
   role: "phd_student"
   status: "current"
+  bio: >
+    Carol Côté places objects
+    in fictional kitchens.
 
+    She writes <b>bold</b> and *stars* as text.
+
+# CASE people.bio_line_breaks
+# A double-quoted string: `\n` is a line break.
 - id: "ddavis"
   name: "Dave Davis"
   aliases: ["D. Davis"]
   role: "ms_student"
   status: "current"
+  bio: "Dave Davis is fictional.\nHe has two lines."
 
 # CASE output.person.end_year
 # CASE output.person.degree
@@ -57,19 +77,25 @@
   degree: "PhD"
   thesis_title: "Learning to Tidy"
   current_position: "Research Scientist, Example Robotics Inc."
+  bio: null
 
 # No aliases: only a full-name match can find Frank.
+# CASE people.bio_empty
+# An empty bio is emitted as written, as an empty current_position is.
 - id: "ffischer"
   name: "Frank Fischer"
   role: "postdoc"
   status: "current"
+  bio: ""
 
 # Hyphenated given name.
+# CASE people.bio_empty
 - id: "ggreen"
   name: "Grace-Ann Green"
   aliases: ["G.-A. Green"]
   role: "phd_student"
   status: "current"
+  bio: "   "
 
 # A lineage suffix in the declared name, so a suffix-marked author has a
 # person to resolve to.

@@ -43,7 +43,7 @@ RECORD_TYPE_INVALID = "RECORD-TYPE-INVALID"
 # ignored, so a misspelt `webiste` is not silently dropped from the document.
 PERSON_KEYS = ("id", "name", "aliases", "role", "status", "photo", "website",
                "email", "co_advisor", "start_year", "end_year", "degree",
-               "thesis_title", "current_position")
+               "thesis_title", "current_position", "bio")
 PROJECT_KEYS = ("id", "title", "description", "website", "image", "status")
 COLLABORATOR_KEYS = ("name", "aliases")
 
@@ -54,7 +54,7 @@ STRING, INTEGER, ALIASES = ("a string", "an integer",
                             "a list of non-empty strings")
 PERSON_TYPES = {**dict.fromkeys(("photo", "website", "email", "co_advisor",
                                  "degree", "thesis_title",
-                                 "current_position"), STRING),
+                                 "current_position", "bio"), STRING),
                 "start_year": INTEGER, "end_year": INTEGER,
                 "aliases": ALIASES}
 PROJECT_TYPES = dict.fromkeys(("description", "website", "image"), STRING)
@@ -238,6 +238,7 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
             degree=entry.get('degree'),
             thesis_title=entry.get('thesis_title'),
             current_position=entry.get('current_position'),
+            bio=entry.get('bio'),
         )
         people.append(person)
 
