@@ -11,7 +11,7 @@ with `schema-v7` to come, and the package version, `sslabdata.__version__`. Entr
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
 
-## Package 5.0.0 (not yet released)
+## Package 5.0.0 (tag `v5.0.0`, 2026-09-30)
 
 It emits `schema_version` 7, whose one change is a person's `bio` (see
 `schema_version` 7 below).
@@ -209,7 +209,7 @@ differently:
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
 
-## `schema_version` 7 (not yet released)
+## `schema_version` 7 (tag `schema-v7`, 2026-09-30)
 
 One change, and nothing else in the document moves (#214):
 

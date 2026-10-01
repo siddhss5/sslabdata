@@ -1,6 +1,6 @@
 [project]
 name = "sslabdata"
-version = "5.0.0rc1"
+version = "5.0.0"
 description = "Renderer-agnostic academic lab data assembler: BibTeX + YAML → structured data"
 readme = "README.md"
 requires-python = ">=3.10"
