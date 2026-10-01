@@ -58,8 +58,8 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 # The current output schema and input schemas are public wheel data, installed
-# at sslabdata/schema/v6/output.schema.json and
-# sslabdata/schema/input/v1/*.schema.json. The package directory is mapped onto
+# at sslabdata/schema/v7/output.schema.json and
+# sslabdata/schema/input/v2/*.schema.json. The package directory is mapped onto
 # the repository's schema/ directory so each frozen file has one copy and one
 # path; earlier versions stay in the sdist only. schema/__init__.py makes the
 # mapped directory a regular package, which editable installs need to resolve.
@@ -71,7 +71,7 @@ packages = ["sslabdata", "sslabdata.parsers", "sslabdata.schema"]
 "sslabdata.schema" = "schema"
 
 [tool.setuptools.package-data]
-"sslabdata.schema" = ["v6/output.schema.json", "input/v1/*.schema.json"]
+"sslabdata.schema" = ["v7/output.schema.json", "input/v2/*.schema.json"]
 # The starting point `sslabdata init` copies.
 "sslabdata" = ["templates/init/*.yaml", "templates/init/bib/*.bib"]
 

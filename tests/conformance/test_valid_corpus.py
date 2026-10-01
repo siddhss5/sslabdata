@@ -760,9 +760,9 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 6),
+    case("output.schema_version", "", "", "", "schema_version", 7),
     case("output.generator", "", "", "", "generator.name", "sslabdata"),
-    case("output.generator", "", "", "", "generator.schema_version", 6),
+    case("output.generator", "", "", "", "generator.schema_version", 7),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.work.bib_id", "works", "bib_id", "type-article", "bib_id",
          "type-article"),
@@ -856,6 +856,19 @@ OUTPUT_FIELDS = [
          "Learning to Tidy"),
     case("output.person.current_position", "people", "id", "eevans", "current_position",
          "Research Scientist, Example Robotics Inc."),
+    case("output.person.bio", "people", "id", "bbrown", "bio",
+         "Bob Brown is a fictional PhD student.\nHe studies shared control.\n\n"
+         "He is advised by Alice Adams & Peggy Park.\n"),
+    # Absent and written as null are the same: null.
+    case("output.person.bio", "people", "id", "aadams", "bio", None),
+    case("output.person.bio", "people", "id", "eevans", "bio", None),
+    case("people.bio_line_breaks", "people", "id", "ccote", "bio",
+         "Carol Côté places objects in fictional kitchens.\n"
+         "She writes <b>bold</b> and *stars* as text.\n"),
+    case("people.bio_line_breaks", "people", "id", "ddavis", "bio",
+         "Dave Davis is fictional.\nHe has two lines."),
+    case("people.bio_empty", "people", "id", "ffischer", "bio", ""),
+    case("people.bio_empty", "people", "id", "ggreen", "bio", "   "),
     case("output.person.work_ids", "people", "id", "ccote", "work_ids",
          ["proj-multiple", "name-accent-tex", "name-accent-utf8", "name-equal-dollar",
           "name-equal-caret", "name-equal-superscript", "name-equal-star",

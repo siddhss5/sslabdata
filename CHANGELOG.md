@@ -6,10 +6,43 @@ described here and not there.
 
 Two version numbers move independently
 ([`SPEC.md` §6](SPEC.md#6-version-policy)): the document's `schema_version`,
-whose releases are the git tags `schema-v4` and `schema-v5`, with
-`schema-v6` to come, and the package version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
+whose releases are the git tags `schema-v4`, `schema-v5` and `schema-v6`,
+with `schema-v7` to come, and the package version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
+
+## Package 5.0.0 (not yet released)
+
+It emits `schema_version` 7, whose one change is a person's `bio` (see
+`schema_version` 7 below).
+
+**Upgrading from 4.0.0.** A consumer must accept `schema_version` 7 before it
+reads a document from this release: the person object is closed, so one that
+validates against schema v6 rejects every person, which now carries `bio`.
+Validate against `schema/v7/output.schema.json`, which the wheel installs as
+`sslabdata/schema/v7/output.schema.json` in place of v6; v6 stays at its
+tagged URL. A consumer that needs the v6 document pins package 4.0.0. No
+input file needs to change: a person without a `bio` gets `bio: null`.
+
+- **A person's `bio`.** `people.yaml` accepts `bio`, a short biography in
+  plain text, not Markdown or HTML. It is emitted as written, with its line
+  breaks: a block scalar (`|`) keeps each line. Control characters are
+  removed and reported under `TEXT-CONTROL-CHARACTER`, and the text is put in
+  NFC, as for every input string. A `bio` that is not a string is reported
+  under `RECORD-TYPE-INVALID` and emitted as `null`; an empty string is
+  emitted as written, as an empty `current_position` is. Where 4.0.0
+  reported `bio` as `RECORD-KEY-UNKNOWN` and dropped it, it is now read
+  (#214).
+- **Input schemas v2.** `schema/input/v2/` adds `bio` to
+  `people.schema.json`; its other three files differ from v1's only in their
+  `$id`s and descriptions, which name the `input-schema-v2` tag. The wheel
+  installs v2 under `sslabdata/schema/input/v2/` in place of v1, which stays
+  at its tagged URL and still accepts a `bio`, because it allows keys it
+  does not list. The files `sslabdata init` writes name v2.
+- **Python API.** `Person.bio` is declared last, so that a positional
+  `Person(...)` binds its other fields as before.
+- The demo gives Bob Brown a two-line bio, and the `people.yaml` that
+  `sslabdata init` writes gives its person one.
 
 ## Package 4.0.0 (tag `v4.0.0`, 2026-09-29)
 
@@ -175,6 +208,23 @@ differently:
 - **Python API.** The elements of `AssemblyResult.diagnostics` and
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
+
+## `schema_version` 7 (not yet released)
+
+One change, and nothing else in the document moves (#214):
+
+1. **A person carries `bio`.** It is the person's `bio` from `people.yaml`,
+   plain text with its line breaks as written, or `null` when the file gives
+   none. It is display text under the text rule
+   ([`SPEC.md` §2](SPEC.md#2-the-text-rule)): renderers escape it, and may
+   read a blank line as a paragraph break. `bio` is required on every
+   person, as a string or `null`.
+
+Adding a property to the closed person object is breaking
+([`SPEC.md` §6](SPEC.md#6-version-policy)), so a consumer validating against
+v6 rejects a v7 document. Works, projects and collaborators are unchanged. A
+consumer that needs the v6 document pins `schema_version` 6 and the schema at
+`schema/v6/output.schema.json`.
 
 ## `schema_version` 6 (tag `schema-v6`, 2026-09-29)
 

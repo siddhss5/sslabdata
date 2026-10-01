@@ -82,15 +82,21 @@ with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
     DIAGNOSTICS = yaml.safe_load(f)
 
 
-def load_schema(name):
-    text = (files("sslabdata.schema") / "input" / "v1"
-            / f"{name}.schema.json").read_text(encoding="utf-8")
+def load_schema(text):
     schema = json.loads(text)
     jsonschema.Draft202012Validator.check_schema(schema)
     return jsonschema.Draft202012Validator(schema)
 
 
-VALIDATORS = {name: load_schema(name) for name in SCHEMAS}
+# The current input schemas, as the wheel installs them.
+VALIDATORS = {name: load_schema((files("sslabdata.schema") / "input" / "v2"
+                                 / f"{name}.schema.json").read_text(encoding="utf-8"))
+              for name in SCHEMAS}
+# v1 is published and frozen, and not in the wheel. A file that names its tag
+# URL in an editor must keep validating after an upgrade.
+PREVIOUS = {name: load_schema((REPO_ROOT / "schema" / "input" / "v1"
+                               / f"{name}.schema.json").read_text(encoding="utf-8"))
+            for name in SCHEMAS}
 
 
 class EditorLoader(yaml.SafeLoader):
@@ -121,9 +127,9 @@ def read(path):
         return None
 
 
-def errors(schema, path):
+def errors(schema, path, validators=VALIDATORS):
     return [f"{'/'.join(map(str, e.absolute_path)) or '(root)'}: {e.message}"
-            for e in VALIDATORS[schema].iter_errors(read(path))]
+            for e in validators[schema].iter_errors(read(path))]
 
 
 # --- Valid inputs ----------------------------------------------------------------
@@ -141,9 +147,10 @@ VALID_INPUTS = [
                      for p, s in VALID_INPUTS])
 def test_valid_inputs_validate(path, schema):
     """input.schema_valid: every input file of the valid corpus, the demo and
-    the examples validates against its schema."""
+    the examples validates against its schema, and against v1's."""
     assert schema in SCHEMAS
     assert errors(schema, path) == []
+    assert errors(schema, path, PREVIOUS) == []
 
 
 # --- The invalid corpus ----------------------------------------------------------

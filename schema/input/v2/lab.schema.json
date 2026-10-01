@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/lab.schema.json",
+  "title": "sslabdata lab.yaml",
+  "description": "The configuration file sslabdata is run with (--config). It describes what sslabdata's loader accepts; the loader stays the authority, and reports each problem under a code in SPEC.md, Diagnostic codes. A key not listed here is reported as CONFIG-KEY-UNKNOWN and ignored, so it is allowed. Published input schemas are immutable: this one is served from the input-schema-v2 tag, which is created when this version ships and is never moved (SPEC.md §6).",
+  "type": "object",
+  "required": ["bib_dir"],
+  "additionalProperties": true,
+  "properties": {
+    "lab": {
+      "description": "The lab header, copied into the document's lab unchanged (SPEC.md §5). The keys below are typed; any other key is allowed and copied through. sslabdata warns when it declares no name (CONFIG-LAB-NAME-MISSING).",
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "institution": { "type": "string" },
+        "department": { "type": "string" },
+        "website": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "logo": { "type": "string" },
+        "links": { "type": "object" }
+      }
+    },
+    "site": {
+      "description": "Read by renderers, not by sslabdata, and accepted without being checked."
+    },
+    "bib_dir": {
+      "description": "The directory the bib_files names are under, relative to the directory sslabdata is run from.",
+      "type": "string"
+    },
+    "bib_files": {
+      "description": "The .bib files to read. sslabdata warns when there are none (CONFIG-BIB-FILES-MISSING).",
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["name", "category"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "A name under bib_dir, emitted as work.source.file: never absolute, and never leaving bib_dir (SPEC.md §5).",
+            "type": "string"
+          },
+          "category": {
+            "description": "Emitted as the category of every work in this file.",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pdf_base_url": {
+      "description": "A work with no pdf field gets this URL plus its citation key as its pdf link. Leave it out to guess no pdf links; an empty or blank value is an error.",
+      "type": ["string", "null"],
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "people_file": {
+      "description": "The people file (people.schema.json), relative to the directory sslabdata is run from.",
+      "type": ["string", "null"]
+    },
+    "projects_file": {
+      "description": "The projects file (projects.schema.json), relative to the directory sslabdata is run from.",
+      "type": ["string", "null"]
+    },
+    "collaborators_file": {
+      "description": "The external co-authors file (collaborators.schema.json), relative to the directory sslabdata is run from.",
+      "type": ["string", "null"]
+    }
+  }
+}

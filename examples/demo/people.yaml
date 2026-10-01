@@ -17,6 +17,9 @@
   website: "https://example.org/people/bbrown"
   co_advisor: "Peggy Park"
   start_year: 2021
+  bio: |
+    Bob Brown is a PhD student advised by Alice Adams and Peggy Park.
+    He works on shared control for assistive robot arms.
 
 - id: "ccote"
   name: "Carol Côté"

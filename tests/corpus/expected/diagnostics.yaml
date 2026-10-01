@@ -268,14 +268,15 @@ text.control_characters:
   diagnostics:
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: ./control.bib, key: control-chars, field: title, values: [U+0001, U+0002, U+007F]}
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: name, values: [U+0001]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: bio, values: [U+0002, U+001F]}
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: lab.yaml, key: lab, field: description, values: [U+0007]}
   kept: [control-chars]
   emits:
     - work: control-chars
       expect: {title: Alpha Beta 0 Gamma Delta, authors.*.person_id: [aadams]}
     - person: aadams
-      expect: {name: Alice Adams}
-  not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\x7f"]
+      expect: {name: Alice Adams, bio: "Alice Adams tidies.\nShe has a\ttab."}
+  not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\\u001f", "\x7f"]
 
 # Valid input kept here as a regression case. One text written with its
 # accents decomposed and written precomposed is read as one text, silently:
@@ -312,8 +313,8 @@ text.nfc_equivalent:
     - work: vale-çelik
       expect: {title: Señor Fictional Robots}
     - person: enoel
-      expect: {name: Émile Noël}
-  not_emitted: ["\\u0300", "\\u0301", "\\u0306", "\\u0308", "\\u0327", "\\u1100", "\\u1112", "\\u1161", "\\u1167", "\\u11ab", "\\u11af"]
+      expect: {name: Émile Noël, bio: "Émile Noël is fictional.\nHe likes crème brûlée."}
+  not_emitted: ["\\u0300", "\\u0301", "\\u0302", "\\u0306", "\\u0308", "\\u0327", "\\u1100", "\\u1112", "\\u1161", "\\u1167", "\\u11ab", "\\u11af"]
 
 # A definition command is an unknown command like any other: it is dropped
 # and reported, and the words, the link and the URL after it are kept. An
@@ -591,6 +592,7 @@ records.optional_type_invalid:
     - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: email}
     - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: end_year}
     - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: aliases}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: bio}
     - {code: RECORD-TYPE-INVALID, severity: warning, file: projects.yaml, key: homebot, field: description}
     - {code: RECORD-TYPE-INVALID, severity: warning, file: projects.yaml, key: homebot, field: website}
     - {code: RECORD-TYPE-INVALID, severity: warning, file: projects.yaml, key: homebot, field: image}
@@ -601,7 +603,7 @@ records.optional_type_invalid:
     - person: aadams
       expect: {status: current, role: professor, photo: null, website: null, start_year: null}
     - person: bbrown
-      expect: {email: null, end_year: null}
+      expect: {email: null, end_year: null, bio: null}
     - project: homebot
       expect: {status: active, description: null, website: null, image: null}
   kept: [ok-entry]

@@ -218,6 +218,9 @@ author names to people:
   website: "https://example.org/people/bbrown"
   co_advisor: "Peggy Park"
   start_year: 2021
+  bio: |
+    Bob Brown is a PhD student advised by Alice Adams and Peggy Park.
+    He works on shared control for assistive robot arms.
 
 - id: "iingram"
   name: "Ivan Ingram"
@@ -233,6 +236,16 @@ author names to people:
 
 `id` and `name` are required. `role` is any non-empty string, so any lab's
 roles fit; `status` is `current` (the default) or `alumni`.
+
+`bio` is a short biography in plain text, not Markdown or HTML: it is
+emitted as written and a renderer escapes it. Line breaks are kept as YAML
+reads them, so a block scalar (`|`) keeps each line, and a renderer may treat
+a blank line as a paragraph break. A person without one gets `bio: null`; an
+empty string is emitted as written, as any other person field is. Keep the
+structured facts in their own fields: nothing reads `degree`, years or
+`current_position` out of a bio, so an alumni line such as "PhD 2022, now
+Research Scientist at Example Robotics" is for the renderer to build from
+those fields.
 
 ### External co-authors (optional, `data/collaborators.yaml`)
 
@@ -269,24 +282,26 @@ deciding which URLs are safe to render is the renderer's job.
 ### Checking inputs in an editor
 
 Each input file has a JSON Schema in
-[`schema/input/v1/`](https://github.com/siddhss5/sslabdata/tree/main/schema/input/v1):
+[`schema/input/v2/`](https://github.com/siddhss5/sslabdata/tree/main/schema/input/v2):
 `lab.schema.json`, `people.schema.json`, `projects.schema.json` and
 `collaborators.schema.json`. The wheel installs them under
-`sslabdata/schema/input/v1/`. An editor can use them to check and complete
+`sslabdata/schema/input/v2/`. An editor can use them to check and complete
 the files as you write; `--validate` stays the check, and also reports what
 a schema cannot see, such as a repeated id or a missing file. With the YAML
 language server (the VS Code YAML extension, among others), name the schema
 in a comment at the top of the file:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v1/schema/input/v1/people.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/people.schema.json
 - id: "aadams"
   name: "Alice Adams"
   role: "professor"
 ```
 
-The URL is the schema's `$id`, served from the `input-schema-v1` tag, which is
+The URL is the schema's `$id`, served from the `input-schema-v2` tag, which is
 never moved ([`SPEC.md` §6](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#6-version-policy)).
+A file that names v1 still validates, because v1 allows keys it does not
+list, but only v2 checks and completes `bio`.
 Use `lab.schema.json`, `projects.schema.json` or `collaborators.schema.json`
 in the same way for the other files.
 
