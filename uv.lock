@@ -918,7 +918,7 @@ wheels = [
 
 [[package]]
 name = "sslabdata"
-version = "4.0.0"
+version = "5.0.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "pybtex" },
