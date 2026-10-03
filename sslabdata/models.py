@@ -18,9 +18,9 @@ from typing import Dict, List, Optional
 from .config import json_lab, reject_absolute_name
 
 
-# The document's schema version (schema/v7/output.schema.json). When it
+# The document's schema version (schema/v8/output.schema.json). When it
 # changes is SPEC.md §6.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 GENERATOR_NAME = "sslabdata"
 
@@ -211,8 +211,33 @@ class Work:
 
 
 @dataclass
+class EarlierRole:
+    """A role a person held in the lab before their current or last one
+    (SPEC.md §5). Its fields mean what a `Person`'s of the same names mean,
+    for this role."""
+    role: str
+    start_year: Optional[int] = None
+    end_year: Optional[int] = None
+    degree: Optional[str] = None
+    thesis_title: Optional[str] = None
+    co_advisor: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            'role': self.role,
+            'start_year': self.start_year,
+            'end_year': self.end_year,
+            'degree': self.degree,
+            'thesis_title': self.thesis_title,
+            'co_advisor': self.co_advisor,
+        }
+
+
+@dataclass
 class Person:
-    """A lab member (current or alumni)."""
+    """A lab member (current or alumni). The role fields describe the
+    current role, or the last one for an alumnus; `earlier_roles` holds the
+    ones before it, oldest first."""
     id: str
     name: str
     aliases: List[str] = field(default_factory=list)
@@ -237,6 +262,8 @@ class Person:
     # so it takes no other field's position in a positional call; to_dict()
     # emits it beside `current_position`.
     bio: Optional[str] = None
+    # Declared after `bio` for the same reason.
+    earlier_roles: List[EarlierRole] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization; ``aliases`` are read for
@@ -256,6 +283,7 @@ class Person:
             'thesis_title': self.thesis_title,
             'current_position': self.current_position,
             'bio': self.bio,
+            'earlier_roles': [role.to_dict() for role in self.earlier_roles],
             'work_ids': list(self.work_ids),
             'derived': dict(self.derived),
         }

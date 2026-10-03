@@ -269,13 +269,15 @@ text.control_characters:
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: ./control.bib, key: control-chars, field: title, values: [U+0001, U+0002, U+007F]}
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: name, values: [U+0001]}
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: bio, values: [U+0002, U+001F]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: "earlier_roles[0].role", values: [U+0001]}
+    - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: people.yaml, key: aadams, field: "earlier_roles[0].thesis_title", values: [U+0002]}
     - {code: TEXT-CONTROL-CHARACTER, severity: warning, file: lab.yaml, key: lab, field: description, values: [U+0007]}
   kept: [control-chars]
   emits:
     - work: control-chars
       expect: {title: Alpha Beta 0 Gamma Delta, authors.*.person_id: [aadams]}
     - person: aadams
-      expect: {name: Alice Adams, bio: "Alice Adams tidies.\nShe has a\ttab."}
+      expect: {name: Alice Adams, bio: "Alice Adams tidies.\nShe has a\ttab.", earlier_roles.0.role: postdoc, earlier_roles.0.thesis_title: Tidy Kitchens}
   not_emitted: ["\\u0001", "\\u0002", "\\u0007", "\\u001f", "\x7f"]
 
 # Valid input kept here as a regression case. One text written with its
@@ -313,7 +315,7 @@ text.nfc_equivalent:
     - work: vale-çelik
       expect: {title: Señor Fictional Robots}
     - person: enoel
-      expect: {name: Émile Noël, bio: "Émile Noël is fictional.\nHe likes crème brûlée."}
+      expect: {name: Émile Noël, bio: "Émile Noël is fictional.\nHe likes crème brûlée.", earlier_roles.0.thesis_title: Décor Théorie}
   not_emitted: ["\\u0300", "\\u0301", "\\u0302", "\\u0306", "\\u0308", "\\u0327", "\\u1100", "\\u1112", "\\u1161", "\\u1167", "\\u11ab", "\\u11af"]
 
 # A definition command is an unknown command like any other: it is dropped
@@ -544,6 +546,75 @@ people.invalid_status:
   exit: 0
   diagnostics:
     - {code: PEOPLE-STATUS-INVALID, severity: warning, file: people.yaml, key: bbrown, field: status, values: [retired]}
+  kept: [ok-entry]
+
+# An earlier role is checked as the person's own role fields are, located at
+# the entry and the field. `earlier_roles` that is not a list is read as [];
+# an entry that is not a record, or has no role or one that is not a string,
+# is not emitted (people.earlier_roles_role_missing); a field of the wrong type
+# is read as null and its entry kept; a blank role draws the warning the
+# person's own would, and is kept as written (people.earlier_roles_role_empty);
+# `status`, `current_position` and a misspelt key in an entry are unknown keys
+# (people.earlier_roles_key_unknown).
+people.earlier_roles_type_invalid:
+  dir: earlier_roles_types
+  exit: 0
+  diagnostics:
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: aadams, field: earlier_roles}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[0]"}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[1].role"}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[2].role"}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[3].start_year"}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[3].end_year"}
+    - {code: RECORD-TYPE-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[3].thesis_title"}
+    - {code: PEOPLE-ROLE-INVALID, severity: warning, file: people.yaml, key: ccote, field: "earlier_roles[0].role"}
+    - {code: RECORD-KEY-UNKNOWN, severity: warning, file: people.yaml, key: ccote, field: "earlier_roles[1].status"}
+    - {code: RECORD-KEY-UNKNOWN, severity: warning, file: people.yaml, key: ccote, field: "earlier_roles[1].current_position"}
+    - {code: RECORD-KEY-UNKNOWN, severity: warning, file: people.yaml, key: ccote, field: "earlier_roles[1].advisr"}
+  emits:
+    - person: aadams
+      expect: {role: professor, earlier_roles: []}
+    - person: bbrown
+      expect:
+        earlier_roles:
+          - {role: intern_grad, start_year: null, end_year: null, degree: null, thesis_title: null, co_advisor: null}
+    - person: ccote
+      expect:
+        status: current
+        current_position: null
+        earlier_roles:
+          - {role: "  ", start_year: null, end_year: null, degree: null, thesis_title: null, co_advisor: null}
+          - {role: phd_student, start_year: null, end_year: null, degree: null, thesis_title: null, co_advisor: null}
+  not_emitted: [advisr, Postdoc]
+  kept: [ok-entry]
+
+# Years that cannot be one history: an entry that ends before it starts
+# (people.earlier_roles_end_before_start), one that starts before the entry
+# above it or after the current role (people.earlier_roles_out_of_order), and
+# one that ends after the current role starts
+# (people.earlier_roles_overlap_current). A warning each, at the entry and
+# the year, naming both years; an error under --strict. Every value is
+# emitted as written.
+people.earlier_roles_years_invalid:
+  dir: earlier_roles_years
+  exit: 0
+  diagnostics:
+    - {code: PEOPLE-ROLE-YEARS-INVALID, severity: warning, file: people.yaml, key: aadams, field: "earlier_roles[0].end_year", values: ["2012", "2014"]}
+    - {code: PEOPLE-ROLE-YEARS-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[1].start_year", values: ["2018", "2019"]}
+    - {code: PEOPLE-ROLE-YEARS-INVALID, severity: warning, file: people.yaml, key: bbrown, field: "earlier_roles[2].start_year", values: ["2022", "2021"]}
+    - {code: PEOPLE-ROLE-YEARS-INVALID, severity: warning, file: people.yaml, key: ccote, field: "earlier_roles[2].end_year", values: ["2025", "2024"]}
+  emits:
+    - person: aadams
+      expect:
+        earlier_roles:
+          - {role: postdoc, start_year: 2014, end_year: 2012, degree: null, thesis_title: null, co_advisor: null}
+    - person: bbrown
+      expect:
+        earlier_roles.*.role: [ms_student, intern_grad, intern_undergrad]
+        earlier_roles.*.start_year: [2019, 2018, 2022]
+    - person: ccote
+      expect:
+        earlier_roles.*.end_year: [null, 2016, 2025]
   kept: [ok-entry]
 
 projects.invalid_status:

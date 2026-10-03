@@ -27,6 +27,12 @@
   role: "phd_student"
   status: "current"
   start_year: 2022
+  earlier_roles:
+    - role: "ms_student"
+      start_year: 2020
+      end_year: 2022
+      degree: "MS"
+      thesis_title: "Tactile Sensing for Grasping in Clutter"
 
 - id: "ddavis"
   name: "Dave Davis"

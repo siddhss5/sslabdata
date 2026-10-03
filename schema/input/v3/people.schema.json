@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v3/schema/input/v3/people.schema.json",
+  "title": "sslabdata people file",
+  "description": "The file lab.yaml names as people_file: a list of lab members and alumni, one record each. It describes what sslabdata's loader accepts; the loader stays the authority, and reports each problem under a code in SPEC.md, Diagnostic codes. A record key not listed here is reported as RECORD-KEY-UNKNOWN and ignored, so it is allowed. What each field becomes in the document is in SPEC.md §5. Published input schemas are immutable: this one is served from the input-schema-v3 tag, which is created when this version ships and is never moved (SPEC.md §6).",
+  "type": ["array", "null"],
+  "items": { "$ref": "#/$defs/person" },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "pattern": "\\S" },
+    "optionalString": { "type": ["string", "null"] },
+    "optionalYear": { "type": ["integer", "null"] },
+    "role": {
+      "description": "Any non-empty string; there is no list of roles (PEOPLE-ROLE-INVALID).",
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "earlierRole": {
+      "description": "One role the person held in the lab before their current or last one. Each field means what the person's own field of the same name means, for that role, and is checked the same way. Only role is required (RECORD-TYPE-INVALID). status and current_position describe the person, not a role, and are read only on the person. The years are checked against each other and against the person's start_year (PEOPLE-ROLE-YEARS-INVALID), which a schema cannot see.",
+      "type": "object",
+      "required": ["role"],
+      "additionalProperties": true,
+      "properties": {
+        "role": { "$ref": "#/$defs/role" },
+        "start_year": { "$ref": "#/$defs/optionalYear" },
+        "end_year": { "$ref": "#/$defs/optionalYear" },
+        "degree": { "$ref": "#/$defs/optionalString" },
+        "thesis_title": { "$ref": "#/$defs/optionalString" },
+        "co_advisor": { "$ref": "#/$defs/optionalString" }
+      }
+    },
+    "person": {
+      "type": "object",
+      "required": ["id", "name", "role"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "The person's id, unique in the file (PEOPLE-ID-DUPLICATE).",
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "aliases": {
+          "description": "Other spellings of the name, used to match BibTeX authors and never emitted.",
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "role": {
+          "description": "The person's current role, or their last one in the lab for an alumnus.",
+          "$ref": "#/$defs/role"
+        },
+        "status": {
+          "description": "current when absent (PEOPLE-STATUS-INVALID).",
+          "enum": ["current", "alumni"]
+        },
+        "photo": { "$ref": "#/$defs/optionalString" },
+        "website": { "$ref": "#/$defs/optionalString" },
+        "email": { "$ref": "#/$defs/optionalString" },
+        "co_advisor": { "$ref": "#/$defs/optionalString" },
+        "start_year": { "$ref": "#/$defs/optionalYear" },
+        "end_year": { "$ref": "#/$defs/optionalYear" },
+        "degree": { "$ref": "#/$defs/optionalString" },
+        "thesis_title": { "$ref": "#/$defs/optionalString" },
+        "current_position": { "$ref": "#/$defs/optionalString" },
+        "bio": {
+          "description": "A short biography, as plain text: not Markdown or HTML. Line breaks are kept as written (SPEC.md §2).",
+          "$ref": "#/$defs/optionalString"
+        },
+        "earlier_roles": {
+          "description": "The roles the person held in the lab before the one the fields above describe, oldest first.",
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/earlierRole" }
+        }
+      }
+    }
+  }
+}

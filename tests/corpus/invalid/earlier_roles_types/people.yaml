@@ -1,0 +1,39 @@
+# CASE people.earlier_roles_type_invalid
+# `earlier_roles` that is not a list, and entries that are not records or
+# hold a field of the wrong type. Each is reported where it is; a field of the
+# wrong type is read as empty, and the entry is kept.
+
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"
+  earlier_roles: "postdoc"
+
+# CASE people.earlier_roles_role_missing
+# An entry that is not a record, one with no role and one whose role is not a
+# string: none can be emitted, since an earlier role is a role. The years
+# and the thesis written as text are read as empty, and their entry is kept.
+- id: "bbrown"
+  name: "Bob Brown"
+  role: "phd_student"
+  status: "current"
+  earlier_roles:
+    - "intern_grad"
+    - {start_year: 2019, end_year: 2020}
+    - {role: 5}
+    - {role: "intern_grad", start_year: "2019", end_year: 2020.5, thesis_title: 7}
+
+# CASE people.earlier_roles_role_empty
+# CASE people.earlier_roles_key_unknown
+# A role the person's own role would be warned about is warned about the same
+# way, and kept as written. `status` and `current_position` describe the
+# person, not a role, so in an entry they are unknown keys, as a misspelt key
+# is.
+- id: "ccote"
+  name: "Carol Cote"
+  role: "postdoc"
+  status: "current"
+  earlier_roles:
+    - {role: "  "}
+    - {role: "phd_student", status: "alumni", current_position: "Postdoc", advisr: "Peggy Park"}

@@ -27,14 +27,14 @@ VALID = CORPUS / "valid"
 INVALID = CORPUS / "invalid"
 EXPECTED = CORPUS / "expected"
 REPO_ROOT = TESTS_DIR.parent
-SCHEMA_PATH = REPO_ROOT / "schema" / "v7" / "output.schema.json"
+SCHEMA_PATH = REPO_ROOT / "schema" / "v8" / "output.schema.json"
 
-# The published schemas before v7. Each stays reachable byte for byte at its
-# own path, so a consumer pinned to v3, v4, v5 or v6 keeps a stable target
+# The published schemas before v8. Each stays reachable byte for byte at its
+# own path, so a consumer pinned to v3, v4, v5, v6 or v7 keeps a stable target
 # (SPEC.md section 6).
 PREVIOUS_SCHEMA_PATHS = {
     version: REPO_ROOT / "schema" / f"v{version}" / "output.schema.json"
-    for version in (3, 4, 5, 6)
+    for version in (3, 4, 5, 6, 7)
 }
 
 

@@ -6,10 +6,61 @@ described here and not there.
 
 Two version numbers move independently
 ([`SPEC.md` §6](SPEC.md#6-version-policy)): the document's `schema_version`,
-whose releases are the git tags `schema-v4`, `schema-v5` and `schema-v6`,
-with `schema-v7` to come, and the package version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
+whose releases are the git tags `schema-v4` to `schema-v7`, with
+`schema-v8` to come, and the package version, `sslabdata.__version__`. Entries are grouped by `schema_version`,
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
+
+## Package 6.0.0 (not yet released)
+
+It emits `schema_version` 8, whose one change is a person's earlier roles
+(see `schema_version` 8 below).
+
+**Upgrading from 5.0.0.** A consumer must accept `schema_version` 8 before it
+reads a document from this release: the person object is closed, so one that
+validates against schema v7 rejects every person, which now carries
+`earlier_roles`. Validate against `schema/v8/output.schema.json`, which the
+wheel installs as `sslabdata/schema/v8/output.schema.json` in place of v7;
+v7 stays at its tagged URL. A consumer that needs the v7 document pins
+package 5.0.0. No input file needs to change: a person without
+`earlier_roles` gets `earlier_roles: []`, and the person's own role fields
+mean what they meant. A consumer that lists people by role, such as a CV's
+table of postdocs or interns, should read `earlier_roles` too, or it keeps
+listing each person under their latest role only.
+
+- **A person's earlier roles.** `people.yaml` accepts `earlier_roles`, the
+  roles a person held in the lab before their current or last one, oldest
+  first, so a path such as undergraduate, PhD student, postdoc, faculty can
+  be written down. Each entry takes the six role-scoped fields a person has,
+  `role`, `start_year`, `end_year`, `degree`, `thesis_title` and
+  `co_advisor`, with the same types and meanings, checked by the same code;
+  only `role` is required. `status` and `current_position` stay on the
+  person. An entry is checked as the person's own fields are, and each
+  diagnostic is located at the person and the entry, such as
+  `people.yaml:<id>:earlier_roles[1].end_year`: a field of the wrong type is
+  `RECORD-TYPE-INVALID` and read as `null`; an entry that is not a mapping,
+  or whose `role` is missing or not a string, is `RECORD-TYPE-INVALID` and
+  left out; an empty `role` is `PEOPLE-ROLE-INVALID`; any other key,
+  `status` and `current_position` included, is `RECORD-KEY-UNKNOWN`. Its
+  strings have control characters removed and are put in NFC, as every input
+  string is. Where 5.0.0 reported `earlier_roles` as `RECORD-KEY-UNKNOWN`
+  and dropped it, it is now read (#218).
+- **New code `PEOPLE-ROLE-YEARS-INVALID`.** A warning, and an error under
+  `--strict`, for years that cannot be one history: an earlier role that
+  ends before it starts, one that starts before the one listed above it or
+  after the person's own `start_year`, and one that ends after the person's
+  own `start_year`. The years are emitted as written.
+- **Input schemas v3.** `schema/input/v3/` adds `earlier_roles` to
+  `people.schema.json`, each entry an `earlierRole` that requires `role`;
+  its other three files differ from v2's only in their `$id`s and
+  descriptions, which name the `input-schema-v3` tag. The wheel installs v3
+  under `sslabdata/schema/input/v3/` in place of v2, which stays at its
+  tagged URL and still accepts `earlier_roles`, because it allows keys it
+  does not list. The files `sslabdata init` writes name v3.
+- **Python API.** `EarlierRole` is public. `Person.earlier_roles` is a list
+  of them, declared last, so that a positional `Person(...)` binds its other
+  fields as before.
+- The demo gives Carol Côté an MS, with its thesis, before her PhD.
 
 ## Package 5.0.0 (tag `v5.0.0`, 2026-09-30)
 
@@ -208,6 +259,26 @@ differently:
 - **Python API.** The elements of `AssemblyResult.diagnostics` and
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
+
+## `schema_version` 8 (not yet released)
+
+One change, and nothing else in the document moves (#218):
+
+1. **A person carries `earlier_roles`.** It lists the roles the person held
+   in the lab before the one the person's own fields describe, oldest first,
+   and is `[]` when `people.yaml` gives none. Each entry is
+   `/$defs/earlierRole`, a closed object with six required keys: `role`, a
+   string, and `start_year`, `end_year`, `degree`, `thesis_title` and
+   `co_advisor`, each with the type of the person's field of that name and
+   `null` when the entry gives none. The person's own `role` and years still
+   describe the current or last role, and `status` and `current_position`
+   still describe the person.
+
+Adding a property to the closed person object is breaking
+([`SPEC.md` §6](SPEC.md#6-version-policy)), so a consumer validating against
+v7 rejects a v8 document. Works, projects and collaborators are unchanged. A
+consumer that needs the v7 document pins `schema_version` 7 and the schema at
+`schema/v7/output.schema.json`.
 
 ## `schema_version` 7 (tag `schema-v7`, 2026-09-30)
 

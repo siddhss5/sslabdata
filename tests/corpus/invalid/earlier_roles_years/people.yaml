@@ -1,0 +1,40 @@
+# CASE people.earlier_roles_years_invalid
+# Years that cannot be the history they describe. Each is a warning at the
+# entry and the year, and everything is emitted as written: sslabdata does
+# not guess which year is wrong.
+
+# CASE people.earlier_roles_end_before_start
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"
+  start_year: 2015
+  earlier_roles:
+    - {role: "postdoc", start_year: 2014, end_year: 2012}
+
+# CASE people.earlier_roles_out_of_order
+# The second entry starts before the first, and the third starts after the
+# role the person holds now.
+- id: "bbrown"
+  name: "Bob Brown"
+  role: "phd_student"
+  status: "current"
+  start_year: 2021
+  earlier_roles:
+    - {role: "ms_student", start_year: 2019, end_year: 2021}
+    - {role: "intern_grad", start_year: 2018, end_year: 2018}
+    - {role: "intern_undergrad", start_year: 2022}
+
+# CASE people.earlier_roles_overlap_current
+# An earlier role that ends after the current one starts. One that ends the
+# year it starts is in order, and so is one with no years at all.
+- id: "ccote"
+  name: "Carol Cote"
+  role: "faculty"
+  status: "current"
+  start_year: 2024
+  earlier_roles:
+    - {role: "intern_undergrad"}
+    - {role: "phd_student", start_year: 2016, end_year: 2016}
+    - {role: "postdoc", start_year: 2022, end_year: 2025}

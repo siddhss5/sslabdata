@@ -6,7 +6,7 @@ both under pytest's temporary directory. To keep and inspect them:
     pytest --no-cov --basetemp=/tmp/init-run tests/conformance/test_init.py
     ls -R /tmp/init-run/test_init_writes_a_lab_that_pa0/new-lab
 
-`new-lab/lab.json` is the document; it validates against schema v7, and each
+`new-lab/lab.json` is the document; it validates against schema v8, and each
 YAML file beside it against its input schema.
 """
 
@@ -54,7 +54,7 @@ def next_command(run, cwd):
 def test_init_writes_a_lab_that_passes_strict_validation(tmp_path):
     """Into a directory that does not exist yet: every file is written, the
     printed next command (`--validate --strict`) passes, `--output` writes a
-    document that matches schema v7, and each written YAML file matches its
+    document that matches schema v8, and each written YAML file matches its
     input schema."""
     run = run_sslabdata(["init", "new-lab"], tmp_path)
     assert run.code == 0 and run.crash is None, run.output

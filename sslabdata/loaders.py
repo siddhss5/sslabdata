@@ -16,7 +16,7 @@ from .config import (
     read_yaml, repeated_message,
 )
 from .diagnostics import Diagnostic, diagnostic
-from .models import Person, Project
+from .models import EarlierRole, Person, Project
 
 
 # One code per condition and file; the RECORD-* codes cover all three files
@@ -32,6 +32,7 @@ COLLABORATORS_NOT_A_LIST = "COLLABORATORS-NOT-A-LIST"
 COLLABORATORS_FIELD_MISSING = "COLLABORATORS-FIELD-MISSING"
 PEOPLE_ID_DUPLICATE = "PEOPLE-ID-DUPLICATE"
 PEOPLE_ROLE_INVALID = "PEOPLE-ROLE-INVALID"
+PEOPLE_ROLE_YEARS_INVALID = "PEOPLE-ROLE-YEARS-INVALID"
 PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
 PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
 PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
@@ -41,22 +42,29 @@ RECORD_TYPE_INVALID = "RECORD-TYPE-INVALID"
 
 # The keys each file's records are read for. Any other key is reported and
 # ignored, so a misspelt `webiste` is not silently dropped from the document.
-PERSON_KEYS = ("id", "name", "aliases", "role", "status", "photo", "website",
-               "email", "co_advisor", "start_year", "end_year", "degree",
-               "thesis_title", "current_position", "bio")
+# A role's keys are read on a person, for the current or last role, and on
+# each of its `earlier_roles`; `status` and `current_position` describe the
+# person and are read on the person alone (SPEC.md §5).
+ROLE_KEYS = ("role", "start_year", "end_year", "degree", "thesis_title",
+             "co_advisor")
+PERSON_KEYS = ("id", "name", "aliases", *ROLE_KEYS, "status", "photo",
+               "website", "email", "current_position", "bio", "earlier_roles")
 PROJECT_KEYS = ("id", "title", "description", "website", "image", "status")
 COLLABORATOR_KEYS = ("name", "aliases")
 
 # The type each optional field accepts; `role` and `status` have codes of
 # their own. A value of another type is read as empty, so it never reaches the
 # document as the wrong type.
-STRING, INTEGER, ALIASES = ("a string", "an integer",
-                            "a list of non-empty strings")
-PERSON_TYPES = {**dict.fromkeys(("photo", "website", "email", "co_advisor",
-                                 "degree", "thesis_title",
+STRING, INTEGER, ALIASES, ROLES = ("a string", "an integer",
+                                   "a list of non-empty strings",
+                                   "a list of earlier roles")
+ROLE_TYPES = {"start_year": INTEGER, "end_year": INTEGER,
+              **dict.fromkeys(("degree", "thesis_title", "co_advisor"),
+                              STRING)}
+PERSON_TYPES = {**ROLE_TYPES,
+                **dict.fromkeys(("photo", "website", "email",
                                  "current_position", "bio"), STRING),
-                "start_year": INTEGER, "end_year": INTEGER,
-                "aliases": ALIASES}
+                "aliases": ALIASES, "earlier_roles": ROLES}
 PROJECT_TYPES = dict.fromkeys(("description", "website", "image"), STRING)
 COLLABORATOR_TYPES = {"aliases": ALIASES}
 
@@ -71,8 +79,38 @@ def _has_type(value, expected: str) -> bool:
         return isinstance(value, str)
     if expected == INTEGER:
         return isinstance(value, int) and not isinstance(value, bool)
+    if expected == ROLES:
+        # Each entry is checked as a role is, by `_earlier_roles()`.
+        return isinstance(value, list)
     return isinstance(value, list) and all(
         isinstance(v, str) and v.strip() for v in value)
+
+
+def _check_fields(entry: dict, known, optional, report) -> None:
+    """Report each key of ``entry`` not in ``known`` and each optional field
+    whose value is not of the type ``optional`` gives it, reading that value
+    as empty. ``report(code, field, message)`` locates a diagnostic at the
+    record. A person, a project, a collaborator and an earlier role are each
+    checked by this one function."""
+    # A YAML key need not be a string (`0:`, `true:`); it is named as text so
+    # that every unknown key has a location, even a falsy one.
+    for key in entry:
+        if key not in known:
+            report(RECORD_KEY_UNKNOWN, str(key),
+                   f"'{key}' is not a key sslabdata reads, and is ignored")
+    for name, expected in optional.items():
+        if entry.get(name) is not None and not _has_type(entry[name],
+                                                         expected):
+            report(RECORD_TYPE_INVALID, name,
+                   f"{name} is {_kind(entry[name])}; it must be {expected}, "
+                   "and is read as empty")
+            entry[name] = None
+
+
+def _role_is_invalid(role) -> bool:
+    """Whether a role draws `PEOPLE-ROLE-INVALID`, on a person or an earlier
+    role: any non-empty string is a role (SPEC.md §5)."""
+    return not isinstance(role, str) or not role.strip()
 
 
 def _records(path: str, codes, required, known, optional,
@@ -168,23 +206,86 @@ def _records(path: str, codes, required, known, optional,
                 f"entry {number}'s {name} is {_kind(value)}; it must be a "
                 "string"))
             continue
-        # A YAML key need not be a string (`0:`, `true:`); it is named as
-        # text so that every unknown key has a location, even a falsy one.
-        for key in entry:
-            if key not in known:
-                diagnostics.append(diagnostic(
-                    RECORD_KEY_UNKNOWN, path, entry[required[0]], str(key),
-                    f"'{key}' is not a key sslabdata reads, and is ignored"))
-        for name, expected in optional.items():
-            if entry.get(name) is not None and not _has_type(entry[name],
-                                                             expected):
-                fail(diagnostic(
-                    RECORD_TYPE_INVALID, path, entry[required[0]], name,
-                    f"{name} is {_kind(entry[name])}; it must be {expected}, "
-                    "and is read as empty"))
-                entry[name] = None
+        _check_fields(entry, known, optional,
+                      lambda code, name, message, key=entry[required[0]]:
+                      fail(diagnostic(code, path, key, name, message)))
         records.append(entry)
     return records
+
+
+def _earlier_roles(entry: dict, path: str, warn) -> List[EarlierRole]:
+    """A person's `earlier_roles`, each entry checked as the person's own
+    role fields are, by the same functions, and located at the person and
+    the entry (`earlier_roles[1].end_year`). An entry that is not a record,
+    or whose role is not a string, cannot be emitted and is reported and left
+    out; any other problem is reported and the entry kept. Then the years
+    are checked as one history (`_check_role_years()`)."""
+    roles: List[EarlierRole] = []
+    places: List[int] = []
+    for index, item in enumerate(entry.get('earlier_roles') or []):
+        at = f"earlier_roles[{index}]"
+
+        def report(code, name, message, at=at):
+            warn(diagnostic(code, path, entry['id'], f"{at}.{name}",
+                            message))
+
+        if not isinstance(item, dict):
+            warn(diagnostic(RECORD_TYPE_INVALID, path, entry['id'], at,
+                            f"{at} is {_kind(item)}; it must be a record "
+                            "with a role, and is left out"))
+            continue
+        role = item.get('role')
+        if not isinstance(role, str):
+            report(RECORD_TYPE_INVALID, 'role',
+                   f"role is {_kind(role)}; an earlier role must have a role, "
+                   "a string, and this one is left out")
+            continue
+        _check_fields(item, ROLE_KEYS, ROLE_TYPES, report)
+        if _role_is_invalid(role):
+            report(PEOPLE_ROLE_INVALID, 'role',
+                   "role is empty; any non-empty string is accepted")
+        roles.append(EarlierRole(
+            role=role,
+            start_year=item.get('start_year'),
+            end_year=item.get('end_year'),
+            degree=item.get('degree'),
+            thesis_title=item.get('thesis_title'),
+            co_advisor=item.get('co_advisor'),
+        ))
+        places.append(index)
+    _check_role_years(roles, places, entry.get('start_year'),
+                      lambda index, name, message: warn(diagnostic(
+                          PEOPLE_ROLE_YEARS_INVALID, path, entry['id'],
+                          f"earlier_roles[{index}].{name}", message)))
+    return roles
+
+
+def _check_role_years(roles: List[EarlierRole], places: List[int],
+                      current_start, report) -> None:
+    """Report years that cannot be one history: an earlier role that ends
+    before it starts, one that starts before one listed above it or after the
+    current role, and one that ends after the current role starts. A year
+    that is absent is not compared. ``places`` holds each role's index in
+    the file, and ``report(index, field, message)`` locates a diagnostic."""
+    latest = None
+    for role, index in zip(roles, places):
+        start, end = role.start_year, role.end_year
+        if start is not None and end is not None and end < start:
+            report(index, 'end_year', f"ends in {end}, before it starts in "
+                   f"{start}")
+        if start is not None:
+            if latest is not None and start < latest:
+                report(index, 'start_year', f"starts in {start}, before an "
+                       "earlier role listed above it, which starts in "
+                       f"{latest}; earlier roles are listed oldest first")
+            elif current_start is not None and start > current_start:
+                report(index, 'start_year', f"starts in {start}, after the "
+                       f"current role, which starts in {current_start}")
+            latest = start if latest is None else max(latest, start)
+        if (end is not None and current_start is not None
+                and end > current_start):
+            report(index, 'end_year', f"ends in {end}, after the current "
+                   f"role starts in {current_start}")
 
 
 def _repeated_ids(records: List[dict], path: str, code: str, report) -> None:
@@ -210,7 +311,7 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
     _repeated_ids(records, path, PEOPLE_ID_DUPLICATE, diagnostics.append)
     for entry in records:
         role = entry.get('role')
-        if not isinstance(role, str) or not role.strip():
+        if _role_is_invalid(role):
             warn(diagnostic(PEOPLE_ROLE_INVALID, path, entry['id'], 'role',
                             "role is missing, empty or not a string; any "
                             "non-empty string is accepted"))
@@ -239,6 +340,7 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
             thesis_title=entry.get('thesis_title'),
             current_position=entry.get('current_position'),
             bio=entry.get('bio'),
+            earlier_roles=_earlier_roles(entry, path, warn),
         )
         people.append(person)
 

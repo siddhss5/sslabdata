@@ -1,7 +1,10 @@
 # CASE text.nfc_equivalent
-# The name and the bio are written decomposed: E + U+0301, e + U+0308.
+# The name, the bio and an earlier role's thesis are written decomposed:
+# E + U+0301, e + U+0308.
 - id: "enoel"
   name: "Émile Noël"
   role: "professor"
   status: "current"
   bio: "Émile Noël is fictional.\nHe likes crème brûlée."
+  earlier_roles:
+    - {role: "phd_student", thesis_title: "Décor Théorie"}

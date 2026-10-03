@@ -760,9 +760,9 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 7),
+    case("output.schema_version", "", "", "", "schema_version", 8),
     case("output.generator", "", "", "", "generator.name", "sslabdata"),
-    case("output.generator", "", "", "", "generator.schema_version", 7),
+    case("output.generator", "", "", "", "generator.schema_version", 8),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.work.bib_id", "works", "bib_id", "type-article", "bib_id",
          "type-article"),
@@ -869,6 +869,22 @@ OUTPUT_FIELDS = [
          "Dave Davis is fictional.\nHe has two lines."),
     case("people.bio_empty", "people", "id", "ffischer", "bio", ""),
     case("people.bio_empty", "people", "id", "ggreen", "bio", "   "),
+    # Oldest first, every role-scoped key on each entry, null where the
+    # entry gives none; the current role stays on the person.
+    case("output.person.earlier_roles", "people", "id", "nquist", "earlier_roles",
+         [{"role": "undergrad", "start_year": 2009, "end_year": 2012,
+           "degree": "BS", "thesis_title": "A Fictional Gripper Made of Folded Paper",
+           "co_advisor": None},
+          {"role": "phd_student", "start_year": 2012, "end_year": 2018,
+           "degree": "PhD", "thesis_title": "Fictional Methods for Grasping in Clutter",
+           "co_advisor": "Peggy Park"},
+          {"role": "postdoc", "start_year": 2018, "end_year": 2021,
+           "degree": None, "thesis_title": None, "co_advisor": None}]),
+    # Absent is the empty list, never null.
+    case("output.person.earlier_roles", "people", "id", "aadams", "earlier_roles", []),
+    case("people.earlier_roles_chain", "people", "id", "nquist", "role", "faculty"),
+    case("people.earlier_roles_chain", "people", "id", "nquist", "start_year", 2021),
+    case("people.earlier_roles_chain", "people", "id", "nquist", "degree", None),
     case("output.person.work_ids", "people", "id", "ccote", "work_ids",
          ["proj-multiple", "name-accent-tex", "name-accent-utf8", "name-equal-dollar",
           "name-equal-caret", "name-equal-superscript", "name-equal-star",

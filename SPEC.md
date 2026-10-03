@@ -7,7 +7,7 @@ them.
 This file states the parts of that contract a JSON Schema cannot express:
 what the strings in the document are, what order the lists are in, what an
 absent key means, which fields are computed, when the version changes, and
-how a repeated `@string` macro resolves. `schema/v7/output.schema.json`
+how a repeated `@string` macro resolves. `schema/v8/output.schema.json`
 states the rest.
 
 Everything here is normative unless it carries a `Target` note. A `Target`
@@ -16,8 +16,8 @@ names the issue that will make it true. Until that issue lands, the rule is
 the intent and the note is the fact. What changed at each release, and what
 it replaced, is in [`CHANGELOG.md`](CHANGELOG.md), not here.
 
-- Applies to: `schema_version` 7 (`sslabdata.models.SCHEMA_VERSION`), package
-  version 5.0.0 (`sslabdata.__version__`).
+- Applies to: `schema_version` 8 (`sslabdata.models.SCHEMA_VERSION`), package
+  version 6.0.0 (`sslabdata.__version__`).
 
 ### How this file cites the code
 
@@ -25,7 +25,7 @@ Every rule below is grounded in a named part of the code rather than a line
 number, because line numbers rot silently: a function such as
 `sslabdata.parsers.bibtex.parse_all_works()`, a method such as
 `Person.to_dict()`, a module-level constant such as `TEXT_FIELDS`, a JSON
-Pointer into `schema/v7/output.schema.json` such as `/$defs/person/required`, or
+Pointer into `schema/v8/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
 statement is cited by its enclosing function.
 
@@ -191,7 +191,10 @@ without depending on English wording. Codes obey three rules:
    the top-level key and `<field>` the key under it, or, deeper in `lab`, the
    keys down to the value joined by `.` with a list member's index in
    brackets (`lab.yaml:lab:links.scores[1]`); for a people or projects
-   file, `<key>` is the record's `id`.
+   file, `<key>` is the record's `id`, and `<field>` the key in it, or the
+   path below it written the same way, counting from `0`
+   (`people.yaml:nquist:earlier_roles[1].end_year`, the second earlier
+   role's `end_year`).
 2. **Severity is not part of the code.** A code says *what was found*, never
    how badly the run took it. Severity belongs to the condition and the mode
    together, and four classes are in use:
@@ -201,7 +204,7 @@ without depending on English wording. Codes obey three rules:
    | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-BIB-FILE-OUTSIDE-BIB-DIR`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-VALUE-NOT-JSON`, `CONFIG-KEY-REPEATED`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `CONFIG-PATH-WRONG-KIND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING`, `RECORD-KEY-REPEATED`, `OUTPUT-WRITE-FAILED`, `INIT-FILE-EXISTS`, `INIT-PATH-WRONG-KIND`, `INIT-PATH-OUTSIDE-DIR`, `INIT-WRITE-FAILED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-AWARD-EMPTY`, `BIB-AWARD-YEAR-MALFORMED`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-BRACE-MISMATCH`, `BIB-COMMENTED-COMMAND-READ`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `LINK-SCHEME-UNSUPPORTED`, `TEXT-CONTROL-CHARACTER`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-DOI-INVALID`, `BIB-AWARD-EMPTY`, `BIB-AWARD-YEAR-MALFORMED`, `BIB-OTHERS-NOT-LAST`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-BRACE-MISMATCH`, `BIB-COMMENTED-COMMAND-READ`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-ROLE-YEARS-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `RECORD-KEY-UNKNOWN`, `RECORD-TYPE-INVALID`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `LINK-SCHEME-UNSUPPORTED`, `TEXT-CONTROL-CHARACTER`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
@@ -269,13 +272,14 @@ Codes in use:
 | `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING` | The same three conditions for `collaborators_file`. A collaborator needs a `name`, a non-empty string, and a missing one is located at `<collaborators_file>::name`. Fatal. |
 | `BIB-ENCODING-INVALID` | A `.bib` file is not UTF-8. Located at the file alone; the prose names the first byte that cannot be read and its line. No other encoding is tried, because a wrong guess would silently change names. Fatal: the file's works are not read. |
 | `PEOPLE-ID-DUPLICATE` | Two people declare one `id`. Located at the second. Both are kept, as a repeated citation key is. A validation error. |
-| `PEOPLE-ROLE-INVALID` | A person's `role` is missing, empty or not a string. Located at `<people_file>:<id>:role`. A role that is not a string is emitted as `null`. A role is otherwise open: any non-empty string is accepted, so no list of roles is checked. A warning. |
+| `PEOPLE-ROLE-INVALID` | A person's `role` is missing, empty or not a string, or an earlier role's `role` is empty or whitespace alone. Located at `<people_file>:<id>:role`, or at `<people_file>:<id>:earlier_roles[<n>].role`. A person's role that is not a string is emitted as `null`; an empty one, the person's or an earlier role's, is emitted as written. (An earlier role whose `role` is missing or not a string is `RECORD-TYPE-INVALID`.) A role is otherwise open: any non-empty string is accepted, so no list of roles is checked (`sslabdata.loaders._role_is_invalid()`). A warning. |
+| `PEOPLE-ROLE-YEARS-INVALID` | A person's `earlier_roles` hold years that cannot be one history (`sslabdata.loaders._check_role_years()`): an earlier role whose `end_year` is before its `start_year`; one whose `start_year` is before that of an earlier role listed above it, since the list is oldest first, or after the person's own `start_year`; or one whose `end_year` is after the person's own `start_year`. A year equal to the one it is compared with is in order, so a role may end the year the next one starts. A year that is absent, or read as empty under `RECORD-TYPE-INVALID`, is not compared. Located at `<people_file>:<id>:earlier_roles[<n>].start_year` or `.end_year`, the year found out of place, naming both years. Every year is emitted as written: sslabdata does not guess which one is wrong. A warning; an error under `--strict`. |
 | `PEOPLE-STATUS-INVALID` | A person's `status` is present and is not `current` or `alumni`. Located at `<people_file>:<id>:status`, naming the value. A missing status reads as `current`, and so does one that is not a string. A warning. |
 | `PEOPLE-ALIAS-AMBIGUOUS` | One spelling, compared through `normalize_name()`, is declared as a name or alias by more than one person, so a name written that way fits all of them and resolves to none. Located at the second person to declare it, under `name` or `aliases`, naming every person who does. A warning, as the `RESOLVE-AMBIGUOUS-NAME` it leads to is. |
 | `PROJECTS-ID-DUPLICATE` | Two projects declare one `id`. Located at the second. Both are kept. A validation error. |
 | `PROJECTS-STATUS-INVALID` | A project's `status` is present and is not `active` or `completed`. A missing status reads as `active`, and so does one that is not a string. A warning. |
-| `RECORD-KEY-UNKNOWN` | A person, project or collaborator record holds a key sslabdata does not read (`sslabdata.loaders.PERSON_KEYS`, `PROJECT_KEYS`, `COLLABORATOR_KEYS`), such as `hobby` or a misspelt `webiste`. One code for all three files. Located at `<people_file>:<id>:<key>`, `<projects_file>:<id>:<key>` or `<collaborators_file>:<collaborator name>:<key>`, once per key. The key is ignored and never emitted; the record is kept. Only a record that is loaded is checked, so a record missing a required field reports that alone. A warning. |
-| `RECORD-TYPE-INVALID` | An optional field of a person, project or collaborator record has a value of the wrong type, other than the `role` and `status` that have codes of their own. A person's `photo`, `website`, `email`, `co_advisor`, `degree`, `thesis_title`, `current_position` and `bio`, and a project's `description`, `website` and `image`, are strings; a person's `start_year` and `end_year` are integers, not booleans; a person's or collaborator's `aliases` is a list of non-empty strings. One code for all three files, located at `<file>:<id>:<field>` (a collaborator's name for its id). The value is read as empty, so it is emitted as `null`, and a wrong `aliases` declares none; the record is kept. Only a record that is loaded is checked. A warning. |
+| `RECORD-KEY-UNKNOWN` | A person, project or collaborator record holds a key sslabdata does not read (`sslabdata.loaders.PERSON_KEYS`, `PROJECT_KEYS`, `COLLABORATOR_KEYS`), such as `hobby` or a misspelt `webiste`, or an entry of a person's `earlier_roles` holds a key other than the six a role has (`sslabdata.loaders.ROLE_KEYS`), which includes the person's `status` and `current_position`. One code for all three files. Located at `<people_file>:<id>:<key>`, `<people_file>:<id>:earlier_roles[<n>].<key>`, `<projects_file>:<id>:<key>` or `<collaborators_file>:<collaborator name>:<key>`, once per key. The key is ignored and never emitted; the record or entry is kept. Only a record or entry that is loaded is checked, so one missing a required field reports that alone. A warning. |
+| `RECORD-TYPE-INVALID` | An optional field of a person, project or collaborator record has a value of the wrong type, other than the `role` and `status` that have codes of their own. A person's `photo`, `website`, `email`, `co_advisor`, `degree`, `thesis_title`, `current_position` and `bio`, and a project's `description`, `website` and `image`, are strings; a person's `start_year` and `end_year` are integers, not booleans; a person's or collaborator's `aliases` is a list of non-empty strings; a person's `earlier_roles` is a list. One code for all three files, located at `<file>:<id>:<field>` (a collaborator's name for its id). The value is read as empty, so it is emitted as `null`, a wrong `aliases` declares none and a wrong `earlier_roles` is `[]`; the record is kept. Only a record that is loaded is checked. An entry of `earlier_roles` is checked by the same function as the person's own fields (`sslabdata.loaders._check_fields()`), with the same types, and located at `<people_file>:<id>:earlier_roles[<n>].<field>`: a field of the wrong type is read as empty and the entry kept. An entry that is not a mapping (`earlier_roles[<n>]`), or whose `role` is missing or not a string (`earlier_roles[<n>].role`), is this code too, and is left out of the document, since an earlier role is a role. A warning. |
 | `RECORD-KEY-REPEATED` | A key is given twice in one mapping of a people, projects or collaborators file, which YAML alone would read as its last value, silently dropping the first. Every YAML file sslabdata reads is read with one loader that finds these (`sslabdata.config.YAMLLoader`). Keys are compared as YAML reads them, so `1` and `0x1` are one key. A merge key (`<<`) is not a repeat: the keys it merges in are overridden by the mapping's own, as YAML merge keys are defined. One code for all three files. Located at `<file>:<id>:<key>` (a collaborator's name for its id), with the path below the record's top level joined by `.` and a list member's index in brackets; the record is named by nothing when the repeated key is its `id` (a collaborator's `name`), and a repeat outside any record is located at `<file>::<path>`. The prose names the key and both lines. Every repeat is reported; the record is not loaded, and the run is fatal, as for a missing field: which value was meant is not sslabdata's to guess. |
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
@@ -288,7 +292,7 @@ Codes in use:
 | `CONFIG-PATH-WRONG-KIND` | A path the configuration names is there but is the wrong kind: a `bib_files` entry, `people_file`, `projects_file` or `collaborators_file` that is a directory or anything else that is not a regular file, or a `bib_dir` that is not a directory. Located as `CONFIG-FILE-NOT-FOUND` is, and checked by the same helper (`sslabdata.assembler.path_problem()`); the prose names the path and says what it is (`'shelf' is a directory, not a file`). Its own code, because the path exists and "not found" would send the user looking for a typo. Fatal, as a missing file is. |
 | `BIB-PARSER-MESSAGE` | The BibTeX parser library raised a message that is neither a syntax error nor an undefined macro — a field repeated within one entry, or a name list it cannot split. The prose is the **library's own wording**, kept as it phrased it. Located at the file, and at the entry key when the library raised it while reading one; the field is left empty. The entry is kept as the library read it. A warning. |
 | `LATEX-CONVERSION-FAILED` | A text field or a name part whose LaTeX the converter could not read at all, or whose conversion left one of the converter's own markers behind — a command that read part of a set-aside URL as its argument, such as an accent written before `\url{…}` (`sslabdata.parsers.latex.latex_to_text()`). Its text is kept as written, with the braces taken off, so it may still hold LaTeX (§2, *Two degraded cases*). Located at the entry and field. A warning. |
-| `TEXT-CONTROL-CHARACTER` | A value read from the input holds a control character (§2, *No string read from the input carries a control character*): a `.bib` field value, located at `<file>:<key>:<field>`, or a YAML scalar, key or value, located as `RECORD-KEY-REPEATED` locates a key in a people, projects or collaborators file and as `CONFIG-KEY-REPEATED` locates one in `lab.yaml`. One line per value, naming each character as `U+XXXX`. The characters are removed and the rest of the value is kept. A warning. |
+| `TEXT-CONTROL-CHARACTER` | A value read from the input holds a control character (§2, *No string read from the input carries a control character*): a `.bib` field value, located at `<file>:<key>:<field>`, or a YAML scalar, key or value, located as `RECORD-KEY-REPEATED` locates a key in a people, projects or collaborators file (`people.yaml:<id>:earlier_roles[0].thesis_title` inside an earlier role) and as `CONFIG-KEY-REPEATED` locates one in `lab.yaml`. One line per value, naming each character as `U+XXXX`. The characters are removed and the rest of the value is kept. A warning. |
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
 | `OUTPUT-WRITE-FAILED` | `--output` names a destination the operating system will not let sslabdata write: a directory, a path under a file, a directory without write permission, a full disk. Located at the `--output` path alone; the prose is the operating system's reason, naming the path it refused when that is not the destination's own directory. Unprefixed on standard error, with no `Wrote …` line. The write is atomic, so a file already at the path is as it was and no temporary file is left behind. Only `--output` writes the document, so no other mode reports it; `init` reports its own writes as `INIT-WRITE-FAILED`. Fatal. |
 | `INIT-FILE-EXISTS` | `sslabdata init` found a file already at a path it writes, and `--force` was not given. Located at that path alone, one line per file. Nothing is written. Fatal. |
@@ -361,8 +365,8 @@ What each mode puts in the array:
 
 **The Python API is convenience only.** Public: the names in `sslabdata.__all__`
 — `assemble`, `AssemblyResult`, `AssemblyError`, the models `LabData`,
-`Work`, `Award`, `Author`, `Contributor`, `Venue`, `Link`, `Person`, `Project`,
-`Collaborator`, the config loader `LabDataConfig` with `BibFile`, and the exporters
+`Work`, `Award`, `Author`, `Contributor`, `Venue`, `Link`, `Person`,
+`EarlierRole`, `Project`, `Collaborator`, the config loader `LabDataConfig` with `BibFile`, and the exporters
 `export_to_yaml` and `export_to_json`, and the exception
 `ConfigurationError`.
 
@@ -542,7 +546,8 @@ converts nor checks them:
   `sslabdata.loaders.load_people()` and `load_projects()` perform no conversion
   of any kind — they check the types of a record's fields, a person's `role` and that a
   `status` is one they know, but emit every string as written — so a person's `name`, `role`, `current_position`,
-  `thesis_title` or `bio`, and a project's `title` or `description`, are copied
+  `thesis_title` or `bio`, the same strings of each of a person's
+  `earlier_roles`, and a project's `title` or `description`, are copied
   straight from `people.yaml` and `projects.yaml`. Not every YAML string is
   emitted — `aliases` and the configuration paths are not; see heading 3.
   "As written" is the string YAML reads, after control characters are
@@ -675,6 +680,7 @@ accident.
 | `work.project_ids` | The order the `project` field wrote them, comma-separated, whitespace trimmed, empty entries dropped (`sslabdata.parsers.bibtex.parse_project_ids()`). |
 | `people` | The order of `people_file`. sslabdata does not sort people (`sslabdata.loaders.load_people()`, called by `sslabdata.assembler.assemble()`). |
 | `projects` | The order of `projects_file`, likewise (`sslabdata.loaders.load_projects()`). |
+| `person.earlier_roles` | The order of the person's `earlier_roles` in `people_file`, which is oldest first. sslabdata does not sort them; one out of order by `start_year` is reported as `PEOPLE-ROLE-YEARS-INVALID` and kept where it was written (`sslabdata.loaders._earlier_roles()`). |
 | `person.work_ids` | The order of the `works` list, filtered to that person's authorships, first occurrence only (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and do not appear. |
 | `project.work_ids` | The order of the `works` list, filtered to that project, first occurrence only (`compute_backlinks()`). |
 | `project.people_ids` | Person id **ascending**, by Unicode code point (`compute_backlinks()` sorts the set it collects). |
@@ -755,18 +761,20 @@ Two consequences worth stating outright:
   authorship then carries a `collaborator_key` instead, and exactly one of
   the two is non-null.
 - An empty list is `[]`, never `null` and never absent. `project.people_ids`
-  for a project with no works is `[]`, and `work.editors` is `[]` for an
-  entry that names no editor.
+  for a project with no works is `[]`, `work.editors` is `[]` for an
+  entry that names no editor, and `person.earlier_roles` is `[]` for a
+  person whose record gives none.
 
 This rule is satisfied by `Author.to_dict()`, `Contributor.to_dict()`,
-`Work.to_dict()`, `Person.to_dict()`, `Project.to_dict()` and
-`Collaborator.to_dict()`, each of which emits every declared key
+`Work.to_dict()`, `Person.to_dict()`, `EarlierRole.to_dict()`,
+`Project.to_dict()` and `Collaborator.to_dict()`, each of which emits every
+declared key
 unconditionally, and by `LabData.to_dict()`, which always emits `lab`.
 
 **Where "absent" cannot happen at all.** The schema defines the document
 itself and each entity type as **closed**: `/additionalProperties` and each
 of `/$defs/authorship`, `/$defs/editorship`, `/$defs/work`, `/$defs/person`,
-`/$defs/project`, `/$defs/collaborator`, `/$defs/venue`, `/$defs/link`,
+`/$defs/earlierRole`, `/$defs/project`, `/$defs/collaborator`, `/$defs/venue`, `/$defs/link`,
 `/$defs/resolution`, `/$defs/award`, and the `source` and `generator` objects, set
 `additionalProperties: false`. Within those, a property that is not declared
 cannot appear, and "absent" always means a declared property with no value.
@@ -815,12 +823,71 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `author.resolution` | **Derived** — `status` over `resolved`, `unresolved` and `ambiguous`, and `method` `exact`, or `null` when nothing matched (`resolve_authors()`). Both are open strings; `fuzzy` is never emitted. |
 | `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`sslabdata.parsers.bibtex.marks_equal_contribution()`). |
 | `work.editors[*]` | The same, minus `collaborator_key` and `equal_contribution`. An editor that matched nobody is simply `person_id: null` (`parse_editor_list()`). |
-| `person.*` except the two below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). `bio` is a short biography in plain text with its line breaks as written (§2), and `null` when absent; it is carried and never read: nothing in the document is derived from it, and no `degree`, year or `current_position` is read out of one. |
+| `person.*` except the three below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). `bio` is a short biography in plain text with its line breaks as written (§2), and `null` when absent; it is carried and never read: nothing in the document is derived from it, and no `degree`, year or `current_position` is read out of one. |
+| `person.earlier_roles` | Input — the person's `earlier_roles` in `people_file`: the roles they held in the lab before the one the person's own fields describe, oldest first, `[]` when there are none (`sslabdata.loaders._earlier_roles()`). Each is `/$defs/earlierRole`: the six role-scoped fields below, each emitted, and `null` when the entry gives none, except `role`, which every entry has. |
 | `person.work_ids` | **Derived** — back-links over authorships (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and are not listed. |
 | `project.id`, `title`, `description`, `website`, `image`, `status` | Input — the fields of `projects_file` (`sslabdata.loaders.load_projects()`). `status` is one of `active` and `completed`, and `active` when absent (`PROJECTS-STATUS-INVALID`). `image` is a URL or a site path, the same kind of value as a person's `photo`, carried as plain text: deciding which URLs are safe to render is the renderer's job. |
 | `project.work_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
 | `collaborators` | **Derived, entirely** — see below (`sslabdata.assembler.group_collaborators()`). |
 | `derived` | Reserved for sslabdata; empty today. See below. |
+
+### A person's roles
+
+A person's fields are of two kinds. **Role-scoped** fields describe one role
+the person held in the lab: `role`, `start_year`, `end_year`, `degree`,
+`thesis_title` and `co_advisor` (`sslabdata.loaders.ROLE_KEYS`).
+**Person-scoped** fields describe the person: `id`, `name`, `aliases`,
+`status`, `photo`, `website`, `email`, `current_position` and `bio`.
+
+The role-scoped fields on the person describe the **current role**, or for an
+alumnus the **last** one they held in the lab. Each entry of
+`earlier_roles` is a role held before it, with the same six fields, of the
+same types and meanings, checked by the same functions
+(`sslabdata.loaders._check_fields()`, `_role_is_invalid()`); only `role` is
+required. So a path such as undergraduate, PhD student, postdoc, faculty is
+written as the faculty role on the person and the other three, oldest first,
+under `earlier_roles`, and a degree and a thesis finished in an earlier role
+stay with it. A record that writes no `earlier_roles` means what it meant
+before they existed.
+
+The years of the two relate as one history: each earlier role's
+`start_year` is no later than the next one's, and no earlier role starts or
+ends after the person's own `start_year`. A role may end the year the next
+one starts. A year that breaks this is reported as
+`PEOPLE-ROLE-YEARS-INVALID` and emitted as written. Overlaps between two
+earlier roles are not checked, and neither is the person's own `end_year`
+against their `start_year`.
+
+`status` and `current_position` are person-level and are never read from an
+earlier role, where they are unknown keys (`RECORD-KEY-UNKNOWN`): `status`
+says whether the person is in the lab now, whatever role they hold, and
+`current_position` says where they went after it. A postdoc who stays on as
+faculty is `status: current` with `role: faculty`, and the postdoc is an
+earlier role; nothing about it is alumni.
+
+**Listing people by role.** A renderer that lists people under each role —
+a CV's table of postdocs or of interns, a page of alumni by degree — reads
+both kinds of role, so that a person appears under every role they held,
+with that role's years:
+
+```python
+def held(person, role):
+    """Each time ``person`` held ``role``, as a dict of the six
+    role-scoped fields, oldest first; the current or last role is last."""
+    current = {key: person[key] for key in
+               ("role", "start_year", "end_year", "degree",
+                "thesis_title", "co_advisor")}
+    return [r for r in [*person["earlier_roles"], current]
+            if r["role"] == role]
+
+postdocs = [(person["name"], r["start_year"], r["end_year"])
+            for person in document["people"]
+            for r in held(person, "postdoc")]
+```
+
+Whether a person who held a role belongs under it on a page about the people
+in the lab *now* is the renderer's choice, made from `status`, which is
+the person's and not the role's.
 
 ### How a name is matched
 
@@ -1131,13 +1198,14 @@ has been published is never edited. Version `N`'s schema stays reachable, byte
 for byte, at its own path after version `N+1` ships, so a consumer pinned to
 `N` keeps a stable target. `schema/v3/output.schema.json`,
 `schema/v4/output.schema.json`, `schema/v5/output.schema.json`,
-`schema/v6/output.schema.json` and `schema/v7/output.schema.json` are those
-paths, and `tests/COVERAGE.md` row `output.versioned_schema` asserts that the
-older four are unchanged byte for byte and still say `3`, `4`, `5` and `6`.
+`schema/v6/output.schema.json`, `schema/v7/output.schema.json` and
+`schema/v8/output.schema.json` are those paths, and `tests/COVERAGE.md` row
+`output.versioned_schema` asserts that the older five are unchanged byte for
+byte and still say `3`, `4`, `5`, `6` and `7`.
 
-**The `$id` is a pinned tag URL.** v7's `$id` is
-`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v7/schema/v7/output.schema.json`.
-The rule that makes it a contract rather than a guess: **the `schema-v7` tag
+**The `$id` is a pinned tag URL.** v8's `$id` is
+`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v8/schema/v8/output.schema.json`.
+The rule that makes it a contract rather than a guess: **the `schema-v8` tag
 is created when this version ships and is never moved.** A branch URL such as
 `blob/main` is not usable — it serves an HTML page rather than the schema, so
 no consumer can ever have resolved v3's `$id` — and this repository publishes
@@ -1153,10 +1221,10 @@ descriptions inside those files, name the repository `labdata`, and the files
 are left byte for byte as published rather than rewritten. v4's raw `$id`
 resolves, because GitHub redirects `labdata` to `sslabdata`. v3's `blob/main`
 `$id` does not resolve, as above. The `$id`s, titles and descriptions of v5,
-v6 and v7 say `sslabdata`.
+v6, v7 and v8 say `sslabdata`.
 
 **The input schemas are versioned apart from the document.**
-`schema/input/v2/` holds a JSON Schema for each input file: `lab.schema.json`,
+`schema/input/v3/` holds a JSON Schema for each input file: `lab.schema.json`,
 `people.schema.json`, `projects.schema.json` and `collaborators.schema.json`.
 They describe what the loaders accept; the loaders stay the authority, and
 the diagnostic codes above report what a schema cannot see. The input format
@@ -1164,13 +1232,16 @@ and the document change for different reasons, so the input schemas carry
 their own version rather than `schema_version`. They follow the same rules:
 a published input schema is never edited, any change to one is a new
 version at a new path, and its `$id` is a pinned tag URL,
-`https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/<file>.schema.json`,
-whose `input-schema-v2` tag is created when this version ships and is never
+`https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v3/schema/input/v3/<file>.schema.json`,
+whose `input-schema-v3` tag is created when this version ships and is never
 moved. A version holds all four files, so a change to one of them versions
-the set: v2 adds a person's `bio` to `people.schema.json`, and its other three
-files differ from v1's only in the tag their `$id`s and descriptions name. `schema/input/v1/`, served
-from the `input-schema-v1` tag, stays byte for byte as published; the wheel
-installs only the current version.
+the set: v3 adds a person's `earlier_roles` to `people.schema.json`, each
+entry an `earlierRole` whose `role` is required and whose other five fields
+share the person's own definitions, and its other three files differ from
+v2's only in the tag their `$id`s and descriptions name. v2 added a person's
+`bio`. `schema/input/v1/` and `schema/input/v2/`, served from the
+`input-schema-v1` and `input-schema-v2` tags, stay byte for byte as
+published; the wheel installs only the current version.
 
 **Version history.** What each `schema_version` changed is in
 [`CHANGELOG.md`](CHANGELOG.md).
@@ -1288,6 +1359,17 @@ structured field into text that will drift from it. A bio passes both; an
 alumni line such as "PhD 2012, now at Example Robotics" fails the second,
 because `degree`, `end_year` and `current_position` already hold it.
 
+A person's `earlier_roles` passes both too, and is still an attribute, not an
+entity: its entries have no ids, are referenced by nothing and belong to one
+person, and each is the same six role-scoped fields the person already
+carries (*A person's roles*, §5). Unlike `bio`, sslabdata does more than
+carry it: it checks each entry as it checks the person's own role, and the
+years as one history. That is checking an attribute, not admitting an
+entity. The alternative, a second record for the same person, is not one:
+it declares the same name and aliases twice, so every authorship of theirs
+becomes `RESOLVE-AMBIGUOUS-NAME`. A record per role, linked to a person,
+would be an entity, and was considered and not adopted.
+
 **There is no generic extension mechanism and no `collections` escape hatch.**
 What one would carry is mostly prose, and its one real service — catching
 references that point at nothing — is delivered by #58 without the document
@@ -1299,7 +1381,7 @@ vocabularies, not over arbitrary content.
 
 ## 9. What this file is not
 
-It does not list the document's fields; `schema/v7/output.schema.json` does.
+It does not list the document's fields; `schema/v8/output.schema.json` does.
 It does not describe renderers such as
 [sslabdata-site](https://github.com/siddhss5/sslabdata-site), which are
 downstream consumers in their own repositories. It does not describe the input formats `lab.yaml`,

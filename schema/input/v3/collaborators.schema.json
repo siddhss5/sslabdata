@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v3/schema/input/v3/collaborators.schema.json",
+  "title": "sslabdata collaborators file",
+  "description": "The file lab.yaml names as collaborators_file: co-authors outside the lab whose spellings are grouped together, one record each. A record never makes anyone a lab member. It describes what sslabdata's loader accepts; the loader stays the authority, and reports each problem under a code in SPEC.md, Diagnostic codes. A record key not listed here is reported as RECORD-KEY-UNKNOWN and ignored, so it is allowed. Published input schemas are immutable: this one is served from the input-schema-v3 tag, which is created when this version ships and is never moved (SPEC.md §6).",
+  "type": ["array", "null"],
+  "items": { "$ref": "#/$defs/collaborator" },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "pattern": "\\S" },
+    "collaborator": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "aliases": {
+          "description": "Other spellings of the name, grouped with it.",
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      }
+    }
+  }
+}
