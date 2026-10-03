@@ -11,7 +11,7 @@ whose releases are the git tags `schema-v4` to `schema-v7`, with
 newest first, and the package release that ships them comes before all of
 them. Numbers such as #101 are issue or pull request numbers in this repository.
 
-## Package 6.0.0 (not yet released)
+## Package 6.0.0 (tag `v6.0.0`, 2026-10-03)
 
 It emits `schema_version` 8, whose one change is a person's earlier roles
 (see `schema_version` 8 below).
@@ -260,7 +260,7 @@ differently:
   `AssemblyError.diagnostics` are `Diagnostic` dataclasses, not strings (see
   below).
 
-## `schema_version` 8 (not yet released)
+## `schema_version` 8 (tag `schema-v8`, 2026-10-03)
 
 One change, and nothing else in the document moves (#218):
 
