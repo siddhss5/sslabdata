@@ -4,10 +4,10 @@
 # file says which they are and why the rest is left out. Regenerate with
 #   SSLABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 # and review the diff before committing.
-schema_version: 7
+schema_version: 8
 generator:
   name: sslabdata
-  schema_version: 7
+  schema_version: 8
 lab:
   name: Corpus Lab
   description: A fictional lab used only by the sslabdata conformance tests.
@@ -525,6 +525,7 @@ people:
   bio: |
     Carol Côté places objects in fictional kitchens.
     She writes <b>bold</b> and *stars* as text.
+  earlier_roles: []
   work_ids:
   - proj-multiple
   - name-accent-tex
@@ -549,6 +550,7 @@ people:
   thesis_title: Learning to Tidy
   current_position: Research Scientist, Example Robotics Inc.
   bio: null
+  earlier_roles: []
   work_ids:
   - type-phdthesis
   derived: {}
@@ -566,6 +568,7 @@ people:
   thesis_title: null
   current_position: null
   bio: null
+  earlier_roles: []
   work_ids:
   - name-equal-dollar
   - name-equal-caret

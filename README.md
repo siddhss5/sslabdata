@@ -24,11 +24,10 @@ sslabdata --config lab.yaml --output lab.yml
   order the lists are in, which fields are derived, when the version changes.
 - [`CHANGELOG.md`](https://github.com/siddhss5/sslabdata/blob/main/CHANGELOG.md) — what changed at each release, and what it
   replaced.
-- [`schema/v6/output.schema.json`](https://github.com/siddhss5/sslabdata/blob/main/schema/v6/output.schema.json) — the
+- [`schema/v8/output.schema.json`](https://github.com/siddhss5/sslabdata/blob/main/schema/v8/output.schema.json) — the
   document's JSON Schema. Published versions are immutable and live at their
-  own paths; [`schema/v3/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v3/output.schema.json),
-  [`schema/v4/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v4/output.schema.json) and
-  [`schema/v5/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v5/output.schema.json) are still there.
+  own paths; [`schema/v3/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v3/output.schema.json)
+  to [`schema/v7/`](https://github.com/siddhss5/sslabdata/blob/main/schema/v7/output.schema.json) are still there.
 - [`tests/COVERAGE.md`](https://github.com/siddhss5/sslabdata/blob/main/tests/COVERAGE.md) — every input case sslabdata
   supports, and every case it does not, with the fixture and test for each.
 
@@ -237,6 +236,55 @@ author names to people:
 `id` and `name` are required. `role` is any non-empty string, so any lab's
 roles fit; `status` is `current` (the default) or `alumni`.
 
+`role`, `start_year`, `end_year`, `degree`, `thesis_title` and `co_advisor`
+describe the person's current role, or their last one in the lab. A person
+who changed roles inside the lab lists the roles before it under
+`earlier_roles`, oldest first. Each entry takes any of those six fields,
+with the same meaning, and needs only `role`. A postdoc who stayed on as
+faculty, and an intern who came back for a PhD:
+
+```yaml
+- id: "kkline"
+  name: "Kara Kline"
+  role: "faculty"
+  status: "current"
+  start_year: 2024
+  earlier_roles:
+    - {role: "postdoc", start_year: 2022, end_year: 2024}
+
+- id: "lmoreau"
+  name: "Leo Moreau"
+  role: "phd_student"
+  status: "current"
+  start_year: 2023
+  earlier_roles:
+    - {role: "intern_grad", start_year: 2022, end_year: 2022}
+```
+
+A degree and a thesis finished in an earlier role stay with it, so an MS
+student who went on to a PhD keeps the MS thesis:
+
+```yaml
+  earlier_roles:
+    - role: "ms_student"
+      start_year: 2020
+      end_year: 2022
+      degree: "MS"
+      thesis_title: "Tactile Sensing for Grasping in Clutter"
+```
+
+`status` and `current_position` describe the person, not a role, and are
+written only on the person: Kara is `current` because she is in the lab now.
+In the document every person has `earlier_roles`, `[]` when there are none,
+and each entry carries all six fields, `null` where it gives none. An entry
+is checked like the person's own fields; years that cannot be one history,
+such as a role that ends before it starts, an entry listed out of order, or
+one that ends after the current role starts, are reported as
+`PEOPLE-ROLE-YEARS-INVALID`. A renderer that lists people by role, such as a
+CV's table of postdocs, reads `earlier_roles` as well as `role`
+([`SPEC.md` §5](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#5-input-versus-derived)
+has an example).
+
 `bio` is a short biography in plain text, not Markdown or HTML: it is
 emitted as written and a renderer escapes it. Line breaks are kept as YAML
 reads them, so a block scalar (`|`) keeps each line, and a renderer may treat
@@ -282,26 +330,27 @@ deciding which URLs are safe to render is the renderer's job.
 ### Checking inputs in an editor
 
 Each input file has a JSON Schema in
-[`schema/input/v2/`](https://github.com/siddhss5/sslabdata/tree/main/schema/input/v2):
+[`schema/input/v3/`](https://github.com/siddhss5/sslabdata/tree/main/schema/input/v3):
 `lab.schema.json`, `people.schema.json`, `projects.schema.json` and
 `collaborators.schema.json`. The wheel installs them under
-`sslabdata/schema/input/v2/`. An editor can use them to check and complete
+`sslabdata/schema/input/v3/`. An editor can use them to check and complete
 the files as you write; `--validate` stays the check, and also reports what
 a schema cannot see, such as a repeated id or a missing file. With the YAML
 language server (the VS Code YAML extension, among others), name the schema
 in a comment at the top of the file:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/people.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v3/schema/input/v3/people.schema.json
 - id: "aadams"
   name: "Alice Adams"
   role: "professor"
 ```
 
-The URL is the schema's `$id`, served from the `input-schema-v2` tag, which is
+The URL is the schema's `$id`, served from the `input-schema-v3` tag, which is
 never moved ([`SPEC.md` §6](https://github.com/siddhss5/sslabdata/blob/main/SPEC.md#6-version-policy)).
-A file that names v1 still validates, because v1 allows keys it does not
-list, but only v2 checks and completes `bio`.
+A file that names v1 or v2 still validates, because each allows keys it does
+not list, but only v3 checks and completes `earlier_roles`, and only v2 and v3
+check `bio`.
 Use `lab.schema.json`, `projects.schema.json` or `collaborators.schema.json`
 in the same way for the other files.
 
@@ -355,7 +404,7 @@ pip install jsonschema
 python -c "
 import json, yaml, jsonschema
 from importlib.resources import files
-schema = json.loads(files('sslabdata.schema').joinpath('v6/output.schema.json').read_text())
+schema = json.loads(files('sslabdata.schema').joinpath('v8/output.schema.json').read_text())
 jsonschema.Draft202012Validator(schema).validate(yaml.safe_load(open('lab.yml')))
 print('valid')
 "

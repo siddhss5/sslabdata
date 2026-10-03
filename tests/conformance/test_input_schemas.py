@@ -62,6 +62,8 @@ NOT_SHAPE = {
     "PEOPLE-ID-DUPLICATE": "compares records with each other",
     "PROJECTS-ID-DUPLICATE": "compares records with each other",
     "PEOPLE-ALIAS-AMBIGUOUS": "compares records with each other",
+    "PEOPLE-ROLE-YEARS-INVALID": "compares years with each other, and an "
+                                 "earlier role's with the person's own",
     "PEOPLE-YAML-INVALID": "the file is not YAML, so there is no data to "
                            "validate",
     "PROJECTS-YAML-INVALID": "as PEOPLE-YAML-INVALID",
@@ -89,14 +91,16 @@ def load_schema(text):
 
 
 # The current input schemas, as the wheel installs them.
-VALIDATORS = {name: load_schema((files("sslabdata.schema") / "input" / "v2"
+VALIDATORS = {name: load_schema((files("sslabdata.schema") / "input" / "v3"
                                  / f"{name}.schema.json").read_text(encoding="utf-8"))
               for name in SCHEMAS}
-# v1 is published and frozen, and not in the wheel. A file that names its tag
-# URL in an editor must keep validating after an upgrade.
-PREVIOUS = {name: load_schema((REPO_ROOT / "schema" / "input" / "v1"
-                               / f"{name}.schema.json").read_text(encoding="utf-8"))
-            for name in SCHEMAS}
+# v1 and v2 are published and frozen, and not in the wheel. A file that names
+# either tag URL in an editor must keep validating after an upgrade.
+PREVIOUS = {version: {name: load_schema(
+                (REPO_ROOT / "schema" / "input" / version
+                 / f"{name}.schema.json").read_text(encoding="utf-8"))
+                for name in SCHEMAS}
+            for version in ("v1", "v2")}
 
 
 class EditorLoader(yaml.SafeLoader):
@@ -147,10 +151,11 @@ VALID_INPUTS = [
                      for p, s in VALID_INPUTS])
 def test_valid_inputs_validate(path, schema):
     """input.schema_valid: every input file of the valid corpus, the demo and
-    the examples validates against its schema, and against v1's."""
+    the examples validates against its schema, and against v1's and v2's."""
     assert schema in SCHEMAS
     assert errors(schema, path) == []
-    assert errors(schema, path, PREVIOUS) == []
+    for previous in PREVIOUS.values():
+        assert errors(schema, path, previous) == []
 
 
 # --- The invalid corpus ----------------------------------------------------------
@@ -179,7 +184,8 @@ def places(schema, data):
 
     In lab.yaml the key is the top-level key. In a data file it names the
     record: by its first required field, or by its id or nothing when that
-    field is what is wrong. A missing or extra property is placed at the
+    field is what is wrong, and the field is the path inside the record, as
+    `earlier_roles[1].end_year`. A missing or extra property is placed at the
     property.
     """
     found = []
@@ -203,9 +209,26 @@ def places(schema, data):
             if isinstance(record, dict):
                 keys |= {record.get("id"),
                          record.get("name" if schema == "collaborators" else "id")}
-            named = [s for s in steps[1:] if isinstance(s, str)]
-            found.append((keys, named[0] if named else None))
+            found.append((keys, dotted(steps[1:]) or None))
     return found
+
+
+def dotted(steps):
+    """A path inside a record as diagnostics name it: keys joined by `.`, a
+    list member's index in brackets (SPEC.md, Diagnostic codes)."""
+    text = ""
+    for step in steps:
+        text += (f"[{step}]" if isinstance(step, int)
+                 else f".{step}" if text else str(step))
+    return text
+
+
+def within(field, place):
+    """Whether a diagnostic located at ``field`` names the schema's
+    ``place``: the same path, or one the place is inside (`aliases` for an
+    error at `aliases[1]`)."""
+    return (field is None or place == field
+            or (place or "").startswith((f"{field}[", f"{field}.")))
 
 
 @pytest.mark.parametrize("case_id, fixture", INVALID_CASES)
@@ -226,7 +249,7 @@ def test_invalid_corpus_agrees_with_the_loaders(case_id, fixture):
         found = places(schema, data)
         for d in at_file:
             if d["code"] in SHAPE and not any(
-                    d.get("key") in keys and d.get("field") in (None, field)
+                    d.get("key") in keys and within(d.get("field"), field)
                     for keys, field in found):
                 problems.append(f"{name}: the loaders report {d['code']} at "
                                 f"{d.get('key')}:{d.get('field')}, and the "

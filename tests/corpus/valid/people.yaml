@@ -182,3 +182,28 @@
   aliases: ["J.-P. Wren"]
   role: "phd_student"
   status: "current"
+
+# A whole path through the lab: undergraduate, PhD student, postdoc, and now
+# faculty. The top-level fields are the current role; each earlier role
+# carries the role-scoped fields it has, and a degree and a thesis finished
+# in it. A role that ends the year the next one starts is in order.
+# CASE output.person.earlier_roles
+# CASE people.earlier_roles_chain
+- id: "nquist"
+  name: "Nadia Quist"
+  role: "faculty"
+  status: "current"
+  start_year: 2021
+  earlier_roles:
+    - role: "undergrad"
+      start_year: 2009
+      end_year: 2012
+      degree: "BS"
+      thesis_title: "A Fictional Gripper Made of Folded Paper"
+    - role: "phd_student"
+      start_year: 2012
+      end_year: 2018
+      degree: "PhD"
+      thesis_title: "Fictional Methods for Grasping in Clutter"
+      co_advisor: "Peggy Park"
+    - {role: "postdoc", start_year: 2018, end_year: 2021}

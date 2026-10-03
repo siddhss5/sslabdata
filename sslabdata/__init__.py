@@ -12,8 +12,8 @@ MIT License - see LICENSE file for details.
 
 from .config import ConfigurationError, LabDataConfig, BibFile
 from .models import (
-    LabData, Work, Award, Author, Contributor, Venue, Link, Person, Project,
-    Collaborator,
+    LabData, Work, Award, Author, Contributor, Venue, Link, Person,
+    EarlierRole, Project, Collaborator,
 )
 from .assembler import assemble, AssemblyError, AssemblyResult
 from .exporters import export_to_yaml, export_to_json
@@ -30,6 +30,7 @@ __all__ = [
     "Venue",
     "Link",
     "Person",
+    "EarlierRole",
     "Project",
     "Collaborator",
     "assemble",

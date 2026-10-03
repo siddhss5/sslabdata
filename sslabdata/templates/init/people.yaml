@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/people.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v3/schema/input/v3/people.schema.json
 #
 # Lab members. A BibTeX author whose name matches a person's name or one of
 # their aliases is linked to that person. This person is fictional.
@@ -12,3 +12,5 @@
   email: "aadams@example.org"
   start_year: 2020
   bio: "Alice Adams leads a fictional robotics lab."  # plain text, not Markdown
+  # Roles held in the lab before this one, oldest first, for example:
+  # earlier_roles: [{role: "postdoc", start_year: 2018, end_year: 2020}]

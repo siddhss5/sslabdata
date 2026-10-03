@@ -6,3 +6,5 @@
   role: "professor"
   status: "current"
   bio: "Alice\x02 Adams tidies.\nShe\x1f has a\ttab."
+  earlier_roles:
+    - {role: "post\x01doc", thesis_title: "Tidy\x02 Kitchens"}

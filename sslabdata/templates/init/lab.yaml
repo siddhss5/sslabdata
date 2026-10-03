@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v2/schema/input/v2/lab.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/siddhss5/sslabdata/input-schema-v3/schema/input/v3/lab.schema.json
 #
 # The configuration sslabdata runs with. The lab, its people and its work are
 # fictional: replace them with your own. Paths are relative to the directory

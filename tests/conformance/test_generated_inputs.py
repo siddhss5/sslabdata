@@ -8,7 +8,7 @@ and checks what must hold for every input:
 
 1. no run raises an uncaught exception;
 2. a run that exits 0 writes a document that validates against
-   `schema/v7/output.schema.json`, and the YAML and JSON documents hold the
+   `schema/v8/output.schema.json`, and the YAML and JSON documents hold the
    same data;
 3. a run that exits 1 reports at least one coded diagnostic;
 4. `--validate` exits 0 only where `--output` in the same format writes;
@@ -23,6 +23,11 @@ and checks what must hold for every input:
    reported, a person's `bio` keeps every word and line break it was written
    with, in NFC and with no control character, its control characters are
    reported, a `bio` that is not a string is reported and emitted as null,
+   a person's `earlier_roles` are emitted in the order written with every
+   word of their text, except an entry that is not a record or has no
+   string `role`, which is reported, a year or text of the wrong type is
+   reported and emitted as null, and years that cannot be one history are
+   reported exactly when they occur,
    an empty file path, a repeated YAML key or a path that is a
    directory is reported, and LaTeX conversion does not invent markup (`<`,
    `>`, `[`, `]`).
@@ -336,9 +341,10 @@ class Generator:
         self.used = set()
         self.names = []    # plain author names, for people and collaborators
         # Awards are drawn from their own stream (`award_field`), and so
-        # are bios (`bio`).
+        # are bios (`bio`) and earlier roles (`earlier_roles`).
         self.ra = random.Random(f"{SEED}:{index}:award")
         self.rb = random.Random(f"{SEED}:{index}:bio")
+        self.rr = random.Random(f"{SEED}:{index}:earlier_roles")
 
     def word(self, capital=False) -> str:
         while True:
@@ -614,6 +620,55 @@ class Generator:
         bio = self.bio()
         if bio is not None:
             pairs.append(Pair("bio", bio))
+        roles = self.earlier_roles()
+        if roles is not None:
+            pairs.append(Pair("earlier_roles", roles))
+        self.repeat_a_key(pairs)
+        return Mapping(pairs)
+
+    def earlier_roles(self):
+        """A person's `earlier_roles`, or None for none, drawn from a stream
+        of its own as `bio` is. Years are drawn close together, so that some
+        lists are in order and some are not."""
+        r, self.r = self.r, self.rr
+        try:
+            rr = self.r
+            if rr.random() < 0.6:
+                return None
+            if self.odd(0.2):
+                return rr.choice([Raw("5"), "postdoc", Raw("null"),
+                                  Mapping([Pair("role", "postdoc")])])
+            return Seq([self.earlier_role() for _ in range(rr.randint(0, 3))])
+        finally:
+            self.r = r
+
+    def earlier_role(self):
+        rr = self.r
+        if self.odd(0.1):
+            return rr.choice(["intern", Raw("5"), Raw("null"), Seq(["a"])])
+        pairs = []
+        if not self.odd(0.15):
+            pairs.append(Pair("role", self.pick(
+                [(8, "role " + self.word()), (1, ""), (1, "  "), (1, Raw("5")),
+                 (1, Raw("null"))], config=True)))
+        for key in ("start_year", "end_year"):
+            if rr.random() < 0.6:
+                pairs.append(Pair(key, Raw(self.pick(
+                    [(8, str(rr.randint(2016, 2024))), (1, "'2020'"),
+                     (1, "true"), (1, "2020.5")], config=True))))
+        for key in ("degree", "thesis_title", "co_advisor"):
+            if rr.random() < 0.3:
+                pieces = [rr.choice(SNIPPETS[g]) for g in rr.choices(
+                    BIO_GROUPS, k=rr.randint(0, 2))]
+                if rr.random() < 0.1:
+                    pieces.insert(rr.randint(0, len(pieces)), rr.choice(CONTROLS))
+                pairs.append(Pair(key, self.pick(
+                    [(8, " ".join(pieces + [self.word()])), (1, Raw("5"))],
+                    config=True)))
+        if self.odd(0.2):
+            pairs.append(Pair(rr.choice(["status", "current_position", "advisr"]),
+                              "x"))
+        rr.shuffle(pairs)
         self.repeat_a_key(pairs)
         return Mapping(pairs)
 
@@ -879,6 +934,7 @@ def check(case: Case, seen: dict, where: Path) -> list:
                      f"{path}: {key}")
 
     _check_bios(case, config, doc, records, fail)
+    _check_earlier_roles(case, config, doc, records, fail)
 
     counts = {}
     for entries in case.bibs.values():
@@ -961,6 +1017,131 @@ def _check_bios(case: Case, config: dict, doc: dict, records, fail) -> None:
                     fail("6 bio control character is not reported", f"{pid}: {bio!r}")
             elif unicodedata.is_normalized("NFC", bio) and got != bio:
                 fail("5 bio is not emitted as written", f"{pid}: {bio!r} -> {got!r}")
+
+
+def _year(value):
+    """A year as the loader must read it: a YAML integer, not a boolean;
+    None for anything else."""
+    if isinstance(value, Raw):
+        value = yaml.safe_load(value.text)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _out_of_order(starts_and_ends, current_start) -> bool:
+    """Whether years can be one history (SPEC.md §5, A person's roles): no
+    role ends before it starts, the starts of the earlier roles and then the
+    current role never decrease, and no earlier role ends after the current
+    role starts."""
+    if any(s is not None and e is not None and e < s for s, e in starts_and_ends):
+        return True
+    starts = [s for s, _ in starts_and_ends if s is not None]
+    starts += [current_start] if current_start is not None else []
+    if any(b < a for a, b in zip(starts, starts[1:])):
+        return True
+    return current_start is not None and any(
+        e is not None and e > current_start for _, e in starts_and_ends)
+
+
+def _check_earlier_roles(case: Case, config: dict, doc: dict, records,
+                         fail) -> None:
+    """Each emitted person's `earlier_roles` against the list its record
+    wrote: an entry with a string role is emitted, in order, keeping every
+    word of its text, in NFC with no control character; anything that cannot
+    be emitted or is read as null is reported at the entry; and a history
+    that is out of order is reported, and one in order is not."""
+    people = case.data.get("people.yaml")
+    if config.get("people_file") != "people.yaml" or not isinstance(people, list):
+        return
+    written = [{yaml_text(p.key): p.value for p in r.pairs} for r in people
+               if isinstance(r, Mapping)
+               and len({yaml_text(p.key) for p in r.pairs}) == len(r.pairs)]
+    ids = [w.get('"id"') for w in written]
+    emitted = {}
+    for person in doc.get("people", []):
+        emitted.setdefault(person.get("id"), []).append(person)
+    for w in written:
+        pid = w.get('"id"')
+        if (not isinstance(pid, str) or ids.count(pid) != 1
+                or len(emitted.get(pid, [])) != 1):
+            continue
+        got = emitted[pid][0].get("earlier_roles")
+        at = [r for r in records if r.get("key") == pid
+              and (r.get("field") or "").startswith("earlier_roles")]
+
+        def reported(code, field, at=at):
+            return any(r.get("code") == code and r.get("field") == field
+                       for r in at)
+
+        roles = w.get('"earlier_roles"')
+        if roles is None or roles == Raw("null"):
+            if got != []:
+                fail("6 absent earlier_roles is not []", f"{pid}: {got!r}")
+            continue
+        if not isinstance(roles, Seq):
+            if got != []:
+                fail("6 earlier_roles that is not a list is emitted", f"{pid}: {got!r}")
+            if not reported("RECORD-TYPE-INVALID", "earlier_roles"):
+                fail("6 earlier_roles that is not a list is not reported", pid)
+            continue
+        kept = []
+        for index, item in enumerate(roles.items):
+            entry = ({yaml_text(p.key).strip('"'): p.value for p in item.pairs}
+                     if isinstance(item, Mapping) else None)
+            if entry is None or not isinstance(entry.get("role"), str):
+                if not any(r.get("code") == "RECORD-TYPE-INVALID"
+                           and (r.get("field") or "").startswith(f"earlier_roles[{index}]")
+                           for r in at):
+                    fail("6 earlier role that cannot be emitted is not reported",
+                         f"{pid}: {yaml_text(item)}")
+                continue
+            kept.append((index, entry))
+        if not isinstance(got, list) or len(got) != len(kept):
+            fail("5 earlier roles lost or invented",
+                 f"{pid}: wrote {yaml_text(roles)}, got {got!r}")
+            continue
+        for (index, entry), role in zip(kept, got):
+            where = f"earlier_roles[{index}]"
+            for name in ("role", "degree", "thesis_title", "co_advisor"):
+                value, out = entry.get(name), role.get(name)
+                if isinstance(value, str):
+                    lost = [word for word in re.findall(r"[Zz]q[a-z]+", value)
+                            if word not in (out or "")]
+                    if not isinstance(out, str) or lost:
+                        fail(f"5 earlier role {name} text lost",
+                             f"{pid}: {value!r} -> {out!r}")
+                    elif not unicodedata.is_normalized("NFC", out):
+                        fail(f"5 earlier role {name} is not NFC", f"{pid}: {out!r}")
+                    elif _CONTROL_IN_TEXT.search(out):
+                        fail(f"5 earlier role {name} keeps a control character",
+                             f"{pid}: {out!r}")
+                    if (_CONTROL_IN_TEXT.search(value) and not reported(
+                            "TEXT-CONTROL-CHARACTER", f"{where}.{name}")):
+                        fail("6 earlier role control character is not reported",
+                             f"{pid}: {value!r}")
+                elif value is not None and value != Raw("null"):
+                    if out is not None:
+                        fail(f"6 earlier role {name} of the wrong type is emitted",
+                             f"{pid}: {out!r}")
+                    if not reported("RECORD-TYPE-INVALID", f"{where}.{name}"):
+                        fail(f"6 earlier role {name} of the wrong type is not reported",
+                             f"{pid}: {yaml_text(value)}")
+            for name in ("start_year", "end_year"):
+                value, year = entry.get(name), _year(entry.get(name))
+                if role.get(name) != year:
+                    fail(f"6 earlier role {name} read as something else",
+                         f"{pid}: {yaml_text(value)} -> {role.get(name)!r}")
+                if (year is None and value is not None and value != Raw("null")
+                        and not reported("RECORD-TYPE-INVALID", f"{where}.{name}")):
+                    fail(f"6 earlier role {name} of the wrong type is not reported",
+                         f"{pid}: {yaml_text(value)}")
+        years = [(r.get("start_year"), r.get("end_year")) for r in got]
+        current = _year(w.get('"start_year"'))
+        wrong = _out_of_order(years, current)
+        flagged = any(r.get("code") == "PEOPLE-ROLE-YEARS-INVALID" for r in at)
+        if wrong != flagged:
+            fail("6 earlier role years " + ("out of order are not reported" if wrong
+                                            else "in order are reported"),
+                 f"{pid}: current role starts {current}, earlier roles {years}")
 
 
 def _check_work(e: Entry, w: dict, excused, fail) -> None:
