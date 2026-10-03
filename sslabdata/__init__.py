@@ -39,4 +39,4 @@ __all__ = [
     "export_to_yaml",
     "export_to_json",
 ]
-__version__ = "6.0.0rc1"
+__version__ = "6.0.0"
